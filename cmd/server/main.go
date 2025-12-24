@@ -1,17 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"html/template"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 	"zhulink/internal/db"
-	"zhulink/internal/handlers"
 	"zhulink/internal/middleware"
+	"zhulink/internal/router"
 	"zhulink/internal/services"
 
 	"github.com/gin-contrib/multitemplate"
@@ -25,6 +29,13 @@ func main() {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, finding env vars from system")
+	}
+
+	// 显式设置模式
+	if mode := os.Getenv("GIN_MODE"); mode != "" {
+		gin.SetMode(mode)
+	} else if os.Getenv("PORT") != "" {
+		gin.SetMode(gin.ReleaseMode)
 	}
 
 	// Initialize Database
@@ -53,93 +64,46 @@ func main() {
 	// Middleware
 	r.Use(middleware.LoadUser())
 
-	// Handlers
-	authHandler := handlers.NewAuthHandler()
-	storyHandler := handlers.NewStoryHandler()
-	voteHandler := handlers.NewVoteHandler()
-	userHandler := handlers.NewUserHandler()
-	nodeHandler := handlers.NewNodeHandler()
-	bookmarkHandler := handlers.NewBookmarkHandler()
-	notificationHandler := handlers.NewNotificationHandler()
-	rssHandler := handlers.NewRSSHandler()
-	transplantHandler := handlers.NewTransplantHandler()
-
-	// Public Routes
-	r.GET("/", storyHandler.ListTop)
-	r.GET("/new", storyHandler.ListNew)
-	r.GET("/search", storyHandler.Search)
-	r.GET("/p/:pid", storyHandler.Detail)
-	r.GET("/t/:name", storyHandler.ListByNode)
-	r.GET("/nodes", nodeHandler.ListNodes)
-	r.GET("/u/:id", userHandler.Profile) // 用户主页
-
-	r.GET("/signup", authHandler.ShowRegister)
-	r.POST("/signup", authHandler.Register)
-	r.GET("/login", authHandler.ShowLogin)
-	r.POST("/login", authHandler.Login)
-	r.GET("/logout", authHandler.Logout)
-
-	// Protected Routes
-	authorized := r.Group("/")
-	authorized.Use(middleware.AuthRequired())
-	{
-		authorized.GET("/submit", storyHandler.ShowCreate)
-		authorized.POST("/submit", storyHandler.Create)
-		authorized.POST("/p/:pid/comment", storyHandler.CreateComment)
-		authorized.POST("/vote/:type/:id", voteHandler.Vote)
-		authorized.POST("/vote/:type/:id/down", voteHandler.Downvote)
-		authorized.POST("/bookmark/:id", bookmarkHandler.Toggle)
-		authorized.GET("/p/:pid/edit", storyHandler.ShowEdit)
-		authorized.POST("/p/:pid/edit", storyHandler.Update)
-
-		authorized.DELETE("/p/:pid", storyHandler.Delete)
-		authorized.DELETE("/comment/:cid", storyHandler.DeleteComment)
-
-		authorized.POST("/notifications/:id/read", notificationHandler.Read)
-		authorized.DELETE("/notifications/:id", notificationHandler.Delete)
-		authorized.POST("/notifications/read-all", notificationHandler.ReadAll)
-	}
-
-	// Dashboard Routes
-	dashboard := r.Group("/dashboard")
-	dashboard.Use(middleware.AuthRequired())
-	{
-		dashboard.GET("", userHandler.Dashboard)
-		dashboard.GET("/notifications", notificationHandler.List)
-		dashboard.GET("/points", userHandler.PointLogs)
-		dashboard.GET("/settings", userHandler.ShowSettings)
-		dashboard.POST("/settings", userHandler.UpdateSettings)
-		dashboard.POST("/checkin", userHandler.CheckIn)
-	}
-
-	// RSS 阅读器路由（苗圃）
-	rss := r.Group("/rss")
-	rss.Use(middleware.AuthRequired())
-	{
-		rss.GET("", rssHandler.Index)
-		rss.GET("/feeds", rssHandler.GetFeeds)
-		rss.GET("/items", rssHandler.GetItems)
-		rss.GET("/read/:id", rssHandler.ReadItem)
-		rss.POST("/subscribe", rssHandler.Subscribe)
-		rss.DELETE("/unsubscribe/:id", rssHandler.Unsubscribe)
-
-		rss.POST("/subscription/update", rssHandler.UpdateSubscription)
-		rss.POST("/refresh/:id", rssHandler.RefreshFeed)
-		rss.POST("/anchor/:id", rssHandler.UpdateAnchor)
-
-		// 推荐到社区 (Transplant)
-		rss.GET("/transplant/:id", transplantHandler.ShowTransplantModal)
-		rss.POST("/transplant/:id", transplantHandler.Transplant)
-	}
+	// Register Routes
+	router.RegisterRoutes(r)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	log.Printf("ZhuLink server starting on :%s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatal(err)
+
+	// 配置 http.Server
+	srv := &http.Server{
+		Addr:           ":" + port,
+		Handler:        r,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   20 * time.Second,
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 20,
 	}
+
+	// 在 goroutine 中启动服务器
+	go func() {
+		log.Printf("ZhuLink server starting on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	// 实现平滑停机
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down server...")
+
+	// 给予 5 秒的缓冲时间来处理现有请求
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
+	}
+
+	log.Println("Server exiting")
 }
 
 func loadTemplates(templatesDir string) multitemplate.Renderer {
@@ -159,9 +123,6 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	if err != nil {
 		panic(err)
 	}
-
-	// Generate our templates map from our views directories
-	// We want to map: "story/list.html" -> [base, list, components...]
 
 	// Helper to assemble files
 	assemble := func(view string) []string {
@@ -193,7 +154,6 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 			return a + b
 		},
 		"timeAgo": func(t interface{}) string {
-			// 尝试将输入转换为 time.Time
 			var timeVal time.Time
 			switch v := t.(type) {
 			case time.Time:
@@ -228,7 +188,6 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 			return template.HTML(s)
 		},
 		"stripHTML": func(s string) string {
-			// 简单的 HTML 标签移除
 			var result []rune
 			inTag := false
 			for _, r := range s {
@@ -240,9 +199,7 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 					result = append(result, r)
 				}
 			}
-			// 移除多余的空白
 			text := string(result)
-			// 替换 &nbsp; 等 HTML 实体
 			text = strings.ReplaceAll(text, "&nbsp;", " ")
 			text = strings.ReplaceAll(text, "&amp;", "&")
 			text = strings.ReplaceAll(text, "&lt;", "<")
@@ -256,42 +213,21 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 		},
 	}
 
-	// Scan views
-	// auth/login.html, auth/register.html
-	// story/list.html, story/detail.html, story/create.html
-	// error.html
-
 	// Manual registration to ensure keys match handler expectation
-	// Auth
 	r.AddFromFilesFuncs("auth/login.html", funcMap, assemble(templatesDir+"/views/auth/login.html")...)
 	r.AddFromFilesFuncs("auth/register.html", funcMap, assemble(templatesDir+"/views/auth/register.html")...)
-
-	// Story
-	// list.html handles both "/" and "/new", handler calls "story/list.html"
 	r.AddFromFilesFuncs("story/list.html", funcMap, assemble(templatesDir+"/views/story/list.html")...)
 	r.AddFromFilesFuncs("story/detail.html", funcMap, assemble(templatesDir+"/views/story/detail.html")...)
 	r.AddFromFilesFuncs("story/create.html", funcMap, assemble(templatesDir+"/views/story/create.html")...)
 	r.AddFromFilesFuncs("story/edit.html", funcMap, assemble(templatesDir+"/views/story/edit.html")...)
-
-	// User
 	r.AddFromFilesFuncs("user/public.html", funcMap, assemble(templatesDir+"/views/user/public.html")...)
-
-	// Dashboard
 	r.AddFromFilesFuncs("dashboard/overview.html", funcMap, assemble(templatesDir+"/views/dashboard/overview.html")...)
 	r.AddFromFilesFuncs("notification/list.html", funcMap, assemble(templatesDir+"/views/notification/list.html")...)
 	r.AddFromFilesFuncs("dashboard/points.html", funcMap, assemble(templatesDir+"/views/dashboard/points.html")...)
 	r.AddFromFilesFuncs("dashboard/settings.html", funcMap, assemble(templatesDir+"/views/dashboard/settings.html")...)
-
-	// Node
 	r.AddFromFilesFuncs("node/list.html", funcMap, assemble(templatesDir+"/views/node/list.html")...)
-
-	// Search
 	r.AddFromFilesFuncs("search.html", funcMap, assemble(templatesDir+"/views/search.html")...)
-
-	// Error
 	r.AddFromFilesFuncs("error.html", funcMap, assemble(templatesDir+"/views/error.html")...)
-
-	// RSS 阅读器（苗圃）
 	r.AddFromFilesFuncs("rss/index.html", funcMap, assemble(templatesDir+"/views/rss/index.html")...)
 	r.AddFromFilesFuncs("rss/feed_list.html", funcMap, templatesDir+"/views/rss/feed_list.html")
 	r.AddFromFilesFuncs("rss/item_list.html", funcMap, templatesDir+"/views/rss/item_list.html")
