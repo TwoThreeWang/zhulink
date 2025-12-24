@@ -15,8 +15,9 @@ type Post struct {
 	URL        string    `json:"url"` // Optional
 	Content    string    `gorm:"type:text" json:"content"`
 	Score      int       `gorm:"default:0" json:"score"`
-	Views      int       `gorm:"default:0" json:"views"` // 浏览/点击量
-	SourceType string    `json:"source_type"`            // e.g., "rss"
+	Views      int       `gorm:"default:0" json:"views"`      // 浏览/点击量
+	SourceType string    `json:"source_type"`                 // e.g., "rss"
+	IsTop      bool      `gorm:"default:false" json:"is_top"` // 是否置顶
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 

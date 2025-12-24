@@ -91,7 +91,7 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 	// Since we haven't added a dedicated Rank column, we'll do dynamic calculation.
 	// Hard delete means we don't worry about deleted_at.
 	db.DB.Preload("User").Preload("Node").
-		Order("score / power((EXTRACT(EPOCH FROM NOW() - created_at)/3600) + 2, 1.8) DESC").
+		Order("is_top DESC, score / power((EXTRACT(EPOCH FROM NOW() - created_at)/3600) + 2, 1.8) DESC").
 		Limit(50).
 		Find(&posts)
 
@@ -183,6 +183,22 @@ func (h *StoryHandler) ShowCreate(c *gin.Context) {
 
 func (h *StoryHandler) Create(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
+
+	// 检查用户状态
+	if user.Status == 2 {
+		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您的账号已被封禁，无法发布内容。"})
+		return
+	}
+	if user.Status == 1 {
+		if user.PunishExpires != nil && time.Now().After(*user.PunishExpires) {
+			// 惩罚已过期，恢复状态（实际应该在 middleware 或单独逻辑中处理，这里简单处理）
+			db.DB.Model(user).Update("status", 0)
+		} else {
+			Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态，暂时无法发布内容。"})
+			return
+		}
+	}
+
 	title := c.PostForm("title")
 	url := c.PostForm("url")
 	content := c.PostForm("content")
@@ -298,6 +314,10 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		}
 	}
 
+	// 查询所有节点供管理员移动帖子使用
+	var nodes []models.Node
+	db.DB.Order("id ASC").Find(&nodes)
+
 	Render(c, http.StatusOK, "story/detail.html", gin.H{
 		"Post":          post,
 		"PostContent":   postContentHTML,
@@ -307,6 +327,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"UpvoteCount":   upvoteCount,
 		"DownvoteCount": downvoteCount,
 		"IsBookmarked":  isBookmarked,
+		"Nodes":         nodes,
 	})
 }
 
@@ -371,46 +392,33 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 
 	// Create Notifications
 	go func() {
-		// 1. Notify Post Author
-		if post.UserID != user.ID {
-			notification := models.Notification{
-				UserID:    post.UserID,
-				ActorID:   user.ID,
-				Type:      models.NotificationTypeCommentPost,
-				PostID:    post.ID,
-				CommentID: &comment.ID,
-			}
-			db.DB.Create(&notification)
-		}
-
-		// 2. Notify Parent Comment Author (if reply)
+		// 如果是回复评论，只通知被回复者
 		if comment.ParentID != nil {
 			var parentComment models.Comment
 			if err := db.DB.First(&parentComment, *comment.ParentID).Error; err == nil {
-				// Don't notify if replying to self, OR if parent author is post author (already notified above? No, distinct events)
-				// Actually, if I reply to my own post, I don't get notified.
-				// If I reply to someone else's comment on my post:
-				// - Post Author (Me) gets "Comment on Post" (maybe redundant? default HN: yes)
-				// - Parent Comment Author (Them) gets "Reply to Comment"
-
-				// Let's refine:
-				// If parent author != user (not replying to self)
-				// AND parent author != post author (avoid double notification if they are same person? Or distinction is good?)
-				// Distinction: "Replied to your comment" is more specific than "Commented on your post".
-				// So if parent author == post author, we might skip the general "Commented on post" notification?
-				// Or better: just send both or prioritize reply.
-				// Let's send NotificationTypeReplyComment to parent author.
-
+				// 不要通知自己
 				if parentComment.UserID != user.ID {
 					notification := models.Notification{
-						UserID:    parentComment.UserID,
-						ActorID:   user.ID,
-						Type:      models.NotificationTypeReplyComment,
-						PostID:    post.ID,
-						CommentID: &comment.ID,
+						UserID:  parentComment.UserID,
+						ActorID: &user.ID,
+						Type:    models.NotificationTypeReplyComment,
+						Reason: fmt.Sprintf("在文章 <a href=\"/p/%s#comment-%d\" target=\"_blank\" class=\"text-moss font-medium hover:underline tracking-tight\">《%s》</a> 中回复了您的评论",
+							post.Pid, comment.ID, post.Title),
 					}
 					db.DB.Create(&notification)
 				}
+			}
+		} else {
+			// 如果是直接评论文章，通知文章作者
+			if post.UserID != user.ID {
+				notification := models.Notification{
+					UserID:  post.UserID,
+					ActorID: &user.ID,
+					Type:    models.NotificationTypeCommentPost,
+					Reason: fmt.Sprintf("在您的文章 <a href=\"/p/%s#comment-%d\" target=\"_blank\" class=\"text-moss font-medium hover:underline tracking-tight\">《%s》</a> 中发布了新的评论",
+						post.Pid, comment.ID, post.Title),
+				}
+				db.DB.Create(&notification)
 			}
 		}
 	}()

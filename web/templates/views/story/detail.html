@@ -104,7 +104,7 @@
             </div>
             {{ end }}
 
-            {{ if .User }}
+            {{ if .CurrentUser }}
             <!-- Article Action Bar (Unified for Mobile & Desktop) -->
             <div class="flex items-center justify-center gap-4">
                 <!-- 收藏 -->
@@ -154,7 +154,79 @@
                         class="text-xs font-semibold text-stone-500 group-hover:text-stone-600">踩({{ .DownvoteCount
                         }})</span>
                 </button>
+
+                <!-- 举报 -->
+                <button onclick="reportItem('post', {{.Post.ID}})"
+                    class="flex flex-col items-center gap-1 p-2.5 rounded-xl hover:bg-stone-50 transition-colors group min-w-[3.5rem]"
+                    title="举报">
+                    <div
+                        class="p-1.5 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
+                        <i data-lucide="flag"
+                            class="w-5 h-5 text-stone-400 group-hover:text-red-500 transition-colors"></i>
+                    </div>
+                    <span class="text-xs font-semibold text-stone-500 group-hover:text-red-600">举报</span>
+                </button>
             </div>
+
+            <!-- Admin Actions -->
+            {{ if and .CurrentUser (eq .CurrentUser.Role "admin") }}
+            <div
+                class="mt-8 p-4 bg-stone-50/50 rounded-xl border border-dashed border-stone-200 flex flex-wrap items-center justify-center gap-4">
+                <span class="text-xs font-bold text-stone-400 uppercase tracking-widest mr-2">管理操作</span>
+
+                <button hx-post="/admin/post/{{.Post.Pid}}/top" hx-swap="innerHTML"
+                    class="px-4 py-1.5 bg-white border border-stone-200 rounded-lg text-sm font-medium text-stone-600 hover:border-moss hover:text-moss transition-all shadow-sm">
+                    {{ if .Post.IsTop }}取消置顶{{ else }}置顶{{ end }}
+                </button>
+
+                <div class="flex items-center">
+                    <select onchange="moveNode('{{.Post.Pid}}', this.value)"
+                        class="px-3 py-1.5 bg-white border border-stone-200 rounded-lg text-sm text-stone-600 focus:ring-1 focus:ring-moss focus:border-moss outline-none shadow-sm transition-all cursor-pointer">
+                        <option value="">移动至新节点</option>
+                        {{ range .Nodes }}
+                        <option value="{{.ID}}" {{ if eq .ID $.Post.NodeID }}disabled{{ end }}>{{.Name}}</option>
+                        {{ end }}
+                    </select>
+                </div>
+
+                <button hx-delete="/admin/post/{{.Post.Pid}}" hx-confirm="管理员确定要删除这棵竹子吗？"
+                    class="px-4 py-1.5 bg-white border border-red-100 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                    彻底删除
+                </button>
+            </div>
+
+            <script>
+                function moveNode(pid, nodeID) {
+                    if (!nodeID) return;
+                    if (confirm('确定要移动节点吗？')) {
+                        const formData = new FormData();
+                        formData.append('node_id', nodeID);
+                        fetch('/admin/post/' + pid + '/move', {
+                            method: 'POST',
+                            body: formData,
+                            headers: { 'HX-Request': 'true' }
+                        }).then(r => { if (r.ok) location.reload(); });
+                    }
+                }
+            </script>
+            {{ end }}
+
+            <script>
+                function reportItem(type, id) {
+                    const reason = prompt('请输入举报原因：');
+                    if (reason) {
+                        const formData = new FormData();
+                        formData.append('reason', reason);
+                        fetch('/report/' + type + '/' + id, {
+                            method: 'POST',
+                            body: formData,
+                            headers: { 'HX-Request': 'true' }
+                        }).then(r => {
+                            if (r.ok) alert('举报已提交，感谢您的维护！');
+                        });
+                    }
+                }
+            </script>
             {{ end }}
         </article>
 

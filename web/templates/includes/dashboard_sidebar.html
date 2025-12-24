@@ -23,5 +23,16 @@
             <i data-lucide="settings" class="w-4 h-4"></i>
             <span>设置</span>
         </a>
+
+        {{ if and .CurrentUser (eq .CurrentUser.Role "admin") }}
+        <div class="pt-4 mt-4 border-t border-stone-100">
+            <p class="px-3 mb-2 text-[10px] font-bold text-stone-400 uppercase tracking-widest">管理面板</p>
+            <a href="/admin/reports"
+                class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "reports" }}bg-red-50 text-red-600{{ else }}text-stone-500 hover:bg-red-50 hover:text-red-700{{ end }}">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i>
+                <span>举报管理</span>
+            </a>
+        </div>
+        {{ end }}
     </div>
 </nav>

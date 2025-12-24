@@ -18,6 +18,7 @@ func RegisterRoutes(r *gin.Engine) {
 	notificationHandler := handlers.NewNotificationHandler()
 	rssHandler := handlers.NewRSSHandler()
 	transplantHandler := handlers.NewTransplantHandler()
+	adminHandler := handlers.NewAdminHandler()
 
 	// 公共路由 (Public Routes)
 	r.GET("/", storyHandler.ListTop)           // 首页 - 热门文章
@@ -43,6 +44,7 @@ func RegisterRoutes(r *gin.Engine) {
 		authorized.POST("/p/:pid/comment", storyHandler.CreateComment) // 发表评论
 		authorized.POST("/vote/:type/:id", voteHandler.Vote)           // 点赞/投票
 		authorized.POST("/vote/:type/:id/down", voteHandler.Downvote)  // 踩/反对
+		authorized.POST("/report/:type/:id", voteHandler.Report)       // 举报
 		authorized.POST("/bookmark/:id", bookmarkHandler.Toggle)       // 收藏/取消收藏
 		authorized.GET("/p/:pid/edit", storyHandler.ShowEdit)          // 编辑文章页面
 		authorized.POST("/p/:pid/edit", storyHandler.Update)           // 提交文章更新
@@ -82,7 +84,19 @@ func RegisterRoutes(r *gin.Engine) {
 		rss.POST("/refresh/:id", rssHandler.RefreshFeed)                // 手动刷新订阅源
 		rss.POST("/anchor/:id", rssHandler.UpdateAnchor)                // 更新阅读进度
 
-		rss.GET("/transplant/:id", transplantHandler.ShowTransplantModal) // 显示推荐到社区的弹窗
 		rss.POST("/transplant/:id", transplantHandler.Transplant)         // 提交推荐到社区
+		rss.GET("/transplant/:id", transplantHandler.ShowTransplantModal) // 显示推荐到社区的弹窗
+	}
+
+	// 管理员路由 (Admin Routes)
+	admin := r.Group("/admin")
+	admin.Use(middleware.AuthRequired())
+	{
+		admin.POST("/post/:pid/top", adminHandler.ToggleTop)     // 置顶
+		admin.POST("/post/:pid/move", adminHandler.MoveNode)     // 移动节点
+		admin.POST("/user/:id/punish", adminHandler.PunishUser)  // 惩罚用户
+		admin.DELETE("/post/:pid", adminHandler.AdminDeletePost) // 管理员删除文章
+		admin.GET("/reports", adminHandler.ListReports)          // 举报列表
+		admin.DELETE("/reports/:id", adminHandler.HandleReport)  // 处理举报
 	}
 }

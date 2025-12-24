@@ -19,7 +19,7 @@ func (h *NotificationHandler) List(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
 
 	var notifications []models.Notification
-	db.DB.Preload("Actor").Preload("Post").Preload("Comment").
+	db.DB.Preload("Actor").
 		Where("user_id = ?", user.ID).
 		Order("created_at DESC").
 		Limit(50).
@@ -42,13 +42,12 @@ func (h *NotificationHandler) Read(c *gin.Context) {
 		return
 	}
 
-	notification.IsRead = true
-	db.DB.Save(&notification)
+	// 使用 Model().Update() 确保更新生效
+	if err := db.DB.Model(&notification).Update("is_read", true).Error; err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 
-	// HTMX response: Update UI to show read state
-	// For simplicity, we can just return 200 OK.
-	// Or we can return a small snippet if we want to change the style.
-	// Let's just return OK for now, client side can add a class or remove the "unread" indicator.
 	c.Status(http.StatusOK)
 }
 
@@ -75,5 +74,5 @@ func (h *NotificationHandler) ReadAll(c *gin.Context) {
 		Where("user_id = ? AND is_read = ?", user.ID, false).
 		Update("is_read", true)
 
-	c.Redirect(http.StatusFound, "/notifications")
+	c.Redirect(http.StatusFound, "/dashboard/notifications")
 }

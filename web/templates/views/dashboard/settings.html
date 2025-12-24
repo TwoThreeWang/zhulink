@@ -7,7 +7,8 @@
     <div class="flex flex-col md:flex-row gap-8 md:gap-12">
         <!-- 侧边栏 -->
         <aside class="md:w-48 flex-shrink-0">
-            {{ template "dashboard_sidebar.html" dict "Active" "settings" "UnreadCount" .UnreadCount }}
+            {{ template "dashboard_sidebar.html" dict "Active" "settings" "UnreadCount" .UnreadCount "CurrentUser"
+            .CurrentUser }}
         </aside>
 
         <!-- 主内容区 -->

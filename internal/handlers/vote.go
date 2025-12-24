@@ -244,7 +244,6 @@ func (h *VoteHandler) Downvote(c *gin.Context) {
 		services.AddPoints(currentUser.ID, services.PointsDownvoteOther, services.ActionDownvoteOther)
 	}()
 
-	// 返回踩数
 	var downvotes int64
 	if itemType == "post" {
 		db.DB.Model(&models.Vote{}).Where("post_id = ? AND value = -1", uID).Count(&downvotes)
@@ -252,4 +251,50 @@ func (h *VoteHandler) Downvote(c *gin.Context) {
 		db.DB.Model(&models.Vote{}).Where("comment_id = ? AND value = -1", uID).Count(&downvotes)
 	}
 	c.String(http.StatusOK, fmt.Sprintf("%d", downvotes))
+}
+
+// Report 处理举报逻辑
+func (h *VoteHandler) Report(c *gin.Context) {
+	user, exists := c.Get(middleware.CheckUserKey)
+	if !exists {
+		c.Header("HX-Redirect", "/login")
+		c.Status(http.StatusOK)
+		return
+	}
+	currentUser := user.(*models.User)
+
+	itemType := c.Param("type") // "post" or "comment"
+	idStr := c.Param("id")
+	id, _ := strconv.Atoi(idStr)
+	uID := uint(id)
+	reason := c.PostForm("reason")
+
+	// 查询项目的 Pid (如果是帖子直接用，如果是评论查询所属帖子)
+	var itemPid string
+	if itemType == "post" {
+		var post models.Post
+		if err := db.DB.First(&post, uID).Error; err == nil {
+			itemPid = post.Pid
+		}
+	} else {
+		var comment models.Comment
+		if err := db.DB.Preload("Post").First(&comment, uID).Error; err == nil {
+			itemPid = comment.Post.Pid
+		}
+	}
+
+	report := models.Report{
+		UserID:   currentUser.ID,
+		ItemType: itemType,
+		ItemID:   uID,
+		ItemPid:  itemPid,
+		Reason:   reason,
+	}
+
+	if err := db.DB.Create(&report).Error; err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.String(http.StatusOK, "已举报")
 }

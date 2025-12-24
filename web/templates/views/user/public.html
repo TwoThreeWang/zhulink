@@ -46,6 +46,50 @@
                                 class="text-xs font-normal text-stone-400">天</span></div>
                     </div>
                 </div>
+
+                <!-- Admin Actions for User -->
+                {{ if and .CurrentUser (eq .CurrentUser.Role "admin") }}
+                <div class="mt-6 flex flex-wrap items-center gap-3">
+                    <span class="text-xs font-bold text-stone-400 uppercase tracking-widest mr-1">管理用户</span>
+
+                    <button onclick="punishUser({{.User.ID}}, 1)"
+                        class="px-4 py-1.5 bg-white border border-stone-200 rounded-lg text-sm font-medium text-amber-600 hover:bg-amber-50 transition-all shadow-sm">
+                        禁言
+                    </button>
+
+                    <button onclick="punishUser({{.User.ID}}, 2)"
+                        class="px-4 py-1.5 bg-white border border-stone-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-all shadow-sm">
+                        封禁
+                    </button>
+
+                    <button onclick="punishUser({{.User.ID}}, 0)"
+                        class="px-4 py-1.5 bg-white border border-stone-200 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-50 transition-all shadow-sm">
+                        解封
+                    </button>
+                </div>
+
+                <script>
+                    function punishUser(uid, status) {
+                        let label = status === 1 ? '禁言' : (status === 2 ? '封禁' : '解封/正常');
+                        let days = 0;
+                        if (status !== 0) {
+                            days = prompt('请输入' + label + '天数 (0 为永久):', '7');
+                            if (days === null) return;
+                        }
+
+                        if (confirm('确定要执行' + label + '操作吗？')) {
+                            const formData = new FormData();
+                            formData.append('status', status);
+                            formData.append('days', days);
+                            fetch('/admin/user/' + uid + '/punish', {
+                                method: 'POST',
+                                body: formData,
+                                headers: { 'HX-Request': 'true' }
+                            }).then(r => { if (r.ok) location.reload(); });
+                        }
+                    }
+                </script>
+                {{ end }}
             </div>
         </div>
     </header>

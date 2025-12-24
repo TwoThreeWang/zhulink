@@ -40,6 +40,7 @@ func Init() {
 		&models.Feed{},
 		&models.UserSubscription{},
 		&models.FeedItem{},
+		&models.Report{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)

@@ -7,7 +7,8 @@
     <div class="flex flex-col md:flex-row gap-8 md:gap-12">
         <!-- 侧边栏 -->
         <aside class="md:w-48 flex-shrink-0">
-            {{ template "dashboard_sidebar.html" dict "Active" "notifications" "UnreadCount" 0 }}
+            {{ template "dashboard_sidebar.html" dict "Active" "notifications" "UnreadCount" 0 "CurrentUser"
+            .CurrentUser }}
         </aside>
 
         <!-- 主内容区 -->
@@ -33,30 +34,15 @@
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex-grow min-w-0">
                             <div class="text-sm text-stone-600 mb-1.5 leading-relaxed">
+                                {{ if .Actor }}
                                 <a href="/u/{{ .Actor.ID }}"
                                     class="font-medium text-ink hover:text-moss transition-colors">{{ .Actor.Username
                                     }}</a>
-                                {{ if eq .Type "comment_post" }}
-                                <span class="text-stone-400 mx-1">评论了文章</span>
-                                <a href="/p/{{ .Post.Pid }}#comment-{{ .CommentID }}"
-                                    class="text-ink hover:text-moss hover:underline decoration-moss/30 underline-offset-2 transition-colors visited-link">
-                                    {{ .Post.Title }}
-                                </a>
-                                {{ else if eq .Type "reply_comment" }}
-                                <span class="text-stone-400 mx-1">在文章</span>
-                                <a href="/p/{{ .Post.Pid }}"
-                                    class="text-ink hover:text-moss hover:underline decoration-moss/30 underline-offset-2 transition-colors visited-link">{{
-                                    .Post.Title }}</a>
-                                <span class="text-stone-400 mx-1">中回复了你</span>
+                                {{ else }}
+                                <span class="text-red-500 font-bold">系统</span>
                                 {{ end }}
+                                <span class="text-stone-600 mx-1">{{ .Reason | safeHTML }}</span>
                             </div>
-
-                            {{ if .Comment.Content }}
-                            <div
-                                class="text-sm text-stone-500 bg-stone-50/50 p-2.5 rounded border border-stone-100/50 line-clamp-2 prose prose-sm max-w-none prose-p:my-0">
-                                {{ .Comment.Content }}
-                            </div>
-                            {{ end }}
 
                             <div class="mt-2 text-xs text-stone-300 flex items-center gap-2">
                                 {{ timeAgo .CreatedAt }}
@@ -68,7 +54,7 @@
                             class="flex-shrink-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             {{ if not .IsRead }}
                             <button hx-post="/notifications/{{ .ID }}/read" hx-swap="none"
-                                onclick="const item = this.closest('[id^=notification-]'); item.classList.remove('border-moss', 'bg-moss/5'); item.classList.add('border-stone-100', 'opacity-60'); this.remove()"
+                                hx-on::after-request="const item = this.closest('[id^=notification-]'); item.classList.remove('border-moss', 'bg-moss/5'); item.classList.add('border-stone-100', 'opacity-60'); this.remove()"
                                 class="p-1.5 text-moss hover:bg-moss/10 rounded transition-colors" title="标记为已读">
                                 <i data-lucide="check" class="w-4 h-4"></i>
                             </button>
