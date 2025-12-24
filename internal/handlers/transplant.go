@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
@@ -89,7 +90,7 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 		llm := services.GetLLMService()
 		summary, err := llm.GenerateSummary(item.Title, item.Description)
 		if err == nil {
-			if summary == "CONTENT_UNSUITABLE" {
+			if strings.Contains(summary, "CONTENT_UNSUITABLE") {
 				// 内容不适宜逻辑
 				go services.AddPoints(user.ID, services.PointsContentViolation, services.ActionContentVioloation)
 

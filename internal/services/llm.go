@@ -70,7 +70,7 @@ func GetLLMService() *LLMService {
 // GenerateSummary 调用 LLM 生成摘要
 func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 	if s.config.Token == "" {
-		return "[AI 摘要] 未配置 LLM_TOKEN，请在 .env 文件中配置以使用真实 AI 功能。", nil
+		return "[✨AI 摘要] 未配置 LLM_TOKEN，请在 .env 文件中配置以使用真实 AI 功能。", nil
 	}
 
 	// 构造提示词
@@ -142,7 +142,7 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 	}
 
 	if len(chatResp.Choices) > 0 {
-		return "[AI 摘要] " + chatResp.Choices[0].Message.Content, nil
+		return "[✨AI 摘要] " + chatResp.Choices[0].Message.Content, nil
 	}
 
 	return "", fmt.Errorf("no summary generated in response")

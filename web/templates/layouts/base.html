@@ -44,12 +44,12 @@
             <div class="flex items-center space-x-6">
                 <!-- Logo -->
                 <a href="/" class="flex items-center space-x-2 group">
-                    <img src="/static/img/logo.svg" alt="ZhuLink Logo" class="h-5 w-auto">
-                    <span class="font-semibold text-base tracking-wide text-ink">ZhuLink</span>
+                    <img src="/static/img/logo.svg" alt="ZhuLink Logo" class="h-6 w-auto">
+                    <span class="font-semibold text-lg tracking-wide text-ink">ZhuLink</span>
                 </a>
 
                 <!-- 核心流入口: 纯文字，选中状态用加粗+底部绿线 -->
-                <nav class="flex items-center space-x-4 text-sm">
+                <nav class="flex items-center space-x-5 text-[15px]">
                     <a href="/" class="relative py-0.5 transition-colors {{ if eq .Active " top" }}text-ink
                         font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
                         热门
@@ -87,16 +87,15 @@
             <div class="flex-grow"></div>
 
             <!-- 右侧: 用户状态 -->
-            <div class="text-xs tracking-wide flex items-center space-x-2">
+            <div class="text-sm tracking-wide flex items-center space-x-3">
                 {{ if .CurrentUser }}
                 <!-- 已登录: 头像 + 用户名 + 下拉菜单 -->
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" @click.outside="open = false"
-                        class="flex items-center space-x-1.5 text-ink-light hover:text-ink transition-colors cursor-pointer">
-                        <span class="text-lg">{{ .CurrentUser.Avatar }}</span>
-                        <span>{{ .CurrentUser.Username }}</span>
-                        <!-- 下拉箭头 -->
-                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform"
+                        class="flex items-center space-x-2 hover:bg-stone-50 px-2 py-1 rounded-md transition-colors">
+                        <span class="text-lg leading-none">{{ .CurrentUser.Avatar }}</span>
+                        <span class="text-ink-light">{{ .CurrentUser.Username }}</span>
+                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform"
                             :class="{ 'rotate-180': open }"></i>
                     </button>
                     <!-- 下拉菜单 -->
@@ -106,12 +105,12 @@
                         x-transition:leave="transition ease-in duration-100"
                         x-transition:leave-start="opacity-100 translate-y-0"
                         x-transition:leave-end="opacity-0 translate-y-1"
-                        class="absolute right-0 mt-1.5 w-36 bg-white border border-stone-100 rounded-lg shadow-lg py-1 text-xs">
+                        class="absolute right-0 mt-1 w-40 bg-white border border-stone-100 rounded-lg shadow-xl py-1 z-[60]">
                         <a href="/u/{{ .CurrentUser.ID }}"
-                            class="block px-3 py-1.5 text-ink-light hover:text-ink hover:bg-stone-50 transition-colors">我的主页</a>
+                            class="block px-3 py-1.5 text-ink-light hover:text-moss hover:bg-stone-50 transition-colors">我的主页</a>
                         <a href="/dashboard"
-                            class="block px-3 py-1.5 text-ink-light hover:text-ink hover:bg-stone-50 transition-colors">个人后台</a>
-                        <hr class="my-1 border-stone-100">
+                            class="block px-3 py-1.5 text-ink-light hover:text-moss hover:bg-stone-50 transition-colors">个人后台</a>
+                        <div class="h-px bg-stone-50 my-1"></div>
                         <a href="/logout"
                             class="block px-3 py-1.5 text-ink-light hover:text-red-600 hover:bg-stone-50 transition-colors">退出</a>
                     </div>
@@ -119,14 +118,17 @@
                 <!-- 通知图标 -->
                 <a href="/dashboard/notifications" class="relative group ml-1">
                     <div
-                        class="flex items-center {{ if gt .UnreadCount 0 }}text-red-500 hover:text-red-600{{ else }}text-ink-light hover:text-ink{{ end }} transition-colors">
-                        <i data-lucide="bell" class="w-3.5 h-3.5 {{ if gt .UnreadCount 0 }}fill-current{{ end }}"></i>
-                        <span class="text-[10px] font-bold ml-0.5">({{ .UnreadCount }})</span>
+                        class="p-1.5 rounded-full hover:bg-stone-50 transition-colors text-ink-light group-hover:text-moss">
+                        <i data-lucide="bell" class="w-4 h-4"></i>
+                        {{ if .UnreadCount }}
+                        <span
+                            class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                        {{ end }}
                     </div>
                 </a>
                 {{ else }}
-                <!-- 未登录: 登录 / 注册 -->
-                <div class="flex items-center space-x-1 text-ink-light text-xs">
+                <!-- 未登录 -->
+                <div class="flex items-center space-x-3 text-ink-light">
                     <a href="/login" class="hover:text-ink transition-colors">登录</a>
                     <span class="text-stone-300">/</span>
                     <a href="/signup" class="hover:text-ink transition-colors">注册</a>
