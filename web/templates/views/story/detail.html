@@ -42,7 +42,8 @@
                     <span class="inline-flex items-center">
                         <i data-lucide="user" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
                         <a href="/u/{{ .Post.User.ID }}" class="font-medium hover:text-moss transition-colors">
-                            {{ .Post.User.Username }}
+                            {{ if eq .Post.SourceType "rss" }}由 {{ .Post.User.Username }} 推荐{{ else }}{{
+                            .Post.User.Username }}{{ end }}
                         </a>
                     </span>
 
