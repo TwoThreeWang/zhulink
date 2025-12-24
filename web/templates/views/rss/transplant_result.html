@@ -19,9 +19,15 @@
         <p class="text-sm text-zinc-500">{{ .Message }}</p>
     </div>
 
-    <div class="pt-4 w-full">
+    <div class="pt-4 w-full space-y-3">
+        {{ if .PostID }}
+        <a href="/p/{{ .PostID }}" target="_blank"
+            class="block w-full px-4 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all">
+            查看帖子
+        </a>
+        {{ end }}
         <button onclick="document.getElementById('transplant-modal').remove(); if(window.hideReader) hideReader();"
-            class="w-full px-4 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold rounded-xl hover:opacity-90 transition-all">
+            class="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold rounded-xl hover:opacity-90 transition-all">
             关闭
         </button>
     </div>
