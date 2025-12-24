@@ -78,30 +78,34 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 # Role
 你是一个专业的资讯分析师和摘要生成专家，专注于为技术和知识社区提供简洁、客观、易懂的中文摘要。
 
+# Safety First (安全第一 - 优先级最高)
+在处理内容前，必须先评估。如果原文内容包含以下任一特征，**绝对不允许生成摘要**，必须**仅**返回字符串 "CONTENT_UNSUITABLE"：
+- 垃圾信息、广告、推广内容
+- 色情、暴力、血腥或恐怖内容
+- 仇恨言语、歧视或人身攻击
+- 任何不适合在纯净技术社区传播的违规内容
+- 原文内容乱码或无法理解
+
 # Task
-请仔细阅读以下文章的标题、内容描述或完整内容。你的任务是为 ZhuLink 社区生成一段**约 100-120 字**的**纯文本中文摘要**。
+为 ZhuLink 社区生成一段约 100-120 字的纯文本中文摘要。
 
 # Output Requirements (输出要求)
-1.  **字数限制**: 严格控制在 **100 到 120 字之间**。如果原文非常短，可适当缩减，但不得少于 50 字。
-2.  **内容类型**:
-    *   针对**技术文章**：应提炼核心技术点、解决的问题、关键概念或实现方法。
-    *   针对**新闻报道**：应包含事件的核心要素（时间、地点、人物、起因、结果）。
-    *   针对**观点分析**：应总结主要论点和核心洞察。
-3.  **语言风格**:
-    *   **纯文本**: 绝对不允许包含任何 HTML 标签、Markdown 格式（如 **粗体**, ## 标题, *列表*）、表情符号、代码块或特殊字符。
-    *   **中立客观**: 仅总结文章内容，不允许加入任何个人观点、评价或推荐语。
-    *   **流畅自然**: 摘要应语义连贯，语言精炼，没有语病。
-4.  **防范措施 (Safeguards)**:
-    *   **拒绝生成**: 如果原文内容明显为**垃圾信息、广告、色情、暴力、仇恨言论或任何不适合公共社区传播的内容**，请不要生成摘要，而是直接返回字符串 "CONTENT_UNSUITABLE"。
-    *   **去除冗余**: 自动过滤掉文章中常见的“免责声明”、“版权信息”、“推广信息”等与核心内容无关的部分。
+1.  **字数控制**: 严格在 **100 到 120 字**之间（原文极短除外，但不少于 50 字）。
+2.  **内容提炼**:
+    - 技术文章：核心点、解决的问题、实现方法。
+    - 新闻报道：核心要素（时、地、人、因、果）。
+    - 观点分析：主要论点和核心洞察。
+3.  **格式限制**:
+    - **必须是纯文本**：禁止 HTML、Markdown（粗体、标题、列表等）、表情符号、代码块。
+    - **中立客观**：不加入个人评价或推荐。
+    - **去除干扰**：自动过滤免责声明、版权、广告等无关内容。
 
-# Input Data (输入数据)
+# Input Data
+### Title: %s
+### Content: %s
 
-### Article Title:
-%s
-
-### Article Content:
-%s
+# Absolute Reminder
+如果你因任何原因无法提供摘要，请务必返回 "CONTENT_UNSUITABLE"。
 `
 	prompt := fmt.Sprintf(promptTemplate, title, content)
 
@@ -142,8 +146,17 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 	}
 
 	if len(chatResp.Choices) > 0 {
-		return "[✨AI 摘要] " + chatResp.Choices[0].Message.Content, nil
+		content := strings.TrimSpace(chatResp.Choices[0].Message.Content)
+		if content == "" {
+			// 如果返回内容为空，通常是由于 API 安全拦截，降级处理
+			return "[✨AI 摘要] CONTENT_UNSUITABLE", nil
+		}
+		if content == "CONTENT_UNSUITABLE" {
+			return "[✨AI 摘要] CONTENT_UNSUITABLE", nil
+		}
+		return "[✨AI 摘要] " + content, nil
 	}
 
-	return "", fmt.Errorf("no summary generated in response")
+	// 连 Choices 都没有，极可能也是安全拦截
+	return "[✨AI 摘要] CONTENT_UNSUITABLE", nil
 }
