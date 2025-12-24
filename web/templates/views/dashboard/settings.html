@@ -1,0 +1,149 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<!-- Dashboard 设置页 - 紧凑、去框化设计 -->
+
+<div class="max-w-5xl mx-auto py-8">
+    <div class="flex flex-col md:flex-row gap-8 md:gap-12">
+        <!-- 侧边栏 -->
+        <aside class="md:w-48 flex-shrink-0">
+            {{ template "dashboard_sidebar.html" dict "Active" "settings" "UnreadCount" .UnreadCount }}
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-grow min-w-0">
+            <h1 class="text-xl font-bold text-ink mb-6 pl-1">账户设置</h1>
+
+            {{ if .Error }}
+            <div class="mb-6 p-3 bg-red-50 border border-red-100 rounded text-red-700 text-sm flex items-center gap-2">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                {{ .Error }}
+            </div>
+            {{ end }}
+
+            <form method="POST" action="/dashboard/settings" class="space-y-8 max-w-2xl">
+                <!-- 基本信息 -->
+                <section>
+                    <h2
+                        class="text-xs text-stone-400 uppercase tracking-widest font-sans mb-4 border-b border-stone-100 pb-2">
+                        基本信息</h2>
+
+                    <!-- 用户名 -->
+                    <div class="mb-4 group">
+                        <label for="username" class="block text-sm font-medium text-ink mb-1.5">用户名</label>
+                        <input type="text" name="username" id="username" value="{{ .User.Username }}"
+                            class="w-full px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm transition-colors group-hover:border-stone-300">
+                        <p class="mt-1 text-xs text-stone-400">在社区中显示的名称</p>
+                    </div>
+
+                    <!-- 邮箱 -->
+                    <div class="mb-4 group">
+                        <label for="email" class="block text-sm font-medium text-ink mb-1.5">邮箱</label>
+                        <input type="email" name="email" id="email" value="{{ .User.Email }}"
+                            class="w-full px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm transition-colors group-hover:border-stone-300">
+                        <p class="mt-1 text-xs text-stone-400">用于登录和接收通知</p>
+                    </div>
+
+                    <!-- 个人简介 -->
+                    <div class="group">
+                        <label for="bio" class="block text-sm font-medium text-ink mb-1.5">个人简介</label>
+                        <textarea name="bio" id="bio" rows="3" maxlength="200"
+                            class="w-full px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white resize-none text-sm transition-colors group-hover:border-stone-300">{{ .User.Bio }}</textarea>
+                        <p class="mt-1 text-xs text-stone-400">一句话介绍自己（最多200字）</p>
+                    </div>
+                </section>
+
+                <!-- 头像选择 -->
+                <section>
+                    <h2
+                        class="text-xs text-stone-400 uppercase tracking-widest font-sans mb-4 border-b border-stone-100 pb-2">
+                        头像设置</h2>
+
+                    <div class="flex items-center gap-4 mb-5">
+                        <div class="text-4xl ring-4 ring-white shadow-md rounded-full w-14 h-14 flex items-center justify-center bg-white select-none"
+                            id="current-avatar">
+                            {{ .User.Avatar }}
+                        </div>
+                        <div>
+                            <p class="text-xs text-stone-400">点击下方 Emoji 或输入自定义头像</p>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="avatar" id="avatar-input" value="{{ .User.Avatar }}">
+
+                    <!-- 常用 emoji -->
+                    <div class="mb-4">
+                        <div class="grid grid-cols-8 sm:grid-cols-10 gap-1">
+                            {{ range .CommonEmojis }}
+                            <button type="button" onclick="selectEmoji('{{ . }}')"
+                                class="text-xl p-1.5 hover:bg-moss/10 rounded transition-colors border border-transparent hover:border-moss/20">
+                                {{ . }}
+                            </button>
+                            {{ end }}
+                        </div>
+                    </div>
+
+                    <!-- 自定义 emoji 输入 -->
+                    <div>
+                        <div class="flex gap-2 max-w-xs">
+                            <input type="text" id="custom-emoji" placeholder="输入 Emoji"
+                                class="flex-grow px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm">
+                            <button type="button" onclick="selectCustomEmoji()"
+                                class="px-4 py-2 bg-moss text-white rounded hover:bg-moss/90 transition-colors text-sm font-medium">
+                                应用
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 修改密码 -->
+                <section>
+                    <h2
+                        class="text-xs text-stone-400 uppercase tracking-widest font-sans mb-4 border-b border-stone-100 pb-2">
+                        安全设置</h2>
+
+                    <div class="mb-4 group">
+                        <label for="old_password" class="block text-sm font-medium text-ink mb-1.5">原密码</label>
+                        <input type="password" name="old_password" id="old_password"
+                            class="w-full px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm transition-colors group-hover:border-stone-300">
+                    </div>
+
+                    <div class="group">
+                        <label for="new_password" class="block text-sm font-medium text-ink mb-1.5">新密码</label>
+                        <input type="password" name="new_password" id="new_password"
+                            class="w-full px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm transition-colors group-hover:border-stone-300">
+                        <p class="mt-1 text-xs text-stone-400">不修改请留空，至少6位字符</p>
+                    </div>
+                </section>
+
+                <!-- 提交按钮 -->
+                <div class="flex items-center justify-between pt-6 mt-8 border-t border-stone-100">
+                    <a href="/logout"
+                        class="text-xs text-red-500 hover:text-red-700 font-medium transition-colors">退出登录</a>
+                    <button type="submit"
+                        class="px-6 py-2 bg-moss text-white rounded hover:bg-moss/90 transition-colors text-sm font-bold shadow-sm hover:shadow">
+                        保存更改
+                    </button>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+
+<script>
+    function selectEmoji(emoji) {
+        document.getElementById('current-avatar').textContent = emoji;
+        document.getElementById('avatar-input').value = emoji;
+    }
+
+    function selectCustomEmoji() {
+        const customEmoji = document.getElementById('custom-emoji').value.trim();
+        if (customEmoji) {
+            document.getElementById('current-avatar').textContent = customEmoji;
+            document.getElementById('avatar-input').value = customEmoji;
+            document.getElementById('custom-emoji').value = '';
+        }
+    }
+</script>
+
+{{ end }}

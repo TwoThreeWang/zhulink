@@ -1,0 +1,282 @@
+{{ template "base.html" . }}
+
+{{ define "scripts" }}
+<!-- Marked.js -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="/static/js/editor.js"></script>
+{{ end }}
+
+{{ define "content" }}
+
+<!-- Prose 样式组件 -->
+{{ template "prose_styles" . }}
+
+<!-- 双栏布局: 8:4 黄金比例 -->
+<div class="grid grid-cols-12 gap-6 md:gap-12">
+
+    <!-- 主内容区: col-span-8 -->
+    <main class="col-span-12 lg:col-span-8">
+
+        <!-- Article Section -->
+        <article class="mb-8 md:mb-12">
+            <!-- Header -->
+            <header class="mb-8">
+                <!-- Title -->
+                <h1 class="font-sans font-bold text-2xl md:text-2.5xl text-ink leading-tight mb-3 break-words">
+                    {{ if .Post.URL }}
+                    <a href="{{ .Post.URL }}" target="_blank" rel="noopener noreferrer"
+                        class="hover:text-moss transition-colors inline-flex items-center gap-2">
+                        {{ .Post.Title }}
+                        <i data-lucide="external-link" class="w-5 h-5 text-stone-400"></i>
+                    </a>
+                    <div class="text-sm font-normal text-stone-400 mt-1 truncate">
+                        {{ .Post.URL }}
+                    </div>
+                    {{ else }}
+                    {{ .Post.Title }}
+                    {{ end }}
+                </h1>
+
+                <!-- Meta -->
+                <div class="flex flex-wrap items-center text-sm text-stone-500 gap-y-2">
+                    <span class="inline-flex items-center">
+                        <i data-lucide="user" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        <a href="/u/{{ .Post.User.ID }}" class="font-medium hover:text-moss transition-colors">
+                            {{ .Post.User.Username }}
+                        </a>
+                    </span>
+
+                    <span class="text-stone-300 mx-2">·</span>
+
+                    <span title="{{ .Post.CreatedAt }}">
+                        {{ timeAgo .Post.CreatedAt }}
+                    </span>
+
+                    <span class="text-stone-300 mx-2">·</span>
+
+                    <a href="/t/{{ .Post.Node.Name }}"
+                        class="inline-flex items-center hover:text-moss transition-colors">
+                        <i data-lucide="folder" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        {{ .Post.Node.Name }}
+                    </a>
+
+                    <span class="text-stone-300 mx-2">·</span>
+
+                    <span class="inline-flex items-center">
+                        <i data-lucide="eye" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        {{ .Post.Views }}
+                    </span>
+
+                    <span class="text-stone-300 mx-2">·</span>
+
+                    <a href="#comments" class="inline-flex items-center hover:text-moss transition-colors">
+                        <i data-lucide="message-square" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        {{ len .Comments }}
+                    </a>
+
+                    {{ if and .CurrentUser (eq .CurrentUser.ID .Post.UserID) }}
+                    <span class="text-stone-300 mx-2">·</span>
+                    <a href="/p/{{ .Post.Pid }}/edit" class="text-stone-400 hover:text-moss transition-colors text-xs">
+                        编辑
+                    </a>
+                    <span class="text-stone-300 mx-2">·</span>
+                    <button hx-delete="/p/{{ .Post.Pid }}" hx-confirm="确定要移除这棵竹子吗？"
+                        class="text-stone-400 hover:text-red-600 transition-colors cursor-pointer text-xs">
+                        删除
+                    </button>
+                    {{ end }}
+                </div>
+            </header>
+
+            <!-- Content Body -->
+            {{ if .PostContent }}
+            <div class="article-content overflow-hidden">
+                <div class="prose prose-stone max-w-none prose-lg
+                    prose-a:text-moss prose-a:no-underline hover:prose-a:underline
+                    prose-headings:font-bold prose-headings:text-ink
+                    prose-p:text-stone-700 prose-p:leading-relaxed
+                    prose-code:text-moss-dark prose-code:bg-stone-100 prose-code:px-1 prose-code:rounded
+                    prose-pre:bg-stone-900 prose-pre:text-stone-50
+                    min-w-0 overflow-x-auto">
+                    {{ .PostContent }}
+                </div>
+            </div>
+            {{ end }}
+
+            <!-- Article Action Bar (Unified for Mobile & Desktop) -->
+            <div class="flex items-center justify-center gap-6">
+                <!-- 收藏 -->
+                <button hx-post="/bookmark/{{.Post.ID}}" hx-swap="innerHTML" hx-target="#bookmark-content-{{.Post.ID}}"
+                    class="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-stone-50 transition-colors group min-w-[4rem]"
+                    title="收藏">
+                    <div id="bookmark-content-{{.Post.ID}}" class="flex flex-col items-center gap-1.5">
+                        <div
+                            class="p-2 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
+                            {{ if .IsBookmarked }}
+                            <i data-lucide="bookmark" class="w-6 h-6 text-amber-500 fill-amber-500"></i>
+                            {{ else }}
+                            <i data-lucide="bookmark"
+                                class="w-6 h-6 text-stone-400 group-hover:text-amber-500 transition-colors"></i>
+                            {{ end }}
+                        </div>
+                        <span
+                            class="text-sm font-semibold {{ if .IsBookmarked }}text-amber-600{{ else }}text-stone-500 group-hover:text-amber-600{{ end }}">收藏({{
+                            .BookmarkCount }})</span>
+                    </div>
+                </button>
+
+                <!-- 点赞 -->
+                <button hx-post="/vote/post/{{.Post.ID}}" hx-swap="innerHTML" hx-target="#score-post-{{.Post.ID}}"
+                    class="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-stone-50 transition-colors group min-w-[4rem]"
+                    title="点赞">
+                    <div
+                        class="p-2 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
+                        <i data-lucide="triangle"
+                            class="w-6 h-6 text-stone-400 group-hover:text-bamboo-500 transition-colors"></i>
+                    </div>
+                    <span id="score-post-{{.Post.ID}}"
+                        class="text-sm font-semibold text-stone-500 group-hover:text-bamboo-600">赞({{ .UpvoteCount
+                        }})</span>
+                </button>
+
+                <!-- 点踩 -->
+                <button hx-post="/vote/post/{{.Post.ID}}/down" hx-swap="innerHTML" hx-target="#downvote-{{.Post.ID}}"
+                    class="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-stone-50 transition-colors group min-w-[4rem]"
+                    title="点踩">
+                    <div
+                        class="p-2 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
+                        <i data-lucide="triangle"
+                            class="w-6 h-6 rotate-180 text-stone-400 group-hover:text-stone-600 transition-colors"></i>
+                    </div>
+                    <span id="downvote-{{.Post.ID}}"
+                        class="text-sm font-semibold text-stone-500 group-hover:text-stone-600">踩({{ .DownvoteCount
+                        }})</span>
+                </button>
+            </div>
+        </article>
+
+        <!-- Divider -->
+        <hr class="border-stone-200/60 mb-10">
+
+        <!-- Comment Section -->
+        <section id="comments">
+            <!-- Comment List Header -->
+            <div class="mb-6">
+                <h3 class="font-bold text-ink text-lg flex items-center gap-2">
+                    评论
+                    <span class="text-sm font-normal text-stone-400 ml-1">{{ len .Comments }} 条</span>
+                </h3>
+            </div>
+
+            <!-- Comment List -->
+            {{ if .Comments }}
+            <div class="divide-y divide-stone-100">
+                {{ range .Comments }}
+                {{ template "comment_item" dict "ID" .ID "Cid" .Cid "Floor" .Floor "Score" .Score "User" .User "UserID"
+                .UserID "CreatedAt" .CreatedAt "ContentHTML" .ContentHTML "CurrentUser" $.CurrentUser }}
+                {{ end }}
+            </div>
+            {{ else }}
+            <div class="py-12 text-center bg-stone-50/50 rounded-lg border border-dashed border-stone-200 mb-8">
+                <p class="text-stone-400">暂无评论，来种下第一颗种子。</p>
+            </div>
+            {{ end }}
+
+            <!-- Comment Form (移到底部) -->
+            <div id="comment-form" class="mt-8 pt-8 border-t border-stone-200 scroll-mt-24">
+                <!-- 回复提示条 -->
+                <div id="reply-hint"
+                    class="hidden mb-4 p-3 bg-moss/5 border border-moss/20 rounded-lg flex justify-between items-center">
+                    <span class="text-sm text-moss">
+                        📝 正在回复 <span id="reply-hint-floor" class="font-bold"></span> 楼（<span
+                            id="reply-hint-user"></span>）
+                    </span>
+                    <button type="button" onclick="cancelReply()"
+                        class="text-xs text-stone-500 hover:text-red-500 transition-colors">
+                        取消回复
+                    </button>
+                </div>
+
+                <form action="/p/{{ .Post.Pid }}/comment" method="POST" class="relative group">
+                    <!-- 隐藏字段 -->
+                    <input type="hidden" name="parent_id" id="reply-parent-id" value="">
+                    <input type="hidden" name="reply_floor" id="reply-floor" value="">
+
+                    {{ template "markdown_editor" dict "Name" "content" "Placeholder" "发表你的见解... (支持 Markdown)" }}
+
+                    <div class="flex justify-end mt-3">
+                        <button type="submit" class="bg-moss text-white px-6 py-2 rounded-md font-medium text-sm
+                                   hover:bg-moss-dark transition-colors shadow-sm
+                                   disabled:opacity-50 disabled:cursor-not-allowed">
+                            发表评论
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- 回复交互脚本 -->
+        <script>
+            // 设置回复状态
+            function setReply(commentId, floor, username) {
+                document.getElementById('reply-parent-id').value = commentId;
+                document.getElementById('reply-floor').value = floor;
+                document.getElementById('reply-hint-floor').textContent = '#' + floor;
+                document.getElementById('reply-hint-user').textContent = '@' + username;
+                document.getElementById('reply-hint').classList.remove('hidden');
+
+                // 滚动到评论框
+                document.getElementById('comment-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                // 聚焦编辑器
+                setTimeout(() => {
+                    const editor = document.querySelector('#comment-form textarea');
+                    if (editor) editor.focus();
+                }, 300);
+            }
+
+            // 取消回复
+            function cancelReply() {
+                document.getElementById('reply-parent-id').value = '';
+                document.getElementById('reply-floor').value = '';
+                document.getElementById('reply-hint').classList.add('hidden');
+            }
+        </script>
+
+    </main>
+
+    <!-- 侧边栏: col-span-4, sticky -->
+    <aside class="hidden lg:block lg:col-span-4">
+        <div class="sticky top-24 space-y-6">
+
+            <!-- Submit Button -->
+            <a href="/submit"
+                class="block bg-moss text-white w-full text-center py-2.5 rounded-md font-medium hover:opacity-90 transition shadow-sm hover:shadow">
+                发布新内容
+            </a>
+
+            <!-- Site Description -->
+            <div class="bg-stone-50 rounded-lg p-5 border border-stone-100">
+                <h3 class="font-bold text-ink mb-2 text-sm">关于 ZhuLink</h3>
+                <p class="text-xs text-stone-600 leading-relaxed text-justify">
+                    一个由用户分享、推荐优质资讯的社区，依靠用户共识挑出值得一读的内容。在这里，我们推崇"白纸墨字"的阅读体验。
+                </p>
+            </div>
+
+        </div>
+    </aside>
+
+</div>
+
+
+<style>
+    /* CSS 渲染优化：屏幕外的评论项不渲染 */
+    .divide-y>article,
+    .divide-y>div[id^="comment-"] {
+        content-visibility: auto;
+        contain-intrinsic-size: 0 120px;
+        /* 预估评论高度 */
+    }
+</style>
+
+{{ end }}

@@ -1,0 +1,131 @@
+{{ define "markdown_editor" }}
+<!--
+Markdown Editor Component (DOM-Bridge Pattern)
+Parameters:
+  - .Name: Form input name (e.g. "content")
+  - .Value: Initial content (handled by Go template, synced to Alpine via DOM)
+  - .Placeholder: Textarea placeholder
+-->
+
+<!-- Editor Container -->
+<div x-data="markdownEditor()" class="border border-stone-200 rounded-lg overflow-hidden bg-white"
+    :class="{ 'fixed inset-0 z-[100] flex flex-col rounded-none': isFullScreen }">
+
+    <!-- Toolbar -->
+    <div class="flex items-center justify-between bg-stone-50 border-b border-stone-200">
+        <!-- Left: Mode Switch + Format Tools -->
+        <div class="flex items-center space-x-4">
+            <!-- Mode Switch -->
+            <div class="flex text-sm font-medium">
+                <button type="button" @click="isPreview = false" class="px-3 py-1.5 rounded-l-md transition-colors"
+                    :class="!isPreview ? 'bg-white text-ink' : 'bg-stone-100 text-stone-500 hover:text-stone-700'">
+                    编辑
+                </button>
+                <button type="button" @click="togglePreview()" class="px-3 py-1.5 rounded-r-md -ml-px transition-colors"
+                    :class="isPreview ? 'bg-white text-ink' : 'bg-stone-100 text-stone-500 hover:text-stone-700'">
+                    预览
+                </button>
+            </div>
+
+            <!-- Format Tools -->
+            <div class="hidden md:flex items-center space-x-0.5 text-stone-500" x-show="!isPreview">
+                <button type="button" @click="insertText('## ', '')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="标题 (H2)">
+                    <i data-lucide="heading-2" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('**', '**')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="加粗 (Ctrl+B)">
+                    <i data-lucide="bold" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('*', '*')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="斜体 (Ctrl+I)">
+                    <i data-lucide="italic" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('~~', '~~')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="删除线">
+                    <i data-lucide="strikethrough" class="w-4 h-4"></i>
+                </button>
+                <span class="w-px h-4 bg-stone-200 mx-1"></span>
+                <button type="button" @click="insertText('> ', '')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="引用">
+                    <i data-lucide="quote" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('`', '`')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="行内代码">
+                    <i data-lucide="code" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('\n```\n', '\n```')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="代码块">
+                    <i data-lucide="file-code" class="w-4 h-4"></i>
+                </button>
+                <span class="w-px h-4 bg-stone-200 mx-1"></span>
+                <button type="button" @click="insertText('- ', '')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="无序列表">
+                    <i data-lucide="list" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('1. ', '')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="有序列表">
+                    <i data-lucide="list-ordered" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('[', '](url)')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="链接 (Ctrl+K)">
+                    <i data-lucide="link" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('![](', ')')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="图片">
+                    <i data-lucide="image" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="insertText('\n---\n', '')"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="分割线">
+                    <i data-lucide="minus" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Right: Fullscreen Button -->
+        <div class="flex items-center space-x-2">
+            <span class="hidden lg:inline text-xs text-stone-400">支持 Markdown</span>
+
+            <!-- Contrast Mode Button (Only in Full Screen) -->
+            <button type="button" @click="toggleSplitView()" x-show="isFullScreen"
+                class="p-2 rounded hover:bg-stone-200 text-stone-500 hover:text-ink transition-colors"
+                :class="isSplitView ? 'bg-stone-200 text-ink' : ''" :title="isSplitView ? '关闭对照' : '对照模式'">
+                <i data-lucide="columns-2" class="w-4 h-4"></i>
+            </button>
+
+            <button type="button" @click="toggleFullScreen()"
+                class="p-2 rounded hover:bg-stone-200 text-stone-500 hover:text-ink transition-colors"
+                :title="isFullScreen ? '退出全屏' : '全屏编辑'">
+                <i x-show="!isFullScreen" data-lucide="maximize-2" class="w-4 h-4"></i>
+                <i x-show="isFullScreen" x-cloak data-lucide="minimize-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Edit/Preview Area -->
+    <div class="relative" :class="[
+            isFullScreen ? 'flex-grow overflow-auto' : '',
+            isSplitView ? 'grid grid-cols-2 gap-4 bg-stone-100' : ''
+        ]">
+        <!-- Editor Textarea -->
+        <!-- x-ref="input" is CRITICAL for DOM-Bridge Pattern -->
+        <textarea x-ref="input" name="{{ .Name }}" x-model="content" x-show="!isPreview || isSplitView"
+            @keydown.ctrl.b.prevent="insertText('**', '**')" @keydown.meta.b.prevent="insertText('**', '**')"
+            @keydown.ctrl.i.prevent="insertText('*', '*')" @keydown.meta.i.prevent="insertText('*', '*')"
+            @keydown.ctrl.k.prevent="insertText('[', '](url)')" @keydown.meta.k.prevent="insertText('[', '](url)')"
+            @keydown.escape="if(isFullScreen) toggleFullScreen()" @input="autoResize($event.target)"
+            class="w-full p-4 md:p-6 bg-white border-0 focus:ring-0 outline-none resize-none font-mono text-sm leading-relaxed text-ink placeholder-stone-400"
+            :class="[
+                isFullScreen ? 'h-full' : 'min-h-[200px]',
+                isSplitView ? '!h-full overflow-y-auto' : ''
+            ]"
+            placeholder="{{ if .Placeholder }}{{ .Placeholder }}{{ else }}在此输入内容...{{ end }}">{{ if .Value }}{{ .Value }}{{ end }}</textarea>
+
+        <!-- Preview Area -->
+        <div x-show="isPreview || isSplitView" x-cloak
+            class="prose max-w-none p-4 md:p-6 h-full overflow-y-auto bg-stone-50/50 min-h-[200px]"
+            :class="isSplitView ? 'bg-white block' : ''" x-html="renderMarkdown(content)">
+        </div>
+    </div>
+</div>
+{{ end }}

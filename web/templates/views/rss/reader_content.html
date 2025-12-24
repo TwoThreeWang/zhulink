@@ -1,0 +1,135 @@
+<!-- 阅读器内容模板 - 顶部固定工具栏 -->
+<div>
+    <!-- 顶部固定工具栏 -->
+    <div class="sticky top-0 z-10 bg-white border-b border-stone-100 px-6 py-3 flex items-center justify-between">
+        <!-- 左侧：关闭按钮 -->
+        <button onclick="hideReader()"
+            class="flex items-center space-x-1.5 text-ink-light hover:text-ink transition-colors cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+            <span class="text-sm">关闭</span>
+        </button>
+
+        <!-- 右侧：打开原文 -->
+        <a href="{{ .Item.Link }}" target="_blank" rel="noopener noreferrer"
+            class="flex items-center space-x-1.5 px-3 py-1.5 text-sm text-moss hover:bg-moss hover:text-white rounded-lg transition-colors">
+            <i data-lucide="external-link" class="w-4 h-4"></i>
+            <span>打开原文</span>
+        </a>
+    </div>
+
+    <!-- 文章内容 -->
+    <article class="p-6 md:p-8">
+        <!-- 标题 -->
+        <h1 class="text-2xl font-bold text-ink mb-4 leading-tight">{{ .Item.Title }}</h1>
+
+        <!-- 元信息 -->
+        <div class="flex items-center space-x-4 text-sm text-ink-light mb-6 pb-6 border-b border-stone-100">
+            <span class="flex items-center space-x-1">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                <span>{{ .Item.PublishedAt.Format "2006-01-02 15:04" }}</span>
+            </span>
+        </div>
+
+        <!-- 正文 -->
+        <div class="article-content max-w-none text-lg leading-relaxed text-ink space-y-4">
+            <style>
+                .article-content img {
+                    max-width: 100%;
+                    height: auto;
+                    border-radius: 0.5rem;
+                    margin: 1rem 0;
+                    display: block;
+                }
+
+                .article-content p {
+                    margin-bottom: 1em;
+                    line-height: 1.8;
+                }
+
+                .article-content a {
+                    color: #4a5d23;
+                    text-decoration: underline;
+                    text-underline-offset: 4px;
+                }
+
+                .article-content ul,
+                .article-content ol {
+                    padding-left: 1.5em;
+                    margin-bottom: 1em;
+                }
+
+                .article-content li {
+                    margin-bottom: 0.5em;
+                    list-style-type: disc;
+                }
+
+                .article-content h2 {
+                    font-size: 1.5em;
+                    font-weight: bold;
+                    margin-top: 1.5em;
+                    margin-bottom: 0.5em;
+                    color: #1c1917;
+                }
+
+                .article-content h3 {
+                    font-size: 1.25em;
+                    font-weight: bold;
+                    margin-top: 1.25em;
+                    margin-bottom: 0.5em;
+                    color: #1c1917;
+                }
+
+                .article-content blockquote {
+                    border-left: 4px solid #e7e5e4;
+                    padding-left: 1em;
+                    color: #57534e;
+                    font-style: italic;
+                    margin: 1.5em 0;
+                }
+
+                .article-content pre {
+                    background: #f5f5f4;
+                    padding: 1em;
+                    border-radius: 0.5rem;
+                    overflow-x: auto;
+                    font-family: monospace;
+                    font-size: 0.9em;
+                    margin: 1.5em 0;
+                }
+
+                .article-content code {
+                    background: #f5f5f4;
+                    padding: 0.2em 0.4em;
+                    border-radius: 0.25rem;
+                    font-family: monospace;
+                    font-size: 0.9em;
+                }
+
+                .article-content iframe {
+                    max-width: 100%;
+                    margin: 1.5em 0;
+                    aspect-ratio: 16/9;
+                }
+            </style>
+            {{ .Item.Content | safeHTML }}
+        </div>
+
+        <!-- 底部操作 -->
+        <div class="mt-8 pt-6 border-t border-stone-100 flex items-center justify-between">
+            <button onclick="hideReader()"
+                class="text-ink-light hover:text-ink transition-colors cursor-pointer text-sm">
+                ← 返回列表
+            </button>
+            <a href="{{ .Item.Link }}" target="_blank" rel="noopener noreferrer"
+                class="flex items-center space-x-1.5 px-4 py-2 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors text-sm">
+                <i data-lucide="external-link" class="w-4 h-4"></i>
+                <span>查看原文</span>
+            </a>
+        </div>
+    </article>
+</div>
+
+<script>
+    // 图标渲染由 index.html 的 htmx:afterSwap 统一处理
+    // 这里不再重复调用 lucide.createIcons()
+</script>

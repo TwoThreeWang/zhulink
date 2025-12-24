@@ -1,0 +1,322 @@
+{{ define "content" }}
+<div class="min-h-[70vh]" hx-history="false" x-data="{
+    showAddModal: false,
+    selectedCategory: '{{ if .Categories }}{{ index .Categories 0 }}{{ end }}',
+    readerItem: null
+}">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+        <!-- 左侧边栏 (桌面端显示) -->
+        <aside class="hidden md:block md:col-span-3">
+            <div class="sticky top-16">
+                <h1 class="text-lg font-bold text-ink mb-4">🌱 苗圃</h1>
+                <!-- 添加订阅按钮 -->
+                <button @click="showAddModal = true"
+                    class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 mb-6 text-sm bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors cursor-pointer">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>添加订阅</span>
+                </button>
+
+                <!-- 分类列表 -->
+                {{ if .Categories }}
+                <div class="px-4 py-2 text-xs font-semibold text-ink-lighter uppercase tracking-wider mb-1">
+                    订阅分类
+                </div>
+                <nav class="space-y-0.5">
+                    {{ range $index, $cat := .Categories }}
+                    <button hx-get="/rss/feeds?category={{ $cat }}" hx-target="#rss-main-container" hx-swap="innerHTML"
+                        @click="selectedCategory = '{{ $cat }}'" :class="selectedCategory === '{{ $cat }}'
+                            ? 'text-ink font-medium border-l-2 border-moss bg-stone-50'
+                            : 'text-ink-light hover:text-ink hover:bg-stone-50 border-l-2 border-transparent'"
+                        class="w-full text-left px-4 py-2.5 transition-colors cursor-pointer">
+                        <span>{{ $cat }}</span>
+                    </button>
+                    {{ end }}
+                </nav>
+                {{ else }}
+                <!-- 空状态 -->
+                <div class="text-center py-8 text-ink-light">
+                    <div class="text-3xl mb-2">📭</div>
+                    <p class="text-sm">暂无订阅分类</p>
+                    <p class="text-xs mt-1">点击上方按钮添加</p>
+                </div>
+                {{ end }}
+
+                <!-- 底部提示 -->
+                <div class="mt-8 p-4 bg-stone-50 rounded-lg text-sm text-ink-light">
+                    <p class="mb-2">💡 使用技巧</p>
+                    <ul class="list-disc list-inside space-y-1 text-xs">
+                        <li>点击分类查看订阅源</li>
+                        <li>点击订阅源查看文章</li>
+                        <li>文章按时间正序排列</li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右侧主内容区 (共用) -->
+        <main class="col-span-1 md:col-span-9">
+            <!-- 移动端顶部 (标题 + 按钮 + 分类胶囊) -->
+            <div class="md:hidden mb-6">
+                <!-- 标题 + 添加按钮 -->
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-lg font-bold text-ink">🌱 苗圃</h1>
+                    <button @click="showAddModal = true"
+                        class="flex items-center space-x-1 px-3 py-1.5 text-sm bg-moss text-white rounded-lg">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>订阅</span>
+                    </button>
+                </div>
+
+                <!-- 横向滚动分类胶囊 (小圆角) -->
+                {{ if .Categories }}
+                <div class="flex space-x-2 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-hide">
+                    {{ range $index, $cat := .Categories }}
+                    <button hx-get="/rss/feeds?category={{ $cat }}" hx-target="#rss-main-container" hx-swap="innerHTML"
+                        @click="selectedCategory = '{{ $cat }}'" :class="selectedCategory === '{{ $cat }}'
+                            ? 'bg-moss text-white'
+                            : 'bg-stone-100 text-ink-light hover:bg-stone-200'"
+                        class="flex-shrink-0 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap">
+                        {{ $cat }}
+                    </button>
+                    {{ end }}
+                </div>
+                {{ end }}
+            </div>
+
+            <!-- RSS 内容容器 (Target) -->
+            <div id="rss-main-container" {{ if .Categories }}
+                hx-get="/rss/feeds?category={{ index .Categories 0 | urlquery }}" hx-trigger="load" hx-swap="innerHTML"
+                {{ end }}>
+                <!-- 初始状态 -->
+                <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
+                    <div class="text-6xl mb-4">📡</div>
+                    <h2 class="text-xl font-medium text-ink mb-2">开始阅读</h2>
+                    <p class="text-sm hidden md:block">从左侧选择一个分类，或添加新的订阅源</p>
+                    <p class="text-sm md:hidden">点击上方分类开始阅读</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== 添加订阅模态框 ==================== -->
+    <div x-show="showAddModal" x-cloak x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        @click.self="showAddModal = false">
+
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6"
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100">
+
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-ink">添加订阅</h3>
+                <button @click="showAddModal = false" class="text-ink-light hover:text-ink cursor-pointer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form hx-post="/rss/subscribe" hx-indicator="#add-loading"
+                @htmx:after-request="if(event.detail.successful && event.detail.xhr.status === 200) { showAddModal = false; location.reload(); }">
+
+                <div class="space-y-4">
+                    <!-- RSS 地址 -->
+                    <div>
+                        <label class="block text-sm font-medium text-ink mb-1">RSS 地址</label>
+                        <input type="url" name="url" required placeholder="https://example.com/feed.xml"
+                            class="w-full px-4 py-2.5 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-moss/50 focus:border-moss transition-colors">
+                    </div>
+
+                    <!-- 自定义标题 -->
+                    <div>
+                        <label class="block text-sm font-medium text-ink mb-1">自定义标题 <span
+                                class="text-ink-light">(可选)</span></label>
+                        <input type="text" name="title" placeholder="留空则使用原标题"
+                            class="w-full px-4 py-2.5 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-moss/50 focus:border-moss transition-colors">
+                    </div>
+
+                    <!-- 分类 -->
+                    <div x-data="{ category: '' }">
+                        <label class="block text-sm font-medium text-ink mb-1">分类</label>
+                        <input type="text" name="category" x-model="category" value="" placeholder="给订阅分个类，方便以后查找"
+                            class="w-full px-4 py-2.5 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-moss/50 focus:border-moss transition-colors">
+
+                        {{ if .Categories }}
+                        <!-- 现有分类快捷选择 -->
+                        <div class="mt-2 text-xs text-ink-light mb-1">或是选择已有分类：</div>
+                        <div class="flex flex-wrap gap-2">
+                            {{ range .Categories }}
+                            <button type="button" @click="category = '{{ . }}'"
+                                class="px-2.5 py-1.5 text-xs bg-stone-100 text-ink-light rounded-lg hover:bg-moss hover:text-white transition-colors cursor-pointer border border-stone-200">
+                                {{ . }}
+                            </button>
+                            {{ end }}
+                        </div>
+                        {{ end }}
+                    </div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="mt-6">
+                    <button type="submit"
+                        class="w-full py-2.5 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors font-medium cursor-pointer flex items-center justify-center">
+                        <!-- 加载图标 (默认隐藏) -->
+                        <span id="add-loading" class="mr-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                        </span>
+                        <span>添加订阅</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== 阅读器全屏 Overlay (简化版 - Vanilla JS) ==================== -->
+    <div id="reader-overlay" class="hidden fixed inset-0 z-[60] bg-stone-50/90 backdrop-blur-sm overflow-y-auto">
+        <div class="max-w-4xl mx-auto bg-white shadow-xl min-h-screen" id="reader-content">
+            <!-- HTMX 加载内容到这里 -->
+        </div>
+    </div>
+
+    <script>
+        // ==================== 内存管理 ====================
+
+        // 防止事件监听器重复绑定
+        if (!window.__rssEventsBound) {
+            window.__rssEventsBound = true;
+
+            // HTMX 替换前销毁旧组件
+            document.body.addEventListener('htmx:beforeSwap', function (evt) {
+                if (evt.detail.target.id === 'rss-main-container' || evt.detail.target.id === 'reader-content') {
+                    const oldContent = evt.detail.target;
+                    // 销毁 Alpine.js 组件
+                    if (window.Alpine && oldContent.querySelector('[x-data]')) {
+                        try {
+                            Alpine.destroyTree(oldContent);
+                        } catch (e) {
+                            console.warn('Alpine.destroyTree failed:', e);
+                        }
+                    }
+                    // 清除可能的图片/视频资源
+                    oldContent.querySelectorAll('img, iframe, video').forEach(el => {
+                        el.src = '';
+                        el.remove();
+                    });
+                }
+            });
+
+            // ESC 键关闭
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !document.getElementById('reader-overlay').classList.contains('hidden')) {
+                    hideReader();
+                }
+            });
+
+            // 点击背景关闭
+            document.getElementById('reader-overlay').addEventListener('click', (e) => {
+                if (e.target.id === 'reader-overlay') {
+                    hideReader();
+                }
+            });
+
+            // HTMX 加载完成后渲染图标（使用 base.html 的全局函数）
+            document.body.addEventListener('htmx:afterSwap', function (evt) {
+                if (evt.detail.target.id === 'rss-main-container' || evt.detail.target.id === 'reader-content') {
+                    if (window.renderLucideIconsIn) {
+                        renderLucideIconsIn(evt.detail.target);
+                    }
+                }
+            });
+        }
+
+        // ==================== 阅读器 ====================
+
+        // 显示阅读器
+        function showReader() {
+            document.getElementById('reader-overlay').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 隐藏阅读器（增强资源释放）
+        function hideReader() {
+            const overlay = document.getElementById('reader-overlay');
+            const content = document.getElementById('reader-content');
+
+            // 1. 销毁 Alpine.js 组件
+            if (window.Alpine && content.querySelector('[x-data]')) {
+                try {
+                    Alpine.destroyTree(content);
+                } catch (e) {
+                    console.warn('Alpine.destroyTree failed:', e);
+                }
+            }
+
+            // 2. 移除所有媒体资源（释放内存）
+            content.querySelectorAll('img, iframe, video, audio').forEach(el => {
+                el.src = '';
+                el.remove();
+            });
+
+            // 3. 清空内容
+            content.innerHTML = '';
+
+            // 4. 隐藏 overlay
+            overlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // 加载文章（核心函数）
+        function loadArticle(id) {
+            // 先清空旧内容，显示加载状态
+            const content = document.getElementById('reader-content');
+
+            // 销毁旧组件
+            if (window.Alpine && content.querySelector('[x-data]')) {
+                try {
+                    Alpine.destroyTree(content);
+                } catch (e) { }
+            }
+
+            // 清除旧媒体资源
+            content.querySelectorAll('img, iframe, video, audio').forEach(el => {
+                el.src = '';
+                el.remove();
+            });
+
+            content.innerHTML = '<div class="flex h-64 items-center justify-center text-ink-light"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-moss mr-3"></div>加载中...</div>';
+            showReader();
+            htmx.ajax('GET', '/rss/read/' + id, { target: '#reader-content', swap: 'innerHTML' });
+        }
+
+        // lucide 图标渲染由 base.html 的 renderLucideIconsIn 统一处理
+    </script>
+</div>
+
+<style>
+    /* 隐藏滚动条 */
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    /* Loading Indicator Logic */
+    #add-loading {
+        display: none;
+    }
+
+    #add-loading.htmx-request {
+        display: inline-flex;
+    }
+</style>
+{{ end }}

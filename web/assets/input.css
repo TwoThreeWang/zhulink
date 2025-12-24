@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    /* 白纸墨字设计系统 */
+    @apply bg-paper text-ink;
+  }
+}

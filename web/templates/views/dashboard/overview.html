@@ -1,0 +1,152 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<!-- Dashboard 概览页 - 紧凑、去框化设计 -->
+
+<div class="max-w-5xl mx-auto py-8">
+    <div class="flex flex-col md:flex-row gap-8 md:gap-12">
+        <!-- 侧边栏 - 极简风格 -->
+        <aside class="md:w-48 flex-shrink-0">
+            {{ template "dashboard_sidebar.html" dict "Active" "overview" "UnreadCount" .UnreadCount }}
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-grow min-w-0">
+            <!-- 欢迎区 - 紧凑 -->
+            <header class="flex items-center gap-4 mb-8">
+                <div
+                    class="text-4xl ring-4 ring-white shadow-lg shadow-stone-200/50 rounded-full w-16 h-16 flex items-center justify-center bg-white flex-shrink-0 text-stone-200 select-none">
+                    {{ if .User.Avatar }}
+                    {{ .User.Avatar }}
+                    {{ else }}
+                    <i data-lucide="user" class="w-8 h-8"></i>
+                    {{ end }}
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-ink mb-1">早安，{{ .User.Username }}</h1>
+                    <p class="text-xs text-stone-400">今天也要充满活力</p>
+                </div>
+
+                <!-- 每日签到 - 放置在右上角 -->
+                <div class="ml-auto">
+                    <button id="checkin-btn" onclick="doCheckIn()"
+                        class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-moss to-emerald-600 text-white text-sm rounded-lg font-medium shadow-sm hover:shadow-md transition-all hover:scale-105 active:scale-95">
+                        <i data-lucide="sun" class="w-4 h-4"></i>
+                        <span>每日签到</span>
+                    </button>
+                    <div id="checkin-result" class="text-xs text-center mt-1 hidden"></div>
+                </div>
+            </header>
+
+            <!-- 杂志风格数据统计 - 紧凑版 -->
+            <section class="flex flex-wrap gap-8 md:gap-16 mb-10 pb-6 border-b border-stone-100">
+                <div>
+                    <span class="text-xs text-stone-400 uppercase tracking-widest font-sans block mb-1">竹笋</span>
+                    <div class="text-2xl font-bold text-moss" id="user-points">{{ .User.Points }}</div>
+                </div>
+                <div>
+                    <span class="text-xs text-stone-400 uppercase tracking-widest font-sans block mb-1">等级</span>
+                    <div class="text-2xl font-bold text-ink flex items-center gap-1">
+                        <span>{{ .LevelIcon }}</span>
+                        <span>{{ .LevelName }}</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-xs text-stone-400 uppercase tracking-widest font-sans block mb-1">发布</span>
+                    <div class="text-2xl font-bold text-ink">{{ .PostCount }}</div>
+                </div>
+                <div>
+                    <span class="text-xs text-stone-400 uppercase tracking-widest font-sans block mb-1">评论</span>
+                    <div class="text-2xl font-bold text-ink">{{ .CommentCount }}</div>
+                </div>
+            </section>
+
+            <script>
+                async function doCheckIn() {
+                    const btn = document.getElementById('checkin-btn');
+                    const result = document.getElementById('checkin-result');
+
+                    btn.disabled = true;
+                    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>签到中...</span>';
+
+                    try {
+                        const response = await fetch('/dashboard/checkin', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                        const data = await response.json();
+
+                        result.classList.remove('hidden');
+                        if (data.success) {
+                            result.className = 'text-xs text-center mt-1 text-moss font-medium';
+                            result.textContent = data.message;
+                            btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>已签到</span>';
+                            btn.className = 'flex items-center gap-2 px-4 py-2 bg-stone-100 text-stone-400 rounded-lg font-medium text-sm cursor-not-allowed';
+                            // 更新积分显示
+                            const pointsEl = document.getElementById('user-points');
+                            if (pointsEl) {
+                                pointsEl.textContent = parseInt(pointsEl.textContent) + data.totalPoints;
+                            }
+                        } else {
+                            result.className = 'text-xs text-center mt-1 text-amber-600';
+                            result.textContent = data.message;
+                            btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>已签到</span>';
+                            btn.className = 'flex items-center gap-2 px-4 py-2 bg-stone-100 text-stone-400 rounded-lg font-medium text-sm cursor-not-allowed';
+                        }
+                    } catch (error) {
+                        result.classList.remove('hidden');
+                        result.className = 'text-xs text-center mt-1 text-red-500';
+                        result.textContent = '签到失败';
+                        btn.disabled = false;
+                        btn.innerHTML = '<i data-lucide="sun" class="w-4 h-4"></i><span>每日签到</span>';
+                    }
+                    // 重新初始化图标
+                    if (window.lucide) lucide.createIcons();
+                }
+            </script>
+
+            <!-- 快捷操作 - 极简风格 -->
+            <section>
+                <h2 class="text-xs text-stone-400 uppercase tracking-widest font-sans mb-3">快捷操作</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <a href="/submit"
+                        class="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-stone-100 hover:border-moss/30 hover:bg-moss/5 transition-colors group">
+                        <div
+                            class="bg-moss/10 text-moss p-1.5 rounded-md group-hover:bg-moss group-hover:text-white transition-colors">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </div>
+                        <span class="text-sm font-medium text-ink">发布新内容</span>
+                    </a>
+                    <a href="/u/{{ .User.ID }}"
+                        class="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-stone-100 hover:border-moss/30 hover:bg-moss/5 transition-colors group">
+                        <div
+                            class="bg-stone-100 text-stone-500 p-1.5 rounded-md group-hover:bg-moss group-hover:text-white transition-colors">
+                            <i data-lucide="user" class="w-4 h-4"></i>
+                        </div>
+                        <span class="text-sm font-medium text-ink">查看我的主页</span>
+                    </a>
+                    <a href="/dashboard/points"
+                        class="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-stone-100 hover:border-moss/30 hover:bg-moss/5 transition-colors group">
+                        <div
+                            class="bg-stone-100 text-stone-500 p-1.5 rounded-md group-hover:bg-moss group-hover:text-white transition-colors">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        </div>
+                        <span class="text-sm font-medium text-ink">积分明细</span>
+                    </a>
+                    <a href="/dashboard/settings"
+                        class="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-stone-100 hover:border-moss/30 hover:bg-moss/5 transition-colors group">
+                        <div
+                            class="bg-stone-100 text-stone-500 p-1.5 rounded-md group-hover:bg-moss group-hover:text-white transition-colors">
+                            <i data-lucide="settings" class="w-4 h-4"></i>
+                        </div>
+                        <span class="text-sm font-medium text-ink">修改设置</span>
+                    </a>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+{{ end }}

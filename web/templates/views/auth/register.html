@@ -1,0 +1,40 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<div class="max-w-md mx-auto mt-16">
+    <!-- 卡片容器: 使用 paper 背景 + 细边框 -->
+    <div class="bg-white p-10 border border-stone-200 shadow-sm">
+        <!-- 标题: 衬线体 -->
+        <h2 class="font-bold text-2xl text-center text-ink mb-8">注册新用户</h2>
+
+        {{ if .Error }}
+        <div class="bg-red-50 text-red-600 p-3 mb-6 text-sm text-center">
+            {{ .Error }}
+        </div>
+        {{ end }}
+
+        <form action="/signup" method="POST" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-ink-light mb-1">邮箱</label>
+                <input type="email" name="email"
+                    class="w-full border border-stone-200 p-3 focus:ring-1 focus:ring-moss focus:border-moss outline-none transition-colors"
+                    placeholder="your@email.com" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-ink-light mb-1">密码</label>
+                <input type="password" name="password"
+                    class="w-full border border-stone-200 p-3 focus:ring-1 focus:ring-moss focus:border-moss outline-none transition-colors"
+                    placeholder="至少6位" required>
+            </div>
+            <!-- 按钮: 深苔绿实心方块 -->
+            <button type="submit"
+                class="w-full bg-moss text-white font-medium py-3 hover:bg-moss-dark transition-colors tracking-wide">
+                创建账号
+            </button>
+        </form>
+        <div class="mt-6 text-center text-sm text-ink-light">
+            已有账号？ <a href="/login" class="text-moss hover:underline">直接登录</a>
+        </div>
+    </div>
+</div>
+{{ end }}

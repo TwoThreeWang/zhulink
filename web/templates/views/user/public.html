@@ -1,0 +1,255 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<!-- 用户个人主页 - 去框化、紧凑风格 -->
+
+<div class="max-w-3xl mx-auto py-6 md:py-10">
+    <!-- 身份区域 Identity Section -->
+    <header class="mb-6 md:mb-10">
+        <div class="flex flex-col md:flex-row items-center md:items-start gap-5 md:gap-6 text-center md:text-left">
+            <!-- 头像 - 浮起效果 -->
+            <div
+                class="text-4xl ring-4 ring-white shadow-lg shadow-stone-200/50 rounded-full w-20 h-20 flex items-center justify-center bg-white flex-shrink-0 text-stone-200 select-none">
+                {{ if .User.Avatar }}
+                {{ .User.Avatar }}
+                {{ else }}
+                <i data-lucide="user" class="w-10 h-10"></i>
+                {{ end }}
+            </div>
+
+            <!-- 用户信息 -->
+            <div class="flex-grow min-w-0 pt-1.5">
+                <h1 class="text-2xl font-bold text-ink mb-2">{{ .User.Username }}</h1>
+
+                {{ if .User.Bio }}
+                <p class="text-stone-500 mb-4 leading-relaxed max-w-lg mx-auto md:mx-0 text-sm">{{ .User.Bio }}</p>
+                {{ else }}
+                <p class="text-stone-400 italic mb-4 text-sm">这个人很懒，什么都没写...</p>
+                {{ end }}
+
+                <!-- 杂志页码风格数据展示 -->
+                <div class="flex items-center justify-center md:justify-start gap-6 md:gap-10">
+                    <div>
+                        <span class="text-xs text-stone-400 uppercase tracking-widest font-sans block mb-0.5">等级</span>
+                        <div class="text-xl font-bold text-ink flex items-center justify-center md:justify-start gap-1">
+                            <span>{{ .LevelIcon }}</span>
+                            <span>{{ .LevelName }}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-stone-400 uppercase tracking-widest font-sans block mb-0.5">竹笋</span>
+                        <div class="text-xl font-bold text-moss">{{ .User.Points }}</div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-stone-400 uppercase tracking-widest font-sans block mb-0.5">林龄</span>
+                        <div class="text-xl font-bold text-ink">{{ .DaysSince }} <span
+                                class="text-xs font-normal text-stone-400">天</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sticky Tab 导航 -->
+    <nav
+        class="sticky top-[3.5rem] md:top-[4rem] z-10 bg-paper/95 backdrop-blur-md border-b border-stone-100 -mx-4 px-4 md:-mx-0 md:px-0 mb-6 overflow-x-auto no-scrollbar">
+        <div class="flex gap-6 min-w-max">
+            <a href="/u/{{ .User.ID }}?tab=posts"
+                class="py-2.5 text-sm font-medium transition-colors border-b-2 {{ if eq .ActiveTab " posts" }}text-ink
+                border-moss{{ else }}text-stone-400 border-transparent hover:text-ink hover:border-stone-200{{ end }}">
+                <span class="inline-flex items-center gap-2">
+                    <i data-lucide="feather" class="w-4 h-4"></i>
+                    发布
+                </span>
+            </a>
+            <a href="/u/{{ .User.ID }}?tab=comments"
+                class="py-2.5 text-sm font-medium transition-colors border-b-2 {{ if eq .ActiveTab " comments"
+                }}text-ink border-moss{{ else }}text-stone-400 border-transparent hover:text-ink
+                hover:border-stone-200{{ end }}">
+                <span class="inline-flex items-center gap-2">
+                    <i data-lucide="message-circle" class="w-4 h-4"></i>
+                    评论
+                </span>
+            </a>
+            <a href="/u/{{ .User.ID }}?tab=bookmarks"
+                class="py-2.5 text-sm font-medium transition-colors border-b-2 {{ if eq .ActiveTab " bookmarks"
+                }}text-ink border-moss{{ else }}text-stone-400 border-transparent hover:text-ink
+                hover:border-stone-200{{ end }}">
+                <span class="inline-flex items-center gap-2">
+                    <i data-lucide="bookmark" class="w-4 h-4"></i>
+                    收藏
+                </span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- 内容区域 -->
+    <div class="min-h-[200px]">
+        {{ if eq .ActiveTab "posts" }}
+        <!-- 发布列表 -->
+        {{ if not .Posts }}
+        <!-- 禅意空状态 -->
+        <div class="py-12 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-stone-50 mb-3">
+                <i data-lucide="leaf" class="w-6 h-6 text-stone-300"></i>
+            </div>
+            <p class="text-stone-400 text-sm font-medium">竹影扫阶尘不动</p>
+        </div>
+        {{ else }}
+        <ul class="divide-y divide-stone-100">
+            {{ range .Posts }}
+            <li class="py-3 group">
+                <div class="flex items-start gap-4">
+                    <!-- Content -->
+                    <div class="flex-grow min-w-0">
+                        <!-- Title -->
+                        <div class="mb-1.5">
+                            {{ if .URL }}
+                            <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug">
+                                {{ .Title }}
+                                <i data-lucide="external-link"
+                                    class="w-3.5 h-3.5 text-stone-300 group-hover:text-moss/70 transition-colors"></i>
+                            </a>
+                            {{ else }}
+                            <a href="/p/{{ .Pid }}"
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors leading-snug">
+                                {{ .Title }}
+                            </a>
+                            {{ end }}
+                        </div>
+
+                        <!-- Meta Row -->
+                        <div class="flex items-center gap-3 text-xs text-stone-400">
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3 h-3"></i>
+                                {{ timeAgo .CreatedAt }}
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="eye" class="w-3 h-3"></i>
+                                {{ .Views }}
+                            </span>
+                            <a href="/p/{{ .Pid }}" class="flex items-center gap-1 hover:text-moss transition-colors">
+                                <i data-lucide="message-square" class="w-3 h-3"></i>
+                                {{ .CommentCount }}
+                            </a>
+                            <a href="/t/{{ .Node.Name }}"
+                                class="px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 hover:bg-moss/10 hover:text-moss transition-colors">
+                                {{ .Node.Name }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            {{ end }}
+        </ul>
+        {{ end }}
+
+        {{ else if eq .ActiveTab "comments" }}
+        <!-- 评论列表 -->
+        {{ if not .Comments }}
+        <!-- 禅意空状态 -->
+        <div class="py-12 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-stone-50 mb-3">
+                <i data-lucide="message-circle" class="w-6 h-6 text-stone-300"></i>
+            </div>
+            <p class="text-stone-400 text-sm font-medium">独坐幽篁里，弹琴复长啸</p>
+        </div>
+        {{ else }}
+        <ul class="space-y-4">
+            {{ range .Comments }}
+            <li class="relative pl-4 border-l-2 border-stone-100 hover:border-moss/30 transition-colors py-0.5 group">
+                <div class="mb-1.5">
+                    <span class="text-xs text-stone-400">评论</span>
+                    <a href="/p/{{ .Post.Pid }}#{{ .Cid }}"
+                        class="text-sm font-medium text-ink hover:text-moss transition-colors ml-1">
+                        {{ .Post.Title }}
+                    </a>
+                </div>
+                <div
+                    class="text-sm text-stone-600 leading-relaxed mb-1.5 prose prose-sm max-w-none prose-p:my-0 text-justify">
+                    {{ .Content }}
+                </div>
+                <div class="flex items-center gap-3 text-xs text-stone-400">
+                    <span>{{ timeAgo .CreatedAt }}</span>
+                    <span>·</span>
+                    <span class="flex items-center gap-1">
+                        <i data-lucide="thumbs-up" class="w-3 h-3"></i>
+                        {{ .Score }}
+                    </span>
+                </div>
+            </li>
+            {{ end }}
+        </ul>
+        {{ end }}
+
+        {{ else if eq .ActiveTab "bookmarks" }}
+        <!-- 收藏列表 -->
+        {{ if not .BookmarkedPosts }}
+        <!-- 禅意空状态 -->
+        <div class="py-12 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-stone-50 mb-3">
+                <i data-lucide="bookmark" class="w-6 h-6 text-stone-300"></i>
+            </div>
+            <p class="text-stone-400 text-sm font-medium">空山无人，水流花开</p>
+        </div>
+        {{ else }}
+        <ul class="divide-y divide-stone-100">
+            {{ range .BookmarkedPosts }}
+            <li class="py-3 group">
+                <div class="flex items-start gap-4">
+                    <!-- Content -->
+                    <div class="flex-grow min-w-0">
+                        <!-- Title -->
+                        <div class="mb-1.5">
+                            {{ if .URL }}
+                            <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug">
+                                {{ .Title }}
+                                <i data-lucide="external-link"
+                                    class="w-3.5 h-3.5 text-stone-300 group-hover:text-moss/70 transition-colors"></i>
+                            </a>
+                            {{ else }}
+                            <a href="/p/{{ .Pid }}"
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors leading-snug">
+                                {{ .Title }}
+                            </a>
+                            {{ end }}
+                        </div>
+
+                        <!-- Meta Row -->
+                        <div class="flex items-center gap-3 text-xs text-stone-400">
+                            <a href="/u/{{ .User.ID }}"
+                                class="hover:text-moss transition-colors flex items-center gap-1">
+                                <i data-lucide="user" class="w-3 h-3"></i>
+                                {{ .User.Username }}
+                            </a>
+                            <span class="text-stone-200">|</span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3 h-3"></i>
+                                {{ timeAgo .CreatedAt }}
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i data-lucide="eye" class="w-3 h-3"></i>
+                                {{ .Views }}
+                            </span>
+                            <a href="/p/{{ .Pid }}" class="flex items-center gap-1 hover:text-moss transition-colors">
+                                <i data-lucide="message-square" class="w-3 h-3"></i>
+                                {{ .CommentCount }}
+                            </a>
+                            <a href="/t/{{ .Node.Name }}"
+                                class="px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 hover:bg-moss/10 hover:text-moss transition-colors">
+                                {{ .Node.Name }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            {{ end }}
+        </ul>
+        {{ end }}
+        {{ end }}
+    </div>
+</div>
+
+{{ end }}

@@ -1,0 +1,12 @@
+{{ define "vote" }}
+<!-- Vote Component: .Type (post/comment), .ID, .Score, .Voted(optional - not fully implemented in handler yet) -->
+<div class="flex flex-col items-center justify-start text-center mr-2 w-6" id="vote-box-{{.Type}}-{{.ID}}">
+    <button hx-post="/vote/{{.Type}}/{{.ID}}" hx-swap="innerHTML" hx-target="#score-{{.Type}}-{{.ID}}"
+        class="text-bamboo-400 hover:text-bamboo-600 focus:outline-none transition-colors" title="Vote Up">
+        <i data-lucide="triangle" class="w-4 h-4"></i>
+    </button>
+    <div id="score-{{.Type}}-{{.ID}}" class="font-bold text-bamboo-600 text-xs mt-1">
+        {{ .Score }}
+    </div>
+</div>
+{{ end }}

@@ -1,0 +1,111 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<!-- 搜索页面: 白纸墨字 Digital Zen -->
+
+<div class="max-w-4xl mx-auto">
+    <!-- 搜索框 -->
+    <header class="mb-8">
+        <form method="GET" action="/search" class="relative">
+            <input type="text" name="q" value="{{ .Query }}" placeholder="搜索内容..."
+                class="w-full px-4 py-3 pr-12 border border-stone-200 rounded-lg bg-white text-ink placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-moss focus:border-transparent transition"
+                autofocus>
+            <button type="submit"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-moss transition-colors">
+                <i data-lucide="search" class="w-5 h-5"></i>
+            </button>
+        </form>
+
+        {{ if .Query }}
+        <p class="text-sm text-stone-500 mt-3">
+            搜索 "{{ .Query }}" 找到 {{ len .Posts }} 个结果
+        </p>
+        {{ end }}
+    </header>
+
+    <!-- 搜索结果 -->
+    {{ if .Query }}
+    {{ if not .Posts }}
+    <!-- 空状态 -->
+    <section class="py-16 text-center">
+        <i data-lucide="search-x" class="w-12 h-12 text-stone-300 mx-auto mb-4"></i>
+        <h2 class="font-sans font-bold text-xl text-ink">未找到相关内容</h2>
+        <p class="text-base text-stone-500 mt-2">
+            尝试使用不同的关键词搜索
+        </p>
+    </section>
+    {{ else }}
+    <!-- 结果列表: 复用 story/list.html 的列表样式 -->
+    <ul class="divide-y divide-stone-200/60">
+        {{ range $index, $post := .Posts }}
+        <li class="py-3 flex items-start gap-1 md:gap-2">
+
+            <!-- 热度指示器 -->
+            {{ template "heat" dict "Score" .Score }}
+
+            <!-- Content -->
+            <div class="flex-grow min-w-0">
+                <!-- Title + Domain -->
+                <div class="leading-snug">
+                    {{ if .URL }}
+                    <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
+                        class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1">
+                        {{ .Title }}
+                        <i data-lucide="external-link" class="w-3.5 h-3.5 text-stone-400 flex-shrink-0"></i>
+                    </a>
+                    {{ else }}
+                    <a href="/p/{{ .Pid }}"
+                        class="font-sans font-medium text-base text-ink hover:text-moss transition-colors">
+                        {{ .Title }}
+                    </a>
+                    {{ end }}
+                </div>
+
+                <!-- Meta Row -->
+                <p class="text-xs text-stone-500 mt-0.5 flex flex-wrap items-center gap-x-2">
+                    <a href="/u/{{ .User.ID }}"
+                        class="hover:text-moss transition-colors inline-flex items-center gap-1">
+                        <i data-lucide="user" class="w-3 h-3"></i>
+                        {{ .User.Username }}
+                    </a>
+                    <span class="text-stone-300">·</span>
+                    <span>{{ timeAgo .CreatedAt }}</span>
+                    <span class="text-stone-300">·</span>
+                    <span class="inline-flex items-center gap-1">
+                        <i data-lucide="eye" class="w-3 h-3"></i>
+                        {{ .Views }}
+                    </span>
+                    <span class="text-stone-300">·</span>
+                    <a href="/p/{{ .Pid }}" class="hover:text-moss transition-colors inline-flex items-center gap-1">
+                        <i data-lucide="message-square" class="w-3 h-3"></i>
+                        {{ .CommentCount }}
+                    </a>
+                </p>
+            </div>
+
+            <!-- Node Badge -->
+            <div class="flex-shrink-0">
+                <a href="/t/{{ .Node.Name }}"
+                    class="inline-block px-2 py-1 text-xs font-medium text-moss bg-moss/10 rounded hover:bg-moss/20 transition-colors">
+                    {{ .Node.Name }}
+                </a>
+            </div>
+
+        </li>
+        {{ end }}
+    </ul>
+    {{ end }}
+    {{ else }}
+    <!-- 初始状态: 搜索提示 -->
+    <section class="py-16 text-center">
+        <i data-lucide="search" class="w-12 h-12 text-stone-300 mx-auto mb-4"></i>
+        <h2 class="font-sans font-bold text-xl text-ink">搜索竹林</h2>
+        <p class="text-base text-stone-500 mt-2">
+            在上方输入关键词开始搜索
+        </p>
+    </section>
+    {{ end }}
+
+</div>
+
+{{ end }}

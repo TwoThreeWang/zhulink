@@ -1,0 +1,27 @@
+<nav class="w-full">
+    <div class="space-y-1">
+        <a href="/dashboard"
+            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "overview" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+            <span>概览</span>
+        </a>
+        <a href="/dashboard/notifications"
+            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "notifications" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+            <i data-lucide="bell" class="w-4 h-4"></i>
+            <span>消息中心</span>
+            {{ if .UnreadCount }}
+            <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{{ .UnreadCount }}</span>
+            {{ end }}
+        </a>
+        <a href="/dashboard/points"
+            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "points" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+            <i data-lucide="trending-up" class="w-4 h-4"></i>
+            <span>积分明细</span>
+        </a>
+        <a href="/dashboard/settings"
+            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "settings" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+            <i data-lucide="settings" class="w-4 h-4"></i>
+            <span>设置</span>
+        </a>
+    </div>
+</nav>

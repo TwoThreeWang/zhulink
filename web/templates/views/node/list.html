@@ -1,0 +1,91 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<!-- 节点列表页面 -->
+
+<!-- 双栏布局: 8:4 黄金比例 -->
+<div class="grid grid-cols-12 gap-12">
+
+    <!-- 主内容区: col-span-8 -->
+    <main class="col-span-12 lg:col-span-8">
+        <!-- 页面标题 -->
+        <header class="mb-8">
+            <h1 class="font-sans font-bold text-2xl md:text-3xl text-ink">
+                节点
+            </h1>
+            <p class="text-base text-stone-500 mt-2">
+                浏览不同话题领域，发现感兴趣的内容。
+            </p>
+        </header>
+
+        {{ if not .Nodes }}
+        <!-- 空状态 -->
+        <section class="py-16 text-center">
+            <p class="text-stone-500">暂无节点</p>
+        </section>
+        {{ else }}
+
+        <!-- 节点网格 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {{ range .Nodes }}
+            <a href="/t/{{ .Name }}"
+                class="group block bg-stone-50 hover:bg-moss/5 rounded-lg p-5 transition-colors border border-stone-100 hover:border-moss/30">
+
+                <!-- 节点名称 -->
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="hash" class="w-4 h-4 text-moss"></i>
+                    <h2 class="font-medium text-ink group-hover:text-moss transition-colors">
+                        {{ .Name }}
+                    </h2>
+                </div>
+
+                <!-- 节点描述 -->
+                {{ if .Description }}
+                <p class="text-sm text-stone-500 leading-relaxed line-clamp-2">
+                    {{ .Description }}
+                </p>
+                {{ else }}
+                <p class="text-sm text-stone-400 italic">
+                    暂无描述
+                </p>
+                {{ end }}
+
+            </a>
+            {{ end }}
+        </div>
+
+        {{ end }}
+    </main>
+
+    <!-- 侧边栏: col-span-4, sticky -->
+    <aside class="hidden lg:block lg:col-span-4">
+        <div class="sticky top-24 space-y-6">
+
+            <!-- Component A: Submit Button -->
+            <a href="/submit"
+                class="block bg-moss text-white w-full text-center py-2.5 rounded-md font-medium hover:opacity-90 transition">
+                发布新内容
+            </a>
+
+            <!-- Component B: Site Description -->
+            <div class="bg-stone-50 rounded-lg p-4">
+                <h3 class="font-bold text-ink mb-2">关于节点</h3>
+                <p class="text-sm text-stone-600 leading-relaxed">
+                    节点是内容分类的方式，帮助你快速找到感兴趣的话题领域。点击任意节点浏览相关内容。
+                </p>
+            </div>
+
+            <!-- Component C: Footer Links -->
+            <nav class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-400">
+                <a href="/" class="hover:text-moss transition-colors">首页</a>
+                <a href="/new" class="hover:text-moss transition-colors">最新</a>
+                <a href="https://github.com" target="_blank" rel="noopener noreferrer"
+                    class="hover:text-moss transition-colors">GitHub</a>
+            </nav>
+
+        </div>
+    </aside>
+
+</div>
+
+{{ end }}

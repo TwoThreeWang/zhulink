@@ -1,0 +1,23 @@
+{{ define "heat" }}
+{{/* 热度指示器组件: .Score (0-100 区间的热度分) */}}
+{{/* 根据分数显示不同的火焰图标和颜色 */}}
+<div class="flex flex-col items-center justify-start text-center w-6">
+    {{ if gt .Score 100 }}
+    {{/* 高热度: 🔥 红色 */}}
+    <i data-lucide="flame" class="w-4 h-4 text-red-500 fill-red-500"></i>
+    <span class="text-xs font-medium text-red-500 mt-0.5">{{ .Score }}</span>
+    {{ else if gt .Score 50 }}
+    {{/* 中热度: 🔥 橙色 */}}
+    <i data-lucide="flame" class="w-4 h-4 text-orange-400"></i>
+    <span class="text-xs font-medium text-orange-400 mt-0.5">{{ .Score }}</span>
+    {{ else if gt .Score 20 }}
+    {{/* 低热度: 温暖 */}}
+    <i data-lucide="flame" class="w-4 h-4 text-amber-300"></i>
+    <span class="text-xs font-medium text-amber-400 mt-0.5">{{ .Score }}</span>
+    {{ else }}
+    {{/* 冷门: 圆点 */}}
+    <i data-lucide="flame" class="w-4 h-4 text-stone-300 mt-0.5"></i>
+    <span class="text-xs text-stone-400 mt-0.5">{{ .Score }}</span>
+    {{ end }}
+</div>
+{{ end }}

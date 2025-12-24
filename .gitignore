@@ -1,0 +1,44 @@
+# Binaries
+main
+zhulink
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Go
+vendor/
+go.work
+go.work.sum
+
+# Node/Web
+node_modules/
+dist/
+.parcel-cache/
+.eslintcache
+
+# Logs
+*.log
+
+# Database (if SQLite is used)
+*.db
+*.sqlite
+*.sqlite-journal
+
+# Temporary/Cache
+tmp/
+.air/

@@ -1,0 +1,234 @@
+<!-- RSS 文章列表 (State B) - HTMX Partial - 内存优化版 -->
+<div id="rss-item-list" class="rss-item-list {{ if .ShowAll }}show-all{{ else }}show-unread-only{{ end }}"
+    hx-history="false" data-feed-id="{{ .Subscription.FeedID }}" data-category="{{ .Category }}"
+    data-show-all="{{ .ShowAll }}"
+    hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ .ShowAll }}"
+    hx-trigger="feed-refreshed from:body" hx-swap="outerHTML" hx-target="this">
+
+    <!-- Header: 面包屑导航 + 操作按钮 (吸顶) -->
+    <div
+        class="sticky top-10 z-10 bg-paper/95 backdrop-blur-sm mb-6 py-4 border-b border-stone-100 -mx-4 px-4 -mt-6 pt-6">
+
+        <!-- 面包屑导航 -->
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-sm min-w-0">
+                <!-- 返回按钮 -->
+                <button hx-get="/rss/feeds?category={{ .Category }}" hx-target="#rss-main-container" hx-swap="innerHTML"
+                    class="flex items-center text-ink-light hover:text-ink transition-colors cursor-pointer">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                </button>
+
+                <!-- 分隔 -->
+                <span class="text-stone-300">|</span>
+
+                <!-- 分类链接 -->
+                <button hx-get="/rss/feeds?category={{ .Category }}" hx-target="#rss-main-container" hx-swap="innerHTML"
+                    class="text-ink-light hover:text-moss transition-colors cursor-pointer truncate">
+                    {{ .Category }}
+                </button>
+
+                <!-- 箭头 -->
+                <i data-lucide="chevron-right" class="w-4 h-4 text-stone-300 flex-shrink-0"></i>
+
+                <!-- 订阅源名称 -->
+                <span class="font-medium text-ink truncate">{{ .FeedTitle }}</span>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="flex items-center space-x-1 flex-shrink-0">
+                <!-- 切换显示模式 (后端驱动) -->
+                <button
+                    hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ if .ShowAll }}false{{ else }}true{{ end }}"
+                    hx-target="#rss-item-list" hx-swap="outerHTML"
+                    class="flex items-center space-x-1 px-2.5 py-1.5 text-sm rounded-lg transition-colors cursor-pointer {{ if .ShowAll }}bg-stone-100 text-ink{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}"
+                    title="{{ if .ShowAll }}仅看未读{{ else }}显示全部{{ end }}">
+                    <i data-lucide="{{ if .ShowAll }}eye-off{{ else }}eye{{ end }}" class="w-4 h-4"></i>
+                </button>
+
+                <!-- 标记全部已读 -->
+                <button hx-post="/rss/anchor/{{ .Subscription.FeedID }}" hx-swap="none"
+                    hx-on::after-request="if(event.detail.successful) { htmx.ajax('GET', '/rss/feeds?category={{ .Category }}', {target:'#rss-main-container', swap:'innerHTML'}) }"
+                    class="flex items-center px-2.5 py-1.5 text-sm text-ink-light hover:text-ink hover:bg-stone-50 rounded-lg transition-colors cursor-pointer"
+                    title="标记全部已读">
+                    <i data-lucide="check-check" class="w-4 h-4"></i>
+                </button>
+
+                <!-- 刷新 -->
+                <button hx-post="/rss/refresh/{{ .Subscription.FeedID }}" hx-swap="none"
+                    class="group flex items-center px-2.5 py-1.5 text-sm text-ink-light hover:text-ink hover:bg-stone-50 rounded-lg transition-colors cursor-pointer"
+                    title="刷新">
+                    <i data-lucide="refresh-cw" class="w-4 h-4 group-[.htmx-request]:animate-spin"></i>
+                </button>
+
+                {{ if .HasMore }}
+                <!-- 加载更多 -->
+                <button
+                    hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&page={{ add .CurrentPage 1 }}&show_all={{ .ShowAll }}"
+                    hx-target="#rss-item-list" hx-swap="outerHTML"
+                    class="flex items-center px-2.5 py-1.5 text-sm text-ink-light hover:text-ink hover:bg-stone-50 rounded-lg transition-colors cursor-pointer"
+                    title="加载更多">
+                    <i data-lucide="chevrons-down" class="w-4 h-4"></i>
+                </button>
+                {{ end }}
+            </div>
+        </div>
+    </div>
+
+    {{ if .Items }}
+    <!-- 文章列表（时间轴样式） -->
+    <div id="item-container" class="space-y-1">
+        {{ range .Items }}
+        <article
+            class="rss-item group relative p-4 rounded-lg cursor-pointer {{ if .IsRead }}is-read text-stone-400 bg-stone-50/50 hover:bg-stone-100/50{{ else }}text-ink bg-white hover:bg-stone-50{{ end }}"
+            data-item-id="{{ .Item.ID }}" data-is-read="{{ .IsRead }}" onclick="handleItemClick(this, {{ .Item.ID }})">
+
+            <!-- 时间轴指示器 (左侧) -->
+            <div
+                class="item-indicator absolute left-0 top-0 bottom-0 w-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity {{ if .IsRead }}bg-stone-200{{ else }}bg-moss{{ end }}">
+            </div>
+
+            <!-- 文章内容 -->
+            <div class="flex items-start justify-between">
+                <div class="flex-1 min-w-0 pr-4">
+                    <!-- 标题 -->
+                    <h3
+                        class="item-title font-medium leading-snug line-clamp-2 {{ if .IsRead }}text-stone-500{{ else }}text-ink group-hover:text-moss{{ end }}">
+                        {{ .Item.Title }}
+                    </h3>
+
+                    <!-- 摘要 (如果有) -->
+                    {{ if .Item.Description }}
+                    <p
+                        class="item-desc mt-1.5 text-sm line-clamp-2 {{ if .IsRead }}text-stone-400{{ else }}text-ink-light{{ end }}">
+                        {{ stripHTML .Item.Description }}
+                    </p>
+                    {{ end }}
+                </div>
+
+                <!-- 发布时间 -->
+                <div class="flex-shrink-0 text-right">
+                    <time class="text-xs {{ if .IsRead }}text-stone-400{{ else }}text-ink-light{{ end }}">
+                        {{ timeAgo .Item.PublishedAt }}
+                    </time>
+                </div>
+            </div>
+
+            <!-- 已读标记 -->
+            <div
+                class="read-check absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity {{ if not .IsRead }}hidden{{ end }}">
+                <i data-lucide="check" class="w-4 h-4 text-stone-300"></i>
+            </div>
+        </article>
+        {{ end }}
+    </div>
+
+    <!-- 分页信息 -->
+    <div class="mt-6 text-center text-sm text-ink-light">
+        {{ if .HasMore }}
+        <button
+            hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&page={{ add .CurrentPage 1 }}&show_all={{ .ShowAll }}"
+            hx-target="#rss-item-list" hx-swap="outerHTML"
+            class="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer">
+            加载更多（第 {{ .CurrentPage }}/{{ .TotalPages }} 页）
+        </button>
+        {{ else }}
+        <p class="py-4">📖 {{ if .ShowAll }}已加载全部 {{ .TotalItems }} 篇文章{{ else }}已加载全部未读文章{{ end }}</p>
+        {{ end }}
+    </div>
+    {{ else }}
+    <!-- 空状态 -->
+    <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
+        <div class="text-5xl mb-4">📄</div>
+        <h3 class="text-lg font-medium text-ink mb-2">{{ if .ShowAll }}暂无文章{{ else }}太棒了！暂无未读文章{{ end }}</h3>
+        <p class="text-sm">{{ if .ShowAll }}该订阅源还没有抓取到文章{{ else }}切换到“显示全部”可以查看历史记录{{ end }}</p>
+        {{ if .ShowAll }}
+        <button hx-post="/rss/refresh/{{ .Subscription.FeedID }}" hx-swap="none"
+            class="mt-4 px-4 py-2 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors cursor-pointer">
+            刷新订阅源
+        </button>
+        {{ else }}
+        <button hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all=true"
+            hx-target="#rss-item-list" hx-swap="outerHTML"
+            class="mt-4 px-4 py-2 bg-stone-100 text-ink hover:bg-stone-200 rounded-lg transition-colors cursor-pointer">
+            显示全部文章
+        </button>
+        {{ end }}
+    </div>
+    {{ end }}
+</div>
+
+<style>
+    /* 限制行数 */
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* 隐藏已读条目（仅未读模式） */
+    .rss-item-list.show-unread-only .rss-item.is-read {
+        display: none;
+    }
+
+    /* 显示全部时的按钮样式 */
+    .rss-item-list.show-all #toggle-read-btn {
+        background-color: rgb(74 93 35);
+        color: white;
+    }
+
+    /* CSS 渲染优化：屏幕外的列表项不渲染 */
+    .rss-item {
+        content-visibility: auto;
+        contain-intrinsic-size: 0 80px;
+        /* 预估高度，避免滚动条跳动 */
+    }
+</style>
+
+<script>
+    // 渲染图标
+    (function () {
+        const container = document.getElementById('rss-item-list');
+        if (container && window.renderLucideIconsIn) {
+            renderLucideIconsIn(container);
+        }
+    })();
+
+    // 点击文章条目
+    function handleItemClick(el, itemId) {
+        // 如果当前是“仅看未读”模式，且条目未读，点击后不需要立即隐藏（保持用户当前位置）
+        // 标记为已读（CSS 类）
+        el.classList.add('is-read');
+        el.dataset.isRead = 'true';
+
+        // 更新样式
+        el.classList.remove('text-ink', 'bg-white', 'hover:bg-stone-50');
+        el.classList.add('text-stone-400', 'bg-stone-50/50', 'hover:bg-stone-100/50');
+
+        const title = el.querySelector('.item-title');
+        if (title) {
+            title.classList.remove('text-ink', 'group-hover:text-moss');
+            title.classList.add('text-stone-500');
+        }
+
+        const desc = el.querySelector('.item-desc');
+        if (desc) {
+            desc.classList.remove('text-ink-light');
+            desc.classList.add('text-stone-400');
+        }
+
+        const indicator = el.querySelector('.item-indicator');
+        if (indicator) {
+            indicator.classList.remove('bg-moss');
+            indicator.classList.add('bg-stone-200');
+        }
+
+        const check = el.querySelector('.read-check');
+        if (check) {
+            check.classList.remove('hidden');
+        }
+
+        // 打开阅读器
+        loadArticle(itemId);
+    }
+</script>

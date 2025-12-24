@@ -1,0 +1,16 @@
+{
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  },
+  "name": "zhulink",
+  "version": "1.0.0",
+  "description": "**ZhuLink** 是一个去算法推荐的内容聚合社区 (类似 Hacker News)。",
+  "main": "tailwind.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

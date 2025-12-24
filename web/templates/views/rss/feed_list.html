@@ -1,0 +1,162 @@
+<!-- RSS 订阅源卡片列表 (State A) - HTMX Partial -->
+<div x-data="{ editingId: null, editTitle: '', editCategory: '' }">
+    <!-- 顶部导航 -->
+    <div class="flex items-center justify-between mb-6 pb-4 border-b border-stone-100">
+        <div class="flex items-center space-x-2">
+            <i data-lucide="folder" class="w-5 h-5 text-moss"></i>
+            <h2 class="text-lg font-bold text-ink">{{ .Category }}</h2>
+        </div>
+        <span class="text-sm text-ink-light">{{ len .Feeds }} 个订阅</span>
+    </div>
+
+    {{ if .Feeds }}
+    <!-- 订阅源卡片网格 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {{ range .Feeds }}
+        <div
+            class="group relative bg-white border border-stone-100 rounded-xl p-4 hover:shadow-md hover:border-moss/30 transition-all">
+
+            <!-- 点击进入文章列表区域 -->
+            <div class="cursor-pointer"
+                hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ $.Category | urlquery }}"
+                hx-target="#rss-main-container" hx-swap="innerHTML">
+
+                <!-- 订阅源信息 -->
+                <div class="flex items-start space-x-3">
+                    <!-- 图标 -->
+                    <div
+                        class="flex-shrink-0 w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center overflow-hidden">
+                        {{ if .Subscription.Feed.IconURL }}
+                        <img src="{{ .Subscription.Feed.IconURL }}" alt="" class="w-full h-full object-cover">
+                        {{ else }}
+                        <span class="text-xl">📰</span>
+                        {{ end }}
+                    </div>
+
+                    <!-- 标题和信息 -->
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-medium text-ink truncate group-hover:text-moss transition-colors">
+                            {{ if .Subscription.Title }}
+                            {{ .Subscription.Title }}
+                            {{ else }}
+                            {{ .Subscription.Feed.Title }}
+                            {{ end }}
+                        </h3>
+                        <p class="text-xs text-ink-light truncate mt-0.5">
+                            {{ .Subscription.Feed.URL }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 未读数徽章 -->
+            {{ if gt .UnreadCount 0 }}
+            <div class="absolute top-3 right-3 pointer-events-none">
+                <span
+                    class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-moss text-white text-xs font-medium rounded-full">
+                    {{ if gt .UnreadCount 99 }}99+{{ else }}{{ .UnreadCount }}{{ end }}
+                </span>
+            </div>
+            {{ end }}
+
+            <!-- 管理按钮 (移动端始终显示，桌面端悬停显示) -->
+            <div
+                class="absolute bottom-3 right-3 flex items-center space-x-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+                <!-- 编辑按钮 -->
+                <button
+                    @click.stop="editingId = {{ .Subscription.ID }}; editTitle = '{{ .Subscription.Title }}'; editCategory = '{{ .Subscription.Category }}'"
+                    class="p-2 text-ink-light hover:text-moss hover:bg-stone-100 rounded transition-colors cursor-pointer"
+                    title="编辑">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <!-- 删除按钮 -->
+                <button hx-delete="/rss/unsubscribe/{{ .Subscription.ID }}"
+                    hx-confirm="确定要取消订阅「{{ if .Subscription.Title }}{{ .Subscription.Title }}{{ else }}{{ .Subscription.Feed.Title }}{{ end }}」吗？"
+                    hx-swap="none" @htmx:after-request="if(event.detail.successful) $el.closest('.group').remove()"
+                    @click.stop
+                    class="p-2 text-ink-light hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                    title="取消订阅">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+        {{ end }}
+    </div>
+    {{ else }}
+    <!-- 空状态 -->
+    <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
+        <div class="text-5xl mb-4">📭</div>
+        <h3 class="text-lg font-medium text-ink mb-2">暂无订阅</h3>
+        <p class="text-sm">点击右上角「添加订阅」开始收集内容</p>
+    </div>
+    {{ end }}
+
+    <!-- 编辑模态框 -->
+    <div x-show="editingId !== null" x-cloak x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        @click.self="editingId = null">
+
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6"
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100">
+
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-ink">编辑订阅</h3>
+                <button @click="editingId = null" class="text-ink-light hover:text-ink cursor-pointer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form hx-post="/rss/subscription/update" hx-swap="none"
+                @htmx:after-request="if(event.detail.successful) { editingId = null; location.reload(); }">
+
+                <input type="hidden" name="id" x-model="editingId">
+
+                <div class="space-y-4">
+                    <!-- 自定义标题 -->
+                    <div>
+                        <label class="block text-sm font-medium text-ink mb-1">自定义标题</label>
+                        <input type="text" name="title" x-model="editTitle" placeholder="留空则使用原标题"
+                            class="w-full px-4 py-2.5 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-moss/50 focus:border-moss transition-colors">
+                    </div>
+
+                    <!-- 分类 -->
+                    <div x-data>
+                        <label class="block text-sm font-medium text-ink mb-1">分类</label>
+                        <input type="text" name="category" x-model="editCategory" placeholder="给订阅分个类，方便阅读"
+                            class="w-full px-4 py-2.5 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-moss/50 focus:border-moss transition-colors">
+
+                        {{ if .AllCategories }}
+                        <!-- 现有分类快捷选择 -->
+                        <div class="mt-2 text-xs text-ink-light mb-1">或是选择已有分类：</div>
+                        <div class="flex flex-wrap gap-2">
+                            {{ range .AllCategories }}
+                            <button type="button" @click="editCategory = '{{ . }}'"
+                                class="px-2.5 py-1.5 text-xs bg-stone-100 text-ink-light rounded-lg hover:bg-moss hover:text-white transition-colors cursor-pointer border border-stone-200">
+                                {{ . }}
+                            </button>
+                            {{ end }}
+                        </div>
+                        {{ end }}
+                    </div>
+                </div>
+
+                <!-- 提交按钮 -->
+                <div class="mt-6 flex space-x-3">
+                    <button type="button" @click="editingId = null"
+                        class="flex-1 py-2.5 border border-stone-200 text-ink rounded-lg hover:bg-stone-50 transition-colors cursor-pointer">
+                        取消
+                    </button>
+                    <button type="submit"
+                        class="flex-1 py-2.5 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors font-medium cursor-pointer">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- lucide 图标由 base.html 的 htmx:afterSwap 统一处理 -->

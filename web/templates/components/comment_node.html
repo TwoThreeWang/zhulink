@@ -1,0 +1,35 @@
+{{ define "comment_item" }}
+<div id="comment-{{ .ID }}" class="py-4 border-b border-stone-100 last:border-b-0 scroll-mt-24">
+    <!-- 顶部行：头像 用户名 时间 + 楼层号 -->
+    <div class="flex justify-between items-start mb-1">
+        <div class="flex items-center gap-2">
+            <a href="/u/{{ .User.ID }}" class="text-lg" title="{{ .User.Username }}">{{ .User.Avatar }}</a>
+            <div class="text-sm">
+                <a href="/u/{{ .User.ID }}" class="font-medium text-ink hover:text-moss transition-colors">{{
+                    .User.Username }}</a>
+                <span class="text-stone-400 ml-1">· {{ timeAgo .CreatedAt }}</span>
+            </div>
+        </div>
+        <span class="text-stone-400 text-sm font-mono">#{{ .Floor }}</span>
+    </div>
+
+    <!-- 操作行 -->
+    <div class="text-xs text-stone-400 mb-2 ml-8 flex gap-3">
+        <button type="button" onclick="setReply({{ .ID }}, {{ .Floor }}, '{{ .User.Username }}')"
+            class="hover:text-moss transition-colors cursor-pointer">回复</button>
+        <a href="#comment-{{ .ID }}" class="hover:text-moss transition-colors">链接</a>
+        {{ if and $.CurrentUser (eq $.CurrentUser.ID .UserID) }}
+        <button type="button" hx-delete="/comment/{{ .Cid }}" hx-confirm="确定要删除这条评论吗？" hx-target="#comment-{{ .ID }}"
+            hx-swap="outerHTML" class="hover:text-red-500 transition-colors cursor-pointer">删除</button>
+        {{ end }}
+    </div>
+
+    <!-- 内容 -->
+    <div class="ml-8 prose prose-sm prose-stone max-w-none
+                prose-a:text-moss prose-a:no-underline hover:prose-a:underline
+                prose-code:text-moss-dark prose-code:bg-stone-100 prose-code:px-1 prose-code:rounded
+                prose-pre:bg-stone-900 prose-pre:text-stone-50">
+        {{ .ContentHTML }}
+    </div>
+</div>
+{{ end }}
