@@ -29,7 +29,9 @@ func (h *RSSHandler) Index(c *gin.Context) {
 	var categories []string
 	db.DB.Model(&models.UserSubscription{}).
 		Where("user_id = ?", user.ID).
-		Distinct("category").
+		Select("category").
+		Group("category").
+		Order("MIN(created_at) ASC").
 		Pluck("category", &categories)
 
 	// 如果没有分类，添加默认分类
@@ -109,7 +111,9 @@ func (h *RSSHandler) GetFeeds(c *gin.Context) {
 	var allCategories []string
 	db.DB.Model(&models.UserSubscription{}).
 		Where("user_id = ?", user.ID).
-		Distinct("category").
+		Select("category").
+		Group("category").
+		Order("MIN(created_at) ASC").
 		Pluck("category", &allCategories)
 
 	c.HTML(http.StatusOK, "rss/feed_list.html", gin.H{
