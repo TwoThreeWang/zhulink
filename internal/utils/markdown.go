@@ -28,8 +28,10 @@ var (
 func init() {
 	// Allow images
 	policy.AllowImages()
-	// Allow standard formatting, links, etc. are allowed by UGCPolicy defaults.
-	// We might want to be strict about scripts, iframes etc. UGCPolicy disallows them.
+	// Force links to open in new tab
+	policy.AddTargetBlankToFullyQualifiedLinks(true)
+	// Add noopener or noreferrer and follow security best practices
+	policy.RequireNoReferrerOnLinks(true)
 }
 
 func RenderMarkdown(source string) template.HTML {
@@ -40,5 +42,7 @@ func RenderMarkdown(source string) template.HTML {
 
 	// Sanitize HTML
 	sanitized := policy.SanitizeBytes(buf.Bytes())
-	return template.HTML(sanitized)
+
+	// Enhance Image Attributes
+	return EnhanceHTMLContent(string(sanitized))
 }

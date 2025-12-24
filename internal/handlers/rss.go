@@ -10,6 +10,7 @@ import (
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
 	"zhulink/internal/services"
+	"zhulink/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -249,7 +250,8 @@ func (h *RSSHandler) ReadItem(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "rss/reader_content.html", gin.H{
-		"Item": item,
+		"Item":        item,
+		"ContentHTML": utils.EnhanceHTMLContent(item.Content),
 	})
 }
 
