@@ -1085,8 +1085,8 @@ body {
   min-width: 20px;
 }
 
-.min-w-\[4rem\] {
-  min-width: 4rem;
+.min-w-\[3\.5rem\] {
+  min-width: 3.5rem;
 }
 
 .min-w-max {

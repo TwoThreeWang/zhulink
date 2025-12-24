@@ -82,16 +82,16 @@ func (h *BookmarkHandler) Toggle(c *gin.Context) {
 	// 返回更新后的HTML片段 - 匹配前端 #bookmark-content-{id} 的内容结构
 	if isBookmarked {
 		c.String(http.StatusOK, fmt.Sprintf(`
-			<div class="p-2 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
-				<i data-lucide="bookmark" class="w-6 h-6 text-amber-500 fill-amber-500"></i>
+			<div class="p-1.5 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
+				<i data-lucide="bookmark" class="w-5 h-5 text-amber-500 fill-amber-500"></i>
 			</div>
-			<span class="text-sm font-semibold text-amber-600">收藏(%d)</span>`, count))
+			<span class="text-xs font-semibold text-amber-600">收藏(%d)</span>`, count))
 	} else {
 		c.String(http.StatusOK, fmt.Sprintf(`
-			<div class="p-2 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
-				<i data-lucide="bookmark" class="w-6 h-6 text-stone-400 group-hover:text-amber-500 transition-colors"></i>
+			<div class="p-1.5 rounded-full bg-stone-50 group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-stone-100">
+				<i data-lucide="bookmark" class="w-5 h-5 text-stone-400 group-hover:text-amber-500 transition-colors"></i>
 			</div>
-			<span class="text-sm font-semibold text-stone-500 group-hover:text-amber-600">收藏(%d)</span>`, count))
+			<span class="text-xs font-semibold text-stone-500 group-hover:text-amber-600">收藏(%d)</span>`, count))
 	}
 }
 
