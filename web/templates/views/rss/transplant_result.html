@@ -1,0 +1,28 @@
+<div class="p-8 flex flex-col items-center text-center space-y-4">
+    <div
+        class="w-16 h-16 rounded-full flex items-center justify-center {{ if .Success }}bg-green-100 text-green-600{{ else }}bg-red-100 text-red-600{{ end }}">
+        {{ if .Success }}
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        {{ else }}
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+        {{ end }}
+    </div>
+
+    <div class="space-y-2">
+        <h4 class="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+            {{ if .Success }}发布成功{{ else }}发布失败{{ end }}
+        </h4>
+        <p class="text-sm text-zinc-500">{{ .Message }}</p>
+    </div>
+
+    <div class="pt-4 w-full">
+        <button onclick="document.getElementById('transplant-modal').remove(); if(window.hideReader) hideReader();"
+            class="w-full px-4 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold rounded-xl hover:opacity-90 transition-all">
+            关闭
+        </button>
+    </div>
+</div>

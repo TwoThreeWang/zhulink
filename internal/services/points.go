@@ -11,19 +11,20 @@ import (
 
 // 积分动作常量
 const (
-	ActionPostCreate       = "发布帖子"
-	ActionPostLiked        = "帖子获赞"
-	ActionPostBookmarked   = "帖子被收藏"
-	ActionPostUnbookmark   = "帖子取消收藏"
-	ActionPostDownvoted    = "帖子被踩"
-	ActionPostDeleted      = "删除帖子"
-	ActionCommentCreate    = "发布评论"
-	ActionCommentLiked     = "评论获赞"
-	ActionCommentDownvoted = "评论被踩"
-	ActionCommentDeleted   = "删除评论"
-	ActionDownvoteOther    = "踩了别人"
-	ActionCheckIn          = "每日签到"
-	ActionCheckInBonus     = "签到额外奖励"
+	ActionPostCreate        = "发布帖子"
+	ActionPostLiked         = "帖子获赞"
+	ActionPostBookmarked    = "帖子被收藏"
+	ActionPostUnbookmark    = "帖子取消收藏"
+	ActionPostDownvoted     = "帖子被踩"
+	ActionPostDeleted       = "删除帖子"
+	ActionCommentCreate     = "发布评论"
+	ActionCommentLiked      = "评论获赞"
+	ActionCommentDownvoted  = "评论被踩"
+	ActionCommentDeleted    = "删除评论"
+	ActionDownvoteOther     = "踩了别人"
+	ActionCheckIn           = "每日签到"
+	ActionCheckInBonus      = "签到额外奖励"
+	ActionContentVioloation = "内容违规惩罚"
 )
 
 // 积分值常量
@@ -40,6 +41,7 @@ const (
 	PointsCommentDeleted   = -3
 	PointsDownvoteOther    = -1
 	PointsCheckIn          = 1
+	PointsContentViolation = -1
 )
 
 // 每日限制

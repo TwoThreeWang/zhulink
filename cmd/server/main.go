@@ -62,6 +62,7 @@ func main() {
 	bookmarkHandler := handlers.NewBookmarkHandler()
 	notificationHandler := handlers.NewNotificationHandler()
 	rssHandler := handlers.NewRSSHandler()
+	transplantHandler := handlers.NewTransplantHandler()
 
 	// Public Routes
 	r.GET("/", storyHandler.ListTop)
@@ -125,6 +126,10 @@ func main() {
 		rss.POST("/subscription/update", rssHandler.UpdateSubscription)
 		rss.POST("/refresh/:id", rssHandler.RefreshFeed)
 		rss.POST("/anchor/:id", rssHandler.UpdateAnchor)
+
+		// 推荐到社区 (Transplant)
+		rss.GET("/transplant/:id", transplantHandler.ShowTransplantModal)
+		rss.POST("/transplant/:id", transplantHandler.Transplant)
 	}
 
 	port := os.Getenv("PORT")
@@ -291,6 +296,8 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("rss/feed_list.html", funcMap, templatesDir+"/views/rss/feed_list.html")
 	r.AddFromFilesFuncs("rss/item_list.html", funcMap, templatesDir+"/views/rss/item_list.html")
 	r.AddFromFilesFuncs("rss/reader_content.html", funcMap, templatesDir+"/views/rss/reader_content.html")
+	r.AddFromFilesFuncs("rss/transplant_modal.html", funcMap, templatesDir+"/views/rss/transplant_modal.html")
+	r.AddFromFilesFuncs("rss/transplant_result.html", funcMap, templatesDir+"/views/rss/transplant_result.html")
 
 	return r
 }

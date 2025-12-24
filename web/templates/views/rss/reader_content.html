@@ -116,20 +116,25 @@
 
         <!-- 底部操作 -->
         <div class="mt-8 pt-6 border-t border-stone-100 flex items-center justify-between">
-            <button onclick="hideReader()"
-                class="text-ink-light hover:text-ink transition-colors cursor-pointer text-sm">
-                ← 返回列表
-            </button>
-            <a href="{{ .Item.Link }}" target="_blank" rel="noopener noreferrer"
-                class="flex items-center space-x-1.5 px-4 py-2 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors text-sm">
-                <i data-lucide="external-link" class="w-4 h-4"></i>
-                <span>查看原文</span>
-            </a>
+            <div class="flex items-center space-x-1">
+                <button onclick="hideReader()"
+                    class="text-ink-light hover:text-ink transition-colors cursor-pointer text-sm">
+                    ← 返回列表
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button hx-get="/rss/transplant/{{ .Item.ID }}" hx-target="body" hx-swap="beforeend"
+                    class="flex items-center space-x-1.5 px-4 py-2 bg-white border border-stone-200 text-ink hover:border-moss hover:text-moss rounded-lg transition-colors text-sm font-bold shadow-sm">
+                    <span>🎋 推荐到社区</span>
+                </button>
+
+                <a href="{{ .Item.Link }}" target="_blank" rel="noopener noreferrer"
+                    class="flex items-center space-x-1.5 px-4 py-2 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors text-sm">
+                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                    <span>查看原文</span>
+                </a>
+            </div>
         </div>
     </article>
 </div>
-
-<script>
-    // 图标渲染由 index.html 的 htmx:afterSwap 统一处理
-    // 这里不再重复调用 lucide.createIcons()
-</script>

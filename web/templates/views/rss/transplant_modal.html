@@ -1,0 +1,116 @@
+<div id="transplant-modal"
+    class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+    <div id="transplant-modal-inner"
+        class="bg-white dark:bg-zinc-900 w-full max-w-lg mx-4 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200"
+        onclick="event.stopPropagation()">
+
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <span>🎋 推荐到社区</span>
+            </h3>
+            <button onclick="document.getElementById('transplant-modal').remove(); if(window.hideReader) hideReader();"
+                class="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+                <svg class="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+        </div>
+
+        <form hx-post="/rss/transplant/{{.Item.ID}}" hx-target="#transplant-modal-inner" hx-swap="innerHTML"
+            hx-indicator="#submit-indicator" class="p-6 space-y-5" id="transplant-form">
+
+            <!-- Article Preview -->
+            <div class="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 line-clamp-2">{{.Item.Title}}</p>
+                <input type="hidden" name="title" value="{{.Item.Title}}">
+            </div>
+
+            <!-- Node Selection -->
+            <div>
+                <label for="node_id" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">选择分类</label>
+                <select id="node_id" name="node_id" required
+                    class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all text-zinc-900 dark:text-zinc-100 cursor-pointer">
+                    {{range .Nodes}}
+                    <option value="{{.ID}}" {{if eq .ID 1}}selected{{end}}>{{.Name}}</option>
+                    {{end}}
+                </select>
+            </div>
+
+            <!-- Recommended Content -->
+            <div>
+                <label for="content" class="block text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-2">推荐语</label>
+                <textarea id="content" name="content" rows="4" placeholder="写下你的推荐语... 留空将由 AI 自动生成摘要"
+                    class="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-600 text-zinc-900 dark:text-zinc-100"></textarea>
+                <p class="mt-2 text-xs text-zinc-500 flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    推荐语将作为帖子的主要内容发布
+                </p>
+            </div>
+
+            <!-- Actions -->
+            <div class="pt-2 flex gap-3">
+                <button type="button"
+                    onclick="document.getElementById('transplant-modal').remove(); if(window.hideReader) hideReader();"
+                    class="flex-1 px-4 py-3 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                    取消
+                </button>
+                <button type="submit" id="submit-btn"
+                    class="flex-[2] px-4 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <span id="submit-text">确认发布</span>
+                    <div id="submit-indicator" class="htmx-indicator">
+                        <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                    </div>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .htmx-indicator {
+        display: none;
+    }
+
+    .htmx-request .htmx-indicator {
+        display: inline-block;
+    }
+
+    .htmx-request #submit-text {
+        content: "正在生成摘要并发布...";
+    }
+
+    /* HTMX 状态改变时禁用按钮 */
+    .htmx-request#submit-btn {
+        pointer-events: none;
+        opacity: 0.5;
+    }
+</style>
+
+<script>
+    // 点击背景关闭弹窗
+    document.getElementById('transplant-modal').addEventListener('click', function (e) {
+        if (e.target === this) {
+            this.remove();
+        }
+    });
+
+    // 处理 HTMX 请求开始，修改文本
+    document.body.addEventListener('htmx:beforeRequest', function (evt) {
+        if (evt.detail.elt.id === 'submit-btn' || evt.detail.elt.closest('form')?.contains(evt.detail.elt)) {
+            const textSpan = document.getElementById('submit-text');
+            if (textSpan) textSpan.innerText = '正在生成并发布...';
+        }
+    });
+</script>
