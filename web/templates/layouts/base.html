@@ -5,26 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ if .Title }}{{ .Title }} - {{ end }}ZhuLink 竹林</title>
-
     <link rel="icon" type="image/svg+xml" href="/static/img/logo.svg">
-
-    <!-- 本地样式 (无外部字体依赖) -->
     <link href="/static/css/style.css?v=4" rel="stylesheet">
-
     <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js"></script>
     <!-- 禁用 HTMX 历史缓存，避免内存累积 -->
     <meta name="htmx-config" content='{"historyCacheSize":0}'>
-
+    <!-- Sitemap引用 -->
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+    <!-- RSS Feed引用 -->
+    <link rel="alternate" type="application/rss+xml" title="ZhuLink RSS Feed" href="/feed.xml">
     <!-- Marked.js & Editor.js (Optional via block) -->
     {{ block "scripts" . }}{{ end }}
-
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
     <style>
         [x-cloak] {
             display: none !important;
@@ -212,12 +208,11 @@
         <div class="container mx-auto px-6 text-center max-w-6xl">
             <p class="font-bold text-lg text-ink tracking-widest mb-4">ZhuLink · 竹林</p>
             <div class="flex items-center justify-center space-x-8 text-xs text-ink-light uppercase tracking-[0.2em]">
-                <a href="#" class="hover:text-moss transition-colors">关于</a>
+                <a href="/p/about" class="hover:text-moss transition-colors">关于</a>
                 <span class="text-stone-200">|</span>
-                <a href="#" class="hover:text-moss transition-colors">指南</a>
+                <a href="/p/guide" class="hover:text-moss transition-colors">指南</a>
                 <span class="text-stone-200">|</span>
-                <a href="https://github.com/wangtwothree/zhulink" target="_blank"
-                    class="hover:text-moss transition-colors">Github</a>
+                <a href="#top" class="hover:text-moss transition-colors">回到顶部</a>
             </div>
         </div>
     </footer>

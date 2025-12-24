@@ -19,6 +19,12 @@ func RegisterRoutes(r *gin.Engine) {
 	rssHandler := handlers.NewRSSHandler()
 	transplantHandler := handlers.NewTransplantHandler()
 	adminHandler := handlers.NewAdminHandler()
+	seoHandler := handlers.NewSEOHandler()
+
+	// SEO路由 (SEO Routes)
+	r.GET("/robots.txt", seoHandler.RobotsTxt)   // robots.txt
+	r.GET("/sitemap.xml", seoHandler.SitemapXML) // sitemap.xml
+	r.GET("/feed.xml", seoHandler.RSSFeed)       // RSS feed
 
 	// 公共路由 (Public Routes)
 	r.GET("/", storyHandler.ListTop)           // 首页 - 热门文章

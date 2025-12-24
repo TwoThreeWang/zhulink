@@ -4,6 +4,77 @@
 <!-- Marked.js -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="/static/js/editor.js"></script>
+
+<!-- SEO Meta标签 -->
+<meta name="description" content="{{ .Description }}">
+<meta name="keywords" content="{{ .Keywords }}">
+<meta name="author" content="{{ .Author }}">
+
+<!-- Open Graph标签 (用于社交媒体分享) -->
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ .Post.Title }}">
+<meta property="og:description" content="{{ .Description }}">
+<meta property="og:url" content="{{ .FullURL }}">
+<meta property="og:site_name" content="ZhuLink 竹林">
+<meta property="article:author" content="{{ .Author }}">
+<meta property="article:published_time" content="{{ .PublishedTime }}">
+<meta property="article:modified_time" content="{{ .ModifiedTime }}">
+<meta property="article:section" content="{{ .Post.Node.Name }}">
+
+<!-- Twitter Card标签 -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ .Post.Title }}">
+<meta name="twitter:description" content="{{ .Description }}">
+
+<!-- Canonical链接 -->
+<link rel="canonical" href="{{ .FullURL }}">
+
+<!-- JSON-LD结构化数据 -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{{ .Post.Title }}",
+  "description": "{{ .Description }}",
+  "author": {
+    "@type": "Person",
+    "name": "{{ .Author }}"
+  },
+  "datePublished": "{{ .PublishedTime }}",
+  "dateModified": "{{ .ModifiedTime }}",
+  "publisher": {
+    "@type": "Organization",
+    "name": "ZhuLink 竹林",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://zhulink.com/static/img/logo.svg"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "{{ .FullURL }}"
+  },
+  "articleSection": "{{ .Post.Node.Name }}",
+  "interactionStatistic": [
+    {
+      "@type": "InteractionCounter",
+      "interactionType": "https://schema.org/ViewAction",
+      "userInteractionCount": {{ .Post.Views }}
+    },
+    {
+      "@type": "InteractionCounter",
+      "interactionType": "https://schema.org/CommentAction",
+      "userInteractionCount": {{ len .Comments }}
+    },
+    {
+      "@type": "InteractionCounter",
+      "interactionType": "https://schema.org/LikeAction",
+      "userInteractionCount": {{ .UpvoteCount }}
+    }
+  ]{{ if .Post.URL }},
+  "url": "{{ .Post.URL }}"{{ end }}
+}
+</script>
 {{ end }}
 
 {{ define "content" }}

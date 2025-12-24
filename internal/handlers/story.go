@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -318,6 +319,42 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	var nodes []models.Node
 	db.DB.Order("id ASC").Find(&nodes)
 
+	// 生成SEO相关数据
+	// 1. 文章摘要: 从内容中提取前150个字符作为description
+	description := post.Content
+	if len(description) > 150 {
+		// 按字符截取,避免截断中文
+		runes := []rune(description)
+		if len(runes) > 150 {
+			description = string(runes[:150]) + "..."
+		}
+	}
+	// 移除markdown标记,简化摘要
+	description = strings.ReplaceAll(description, "#", "")
+	description = strings.ReplaceAll(description, "*", "")
+	description = strings.ReplaceAll(description, "`", "")
+	description = strings.TrimSpace(description)
+
+	// 2. 关键词: 使用节点名称和网站名称
+	keywords := fmt.Sprintf("%s, ZhuLink, 竹林, 技术分享", post.Node.Name)
+
+	// 3. 完整URL (用于og:url和canonical)
+	// 从环境变量获取网站URL,如果未设置则使用默认值
+	siteURL := os.Getenv("SITE_URL")
+	if siteURL == "" {
+		siteURL = "https://zhulink.com"
+	}
+	fullURL := fmt.Sprintf("%s/p/%s", siteURL, post.Pid)
+
+	// 4. 作者信息
+	author := post.User.Username
+
+	// 5. 发布时间 (ISO 8601格式)
+	publishedTime := post.CreatedAt.Format(time.RFC3339)
+
+	// 6. 修改时间
+	modifiedTime := post.UpdatedAt.Format(time.RFC3339)
+
 	Render(c, http.StatusOK, "story/detail.html", gin.H{
 		"Post":          post,
 		"PostContent":   postContentHTML,
@@ -328,6 +365,13 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"DownvoteCount": downvoteCount,
 		"IsBookmarked":  isBookmarked,
 		"Nodes":         nodes,
+		// SEO相关数据
+		"Description":   description,
+		"Keywords":      keywords,
+		"FullURL":       fullURL,
+		"Author":        author,
+		"PublishedTime": publishedTime,
+		"ModifiedTime":  modifiedTime,
 	})
 }
 

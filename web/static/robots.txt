@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+
+# 禁止爬取用户后台和管理后台
+Disallow: /dashboard/
+Disallow: /admin/
+
+# 禁止爬取登录注册页面
+Disallow: /login
+Disallow: /signup
+
+# 禁止爬取API端点
+Disallow: /vote/
+Disallow: /bookmark/
+Disallow: /report/
+
+# Sitemap位置
+Sitemap: https://zhulink.com/sitemap.xml
+
+# 爬取延迟(可选,避免服务器压力)
+Crawl-delay: 1
