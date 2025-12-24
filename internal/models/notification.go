@@ -10,6 +10,7 @@ const (
 	NotificationTypeCommentPost  NotificationType = "comment_post"
 	NotificationTypeReplyComment NotificationType = "reply_comment"
 	NotificationTypeSystem       NotificationType = "system"
+	NotificationTypeReport       NotificationType = "report" // 举报通知
 )
 
 type Notification struct {

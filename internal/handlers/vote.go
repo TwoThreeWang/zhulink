@@ -296,5 +296,42 @@ func (h *VoteHandler) Report(c *gin.Context) {
 		return
 	}
 
+	// 异步向所有管理员发送举报通知
+	go func() {
+		// 查询所有管理员用户
+		var admins []models.User
+		if err := db.DB.Where("role = ?", "admin").Find(&admins).Error; err != nil {
+			return
+		}
+
+		// 构建被举报内容的链接和描述
+		var contentLink string
+		var contentDesc string
+		if itemType == "post" {
+			contentLink = fmt.Sprintf("/p/%s", itemPid)
+			var post models.Post
+			if err := db.DB.First(&post, uID).Error; err == nil {
+				contentDesc = fmt.Sprintf("文章《%s》", post.Title)
+			} else {
+				contentDesc = "一篇文章"
+			}
+		} else {
+			contentLink = fmt.Sprintf("/p/%s#comment-%d", itemPid, uID)
+			contentDesc = "一条评论"
+		}
+
+		// 为每个管理员创建通知
+		for _, admin := range admins {
+			notification := models.Notification{
+				UserID:  admin.ID,
+				ActorID: &currentUser.ID,
+				Type:    models.NotificationTypeReport,
+				Reason: fmt.Sprintf("举报了<a href=\"%s\" target=\"_blank\" class=\"text-moss font-medium hover:underline tracking-tight\">%s</a>,原因: %s",
+					contentLink, contentDesc, reason),
+			}
+			db.DB.Create(&notification)
+		}
+	}()
+
 	c.String(http.StatusOK, "已举报")
 }
