@@ -41,13 +41,13 @@
                     <div class="leading-snug line-clamp-2">
                         {{ if .URL }}
                         <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
-                            class="font-sans font-medium text-base text-ink hover:text-moss transition-colors">
+                            class="font-sans font-medium text-base text-ink hover:text-moss transition-colors visited-link">
                             {{ .Title }}
                             <i data-lucide="external-link" class="w-3.5 h-3.5 text-stone-400 inline-block ml-1"></i>
                         </a>
                         {{ else }}
                         <a href="/p/{{ .Pid }}"
-                            class="font-sans font-medium text-base text-ink hover:text-moss transition-colors">
+                            class="font-sans font-medium text-base text-ink hover:text-moss transition-colors visited-link">
                             {{ .Title }}
                         </a>
                         {{ end }}

@@ -49,13 +49,13 @@
                 <div class="leading-snug">
                     {{ if .URL }}
                     <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
-                        class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1">
+                        class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1 visited-link">
                         {{ .Title }}
                         <i data-lucide="external-link" class="w-3.5 h-3.5 text-stone-400 flex-shrink-0"></i>
                     </a>
                     {{ else }}
                     <a href="/p/{{ .Pid }}"
-                        class="font-sans font-medium text-base text-ink hover:text-moss transition-colors">
+                        class="font-sans font-medium text-base text-ink hover:text-moss transition-colors visited-link">
                         {{ .Title }}
                     </a>
                     {{ end }}

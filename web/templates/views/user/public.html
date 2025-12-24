@@ -106,14 +106,14 @@
                         <div class="mb-1.5">
                             {{ if .URL }}
                             <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
-                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug">
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug visited-link">
                                 {{ .Title }}
                                 <i data-lucide="external-link"
                                     class="w-3.5 h-3.5 text-stone-300 group-hover:text-moss/70 transition-colors"></i>
                             </a>
                             {{ else }}
                             <a href="/p/{{ .Pid }}"
-                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors leading-snug">
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors leading-snug visited-link">
                                 {{ .Title }}
                             </a>
                             {{ end }}
@@ -162,7 +162,7 @@
                 <div class="mb-1.5">
                     <span class="text-xs text-stone-400">评论</span>
                     <a href="/p/{{ .Post.Pid }}#{{ .Cid }}"
-                        class="text-sm font-medium text-ink hover:text-moss transition-colors ml-1">
+                        class="text-sm font-medium text-ink hover:text-moss transition-colors ml-1 visited-link">
                         {{ .Post.Title }}
                     </a>
                 </div>
@@ -204,14 +204,14 @@
                         <div class="mb-1.5">
                             {{ if .URL }}
                             <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
-                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug">
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug visited-link">
                                 {{ .Title }}
                                 <i data-lucide="external-link"
                                     class="w-3.5 h-3.5 text-stone-300 group-hover:text-moss/70 transition-colors"></i>
                             </a>
                             {{ else }}
                             <a href="/p/{{ .Pid }}"
-                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors leading-snug">
+                                class="font-sans font-medium text-base text-ink hover:text-moss transition-colors leading-snug visited-link">
                                 {{ .Title }}
                             </a>
                             {{ end }}

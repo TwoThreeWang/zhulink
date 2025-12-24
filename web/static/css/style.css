@@ -2952,4 +2952,11 @@ body {
     --tw-bg-opacity: 1;
     background-color: rgb(39 39 42 / var(--tw-bg-opacity, 1));
   }
+  .visited-link:visited {
+    color: #a1a1aa !important; /* 对应 zinc-400，在深色模式下稍微亮一点 */
+  }
+}
+/* 访问过的链接样式淡化 */
+.visited-link:visited {
+  color: #78716c !important; /* 对应 stone-400 */
 }

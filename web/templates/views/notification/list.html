@@ -39,13 +39,13 @@
                                 {{ if eq .Type "comment_post" }}
                                 <span class="text-stone-400 mx-1">评论了文章</span>
                                 <a href="/p/{{ .Post.Pid }}#comment-{{ .CommentID }}"
-                                    class="text-ink hover:text-moss hover:underline decoration-moss/30 underline-offset-2 transition-colors">
+                                    class="text-ink hover:text-moss hover:underline decoration-moss/30 underline-offset-2 transition-colors visited-link">
                                     {{ .Post.Title }}
                                 </a>
                                 {{ else if eq .Type "reply_comment" }}
                                 <span class="text-stone-400 mx-1">在文章</span>
                                 <a href="/p/{{ .Post.Pid }}"
-                                    class="text-ink hover:text-moss hover:underline decoration-moss/30 underline-offset-2 transition-colors">{{
+                                    class="text-ink hover:text-moss hover:underline decoration-moss/30 underline-offset-2 transition-colors visited-link">{{
                                     .Post.Title }}</a>
                                 <span class="text-stone-400 mx-1">中回复了你</span>
                                 {{ end }}
