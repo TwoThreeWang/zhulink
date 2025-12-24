@@ -36,11 +36,36 @@ func (h *RSSHandler) Index(c *gin.Context) {
 		categories = []string{"先放这儿"}
 	}
 
+	// 获取当前已订阅总数
+	var currentCount int64
+	db.DB.Model(&models.UserSubscription{}).Where("user_id = ?", user.ID).Count(&currentCount)
+
+	maxCount := getMaxSubscriptionCount(user.Points)
+
 	Render(c, http.StatusOK, "rss/index.html", gin.H{
-		"Title":      "苗圃 - RSS 阅读器",
-		"Active":     "rss",
-		"Categories": categories,
+		"Title":           "苗圃 - RSS 阅读器",
+		"Active":          "rss",
+		"Categories":      categories,
+		"CurrentRSSCount": int(currentCount),
+		"MaxRSSCount":     maxCount,
 	})
+}
+
+// getMaxSubscriptionCount 根据积分获取订阅上限
+func getMaxSubscriptionCount(points int) int {
+	if points > 1000 {
+		return -1 // 无限制
+	}
+	if points >= 201 {
+		return 100
+	}
+	if points >= 51 {
+		return 30
+	}
+	if points >= 11 {
+		return 10
+	}
+	return 3
 }
 
 // GetFeeds HTMX 接口，获取指定分类的订阅源列表
@@ -250,6 +275,24 @@ func (h *RSSHandler) Subscribe(c *gin.Context) {
 
 	if category == "" {
 		category = "先放这儿"
+	}
+
+	// 校验订阅数量限制
+	var currentCount int64
+	db.DB.Model(&models.UserSubscription{}).Where("user_id = ?", user.ID).Count(&currentCount)
+	maxCount := getMaxSubscriptionCount(user.Points)
+
+	if maxCount != -1 && int(currentCount) >= maxCount {
+		payload := map[string]interface{}{
+			"show-error": map[string]string{
+				"message": "您的竹笋不足以支撑更多订阅",
+			},
+		}
+		if jsonBytes, err := json.Marshal(payload); err == nil {
+			c.Header("HX-Trigger", url.PathEscape(string(jsonBytes)))
+		}
+		c.String(http.StatusForbidden, "")
+		return
 	}
 
 	// 创建或获取 Feed

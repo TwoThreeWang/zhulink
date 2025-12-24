@@ -8,7 +8,12 @@
         <!-- 左侧边栏 (桌面端显示) -->
         <aside class="hidden md:block md:col-span-3">
             <div class="sticky top-16">
-                <h1 class="text-lg font-bold text-ink mb-4">🌱 苗圃</h1>
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-lg font-bold text-ink">🌱 苗圃</h1>
+                    <div class="text-xs text-ink-light bg-stone-100 px-2 py-1 rounded-md">
+                        {{ .CurrentRSSCount }}{{ if ne .MaxRSSCount -1 }}/{{ .MaxRSSCount }}{{ end }}
+                    </div>
+                </div>
                 <!-- 添加订阅按钮 -->
                 <button @click="showAddModal = true"
                     class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 mb-6 text-sm bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors cursor-pointer">
@@ -59,7 +64,12 @@
             <div class="md:hidden mb-6">
                 <!-- 标题 + 添加按钮 -->
                 <div class="flex items-center justify-between mb-4">
-                    <h1 class="text-lg font-bold text-ink">🌱 苗圃</h1>
+                    <div class="flex items-center justify-between mb-1">
+                        <h1 class="text-lg font-bold text-ink">🌱 苗圃</h1>
+                        <div class="text-xs text-ink-light bg-stone-100 px-2 py-1 rounded-md">
+                            {{ .CurrentRSSCount }}{{ if ne .MaxRSSCount -1 }}/{{ .MaxRSSCount }}{{ end }}
+                        </div>
+                    </div>
                     <button @click="showAddModal = true"
                         class="flex items-center space-x-1 px-3 py-1.5 text-sm bg-moss text-white rounded-lg">
                         <i data-lucide="plus" class="w-4 h-4"></i>
