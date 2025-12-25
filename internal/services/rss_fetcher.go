@@ -162,3 +162,61 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 
 	return feed, nil
 }
+
+// StartScheduledFetch 启动定时拉取任务
+// 每 30 分钟自动拉取所有订阅源的新文章
+func (f *RSSFetcher) StartScheduledFetch() {
+	ticker := time.NewTicker(30 * time.Minute)
+	go func() {
+		// 启动时立即执行一次
+		log.Println("开始首次 RSS 订阅源拉取...")
+		f.RefreshAllFeeds()
+		log.Println("首次 RSS 订阅源拉取完成")
+
+		// 然后按定时器执行
+		for range ticker.C {
+			log.Println("开始定时 RSS 订阅源拉取...")
+			f.RefreshAllFeeds()
+			log.Println("定时 RSS 订阅源拉取完成")
+		}
+	}()
+}
+
+// CleanupOldItems 清除发布时间超过 30 天的文章
+func (f *RSSFetcher) CleanupOldItems() error {
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+	result := db.DB.Where("published_at < ?", thirtyDaysAgo).Delete(&models.FeedItem{})
+
+	if result.Error != nil {
+		return fmt.Errorf("清除过期文章失败: %w", result.Error)
+	}
+
+	log.Printf("已清除 %d 篇超过 30 天的 RSS 文章", result.RowsAffected)
+	return nil
+}
+
+// StartScheduledCleanup 启动定时清除任务
+// 每天凌晨 2 点清除超过 30 天的文章
+func (f *RSSFetcher) StartScheduledCleanup() {
+	go func() {
+		for {
+			// 计算到下一个凌晨 2 点的时间
+			now := time.Now()
+			next := time.Date(now.Year(), now.Month(), now.Day(), 2, 0, 0, 0, now.Location())
+			if now.After(next) {
+				next = next.Add(24 * time.Hour)
+			}
+			duration := next.Sub(now)
+
+			log.Printf("下次 RSS 文章清除将在 %s 后执行 (预计时间: %s)", duration, next.Format("2006-01-02 15:04:05"))
+			time.Sleep(duration)
+
+			log.Println("开始清除过期 RSS 文章...")
+			if err := f.CleanupOldItems(); err != nil {
+				log.Printf("清除过期 RSS 文章失败: %v", err)
+			} else {
+				log.Println("清除过期 RSS 文章完成")
+			}
+		}
+	}()
+}

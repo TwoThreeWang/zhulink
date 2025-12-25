@@ -48,6 +48,12 @@ func main() {
 	// 初始化异步排名服务
 	services.GetRankingService()
 
+	// 启动 RSS 定时任务
+	rssFetcher := services.GetRSSFetcher()
+	rssFetcher.StartScheduledFetch()   // 每 30 分钟拉取新文章
+	rssFetcher.StartScheduledCleanup() // 每天凌晨 2 点清除过期文章
+	log.Println("RSS 定时任务已启动: 拉取间隔 30 分钟, 保留最近 30 天文章")
+
 	// Initialize Gin
 	r := gin.Default()
 
