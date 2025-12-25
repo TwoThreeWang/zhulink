@@ -21,6 +21,28 @@ func (h *AuthHandler) ShowRegister(c *gin.Context) {
 	Render(c, http.StatusOK, "auth/register.html", nil)
 }
 
+// createUser 创建新用户的通用函数
+func (h *AuthHandler) createUser(username, email, password string) (*models.User, error) {
+	hash, err := utils.HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
+	user := models.User{
+		Username: username,
+		Email:    email,
+		Password: hash,
+		Avatar:   utils.GetRandomEmoji(), // 随机 emoji 头像
+		Points:   0,                      // 默认 0 竹笋
+	}
+
+	if err := db.DB.Create(&user).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (h *AuthHandler) Register(c *gin.Context) {
 	email := c.PostForm("email")
 	password := c.PostForm("password")
@@ -38,21 +60,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	hash, err := utils.HashPassword(password)
+	user, err := h.createUser(username, email, password)
 	if err != nil {
-		Render(c, http.StatusInternalServerError, "auth/register.html", gin.H{"Error": "系统错误"})
-		return
-	}
-
-	user := models.User{
-		Username: username,
-		Email:    email,
-		Password: hash,
-		Avatar:   utils.GetRandomEmoji(), // 随机 emoji 头像
-		Points:   0,                      // 默认 0 竹笋
-	}
-
-	if err := db.DB.Create(&user).Error; err != nil {
 		Render(c, http.StatusConflict, "auth/register.html", gin.H{"Error": "邮箱已注册"})
 		return
 	}

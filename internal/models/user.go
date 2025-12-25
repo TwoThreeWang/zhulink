@@ -15,6 +15,8 @@ type User struct {
 	Role          string     `gorm:"size:20;default:'user';not null" json:"role"` // user, admin
 	Status        int        `gorm:"default:0" json:"status"`                     // 0:正常, 1:禁言, 2:封禁
 	PunishExpires *time.Time `json:"punish_expires"`                              // 惩罚到期时间
+	GoogleID      string     `gorm:"index" json:"google_id"`                      // Google OAuth ID
+	GoogleEmail   string     `gorm:"index" json:"google_email"`                   // Google 邮箱
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	// No DeletedAt for hard delete

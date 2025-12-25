@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 	"zhulink/internal/db"
+	"zhulink/internal/handlers"
 	"zhulink/internal/middleware"
 	"zhulink/internal/router"
 	"zhulink/internal/services"
@@ -40,6 +41,9 @@ func main() {
 
 	// Initialize Database
 	db.Init()
+
+	// 初始化 Google OAuth
+	handlers.InitGoogleOAuth()
 
 	// 初始化异步排名服务
 	services.GetRankingService()

@@ -260,19 +260,33 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	// 如果要修改密码
-	if oldPassword != "" && newPassword != "" {
-		if !utils.CheckPasswordHash(oldPassword, user.Password) {
+	if newPassword != "" {
+		if len(newPassword) < 6 {
 			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
-				"Error":        "原密码错误",
+				"Error":        "新密码至少6位",
 				"User":         user,
 				"CommonEmojis": utils.GetCommonEmojis(),
 			})
 			return
 		}
 
-		if len(newPassword) < 6 {
+		// 验证原密码
+		passwordValid := false
+		if oldPassword != "" {
+			// 用户提供了原密码,直接验证
+			passwordValid = utils.CheckPasswordHash(oldPassword, user.Password)
+		} else if user.GoogleID != "" {
+			// 用户没有提供原密码,但有 GoogleID,尝试使用 GoogleID 验证
+			passwordValid = utils.CheckPasswordHash(user.GoogleID, user.Password)
+		}
+
+		if !passwordValid {
+			errorMsg := "原密码错误"
+			if user.GoogleID != "" && oldPassword == "" {
+				errorMsg = "原密码错误。如果您是通过 Google 登录注册的,原密码可以留空"
+			}
 			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
-				"Error":        "新密码至少6位",
+				"Error":        errorMsg,
 				"User":         user,
 				"CommonEmojis": utils.GetCommonEmojis(),
 			})

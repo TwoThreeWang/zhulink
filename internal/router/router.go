@@ -41,6 +41,10 @@ func RegisterRoutes(r *gin.Engine) {
 	r.POST("/login", authHandler.Login)        // 提交登录
 	r.GET("/logout", authHandler.Logout)       // 退出登录
 
+	// Google OAuth 路由 (Google OAuth Routes)
+	r.GET("/auth/google", authHandler.GoogleLogin)             // Google 登录
+	r.GET("/auth/google/callback", authHandler.GoogleCallback) // Google 回调
+
 	// 受保护路由 (Protected Routes)
 	authorized := r.Group("/")
 	authorized.Use(middleware.AuthRequired())
@@ -73,6 +77,11 @@ func RegisterRoutes(r *gin.Engine) {
 		dashboard.GET("/settings", userHandler.ShowSettings)      // 用户设置页面
 		dashboard.POST("/settings", userHandler.UpdateSettings)   // 提交用户设置更新
 		dashboard.POST("/checkin", userHandler.CheckIn)           // 每日签到
+
+		// Google 账号绑定路由
+		dashboard.GET("/settings/bind-google", authHandler.BindGoogle)                  // 绑定 Google 账号
+		dashboard.GET("/settings/bind-google/callback", authHandler.GoogleBindCallback) // Google 绑定回调
+		dashboard.POST("/settings/unbind-google", authHandler.UnbindGoogle)             // 解除 Google 绑定
 	}
 
 	// RSS 阅读器路由 (RSS Reader Routes)
