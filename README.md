@@ -197,6 +197,28 @@ docker-compose -f docker-compose.dev.yml up -d
 make dev
 ```
 
+### 自动化部署脚本
+
+使用部署脚本可以一键完成代码拉取、构建和部署:
+
+```bash
+# 首次部署
+cp .env.example .env
+nano .env  # 配置数据库等信息
+./deploy.sh
+
+# 后续更新
+./deploy.sh  # 自动拉取最新代码、构建、部署
+```
+
+**脚本功能**:
+- ✅ 自动拉取最新代码
+- ✅ 备份当前运行版本
+- ✅ 构建 Docker 镜像
+- ✅ 健康检查
+- ✅ 失败自动回滚
+- ✅ 清理旧镜像
+
 **详细部署文档**: 查看 [DOCKER_DEPLOY.md](./DOCKER_DEPLOY.md)
 
 
