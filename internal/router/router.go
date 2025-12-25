@@ -1,6 +1,7 @@
 package router
 
 import (
+	"net/http"
 	"zhulink/internal/handlers"
 	"zhulink/internal/middleware"
 
@@ -20,6 +21,11 @@ func RegisterRoutes(r *gin.Engine) {
 	transplantHandler := handlers.NewTransplantHandler()
 	adminHandler := handlers.NewAdminHandler()
 	seoHandler := handlers.NewSEOHandler()
+
+	// 404 Handler
+	r.NoRoute(func(c *gin.Context) {
+		handlers.RenderError(c, http.StatusNotFound, "您访问的页面不存在")
+	})
 
 	// SEO路由 (SEO Routes)
 	r.GET("/robots.txt", seoHandler.RobotsTxt)   // robots.txt
