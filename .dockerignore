@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# 环境变量文件
+.env
+.env.*
+
+# 构建产物
+tmp/
+zhulink
+main
+*.exe
+
+# Node.js
+node_modules/
+npm-debug.log
+
+# 开发工具配置
+.air.toml
+.vscode/
+.idea/
+
+# 文档
+README.md
+LICENSE
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 其他
+*.log
+*.swp
+*.swo
+*~
+.DS_Store

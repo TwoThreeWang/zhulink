@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  # ZhuLink 应用
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zhulink
+    restart: unless-stopped
+    # 将宿主机的 .env 文件映射到容器中
+    volumes:
+      - ./.env:/app/.env:ro
+    ports:
+      - "8080:8080"
+    # 如果数据库在同一 Docker 网络中,取消下面的注释并配置网络
+    # networks:
+    #   - your-network-name
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# 如果数据库在同一 Docker 网络中,取消下面的注释
+# networks:
+#   your-network-name:
+#     external: true

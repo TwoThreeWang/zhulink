@@ -151,6 +151,55 @@ make dev
 
 访问: `http://localhost:8080`
 
+## 🐳 Docker 部署 (推荐生产环境)
+
+### 快速部署
+
+```bash
+# 1. 配置环境变量
+cp .env.example .env
+nano .env  # 修改必要的配置
+
+# 2. 启动服务
+docker-compose up -d
+
+# 3. 查看日志
+docker-compose logs -f
+```
+
+### Docker 特性
+
+- ✅ **多阶段构建**: 优化镜像体积 (< 30MB)
+- ✅ **自动化构建**: 自动编译 Go 和压缩 CSS
+- ✅ **环境变量映射**: 宿主机 `.env` 文件直接映射到容器
+- ✅ **健康检查**: 自动监控服务状态
+- ✅ **安全运行**: 非 root 用户运行
+
+### 配置说明
+
+编辑 `.env` 文件,配置数据库连接:
+
+```bash
+# 使用已有的 PostgreSQL 数据库
+DATABASE_URL="host=your-db-host user=your-user password=your-password dbname=zhulink port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+
+# 如果数据库在本地
+DATABASE_URL="host=host.docker.internal user=postgres password=postgres dbname=zhulink port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+```
+
+### 开发环境 (仅数据库)
+
+```bash
+# 启动开发数据库
+docker-compose -f docker-compose.dev.yml up -d
+
+# 本地运行应用
+make dev
+```
+
+**详细部署文档**: 查看 [DOCKER_DEPLOY.md](./DOCKER_DEPLOY.md)
+
+
 ### 5. 生产环境构建
 ```bash
 # 构建二进制文件
@@ -236,14 +285,20 @@ zhulink/
 # 开发模式 (热重载 + CSS 监听)
 make dev
 
-# 构建生产版本
+# 生产构建 (Go 二进制 + 压缩 CSS)
 make build
 
-# 仅编译 CSS
-make css
+# 仅编译 CSS (开发模式,监听)
+make css-watch
+
+# 仅编译 CSS (生产模式,压缩)
+make css-build
 
 # 安装开发工具
 make setup
+
+# 清理构建产物
+make clean
 ```
 
 ## 🎯 核心特性说明
@@ -301,12 +356,36 @@ Score = (Points - 1) / (HoursSincePost + 2)^Gravity
 
 ## 🌐 部署建议
 
-### 环境要求
+### 推荐方式: Docker Compose (生产环境)
+
+使用 Docker Compose 部署是最简单和推荐的方式:
+
+```bash
+# 配置环境变量
+cp .env.production.example .env
+nano .env
+
+# 启动服务
+docker-compose up -d
+```
+
+**优势**:
+- 一键部署,无需手动配置环境
+- 自动构建优化的镜像 (< 30MB)
+- 使用已有的 PostgreSQL 数据库
+- 包含健康检查和自动重启
+- `.env` 文件直接映射到容器
+
+详见: [DOCKER_DEPLOY.md](./DOCKER_DEPLOY.md)
+
+### 传统部署方式
+
+#### 环境要求
 - PostgreSQL 12+
 - 至少 512MB RAM
 - Go 1.21+ (编译环境)
 
-### 生产环境配置
+#### 生产环境配置
 1. 设置 `GIN_MODE=release`
 2. 使用强随机 `SESSION_SECRET`
 3. 配置 HTTPS (推荐使用 Nginx 反向代理)
