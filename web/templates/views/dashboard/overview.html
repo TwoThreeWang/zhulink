@@ -24,8 +24,12 @@
                     {{ end }}
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-ink mb-1">早安，{{ .User.Username }}</h1>
-                    <p class="text-xs text-stone-400">今天也要充满活力</p>
+                    <h1 class="text-xl font-bold text-ink mb-1">Hi，{{ .User.Username }}</h1>
+                    {{ if .User.Bio }}
+                    <p class="text-xs text-stone-400">{{ .User.Bio }}</p>
+                    {{ else }}
+                    <p class="text-xs text-stone-400">这个人很懒，什么都没写...</p>
+                    {{ end }}
                 </div>
 
                 <!-- 每日签到 - 放置在右上角 -->

@@ -11,7 +11,9 @@ type RankConfig struct {
 	WeightComment  float64 // 2.0
 	WeightUpvote   float64 // 1.0
 	WeightDownvote float64 // 1.5
-	ScaleFactor    float64 // 放大系数 (100)
+	WeightView     float64 // 0.005 (浏览量权重极小)
+	ScaleFactor    float64 // 放大系数 (1000)
+	TimeBase       float64 // 时间基数 (24)
 }
 
 var DefaultConfig = RankConfig{
@@ -20,18 +22,20 @@ var DefaultConfig = RankConfig{
 	WeightComment:  2.0,
 	WeightUpvote:   1.0,
 	WeightDownvote: 1.5,
-	ScaleFactor:    100.0, // 让分数落在 0-100 区间，像"温度"
+	WeightView:     0.005,  // 浏览量权重极小,1000 次浏览 ≈ 5 分互动值
+	ScaleFactor:    1000.0, // 让分数落在 0-999 区间
+	TimeBase:       24.0,   // 时间基数,防止新帖分数虚高
 }
 
 func CalculateScore(t time.Time, up, down, collect, view, comment int) float64 {
 	hours := time.Since(t).Hours()
 
 	// 1. 计算加权互动值 (Weighted Sum)
-	// 注意：这里去掉了 View，因为 View 数量级太大，不适合放在 Log 里的权重计算，
-	// 或者 View 的权重需要给得极小 (e.g., 0.01)
+	// 浏览量以极小权重参与计算,避免数量级过大扭曲结果
 	weightedSum := (float64(up) * DefaultConfig.WeightUpvote) +
 		(float64(comment) * DefaultConfig.WeightComment) +
-		(float64(collect) * DefaultConfig.WeightCollect) -
+		(float64(collect) * DefaultConfig.WeightCollect) +
+		(float64(view) * DefaultConfig.WeightView) -
 		(float64(down) * DefaultConfig.WeightDownvote)
 
 	// 2. 基础修正
@@ -47,7 +51,8 @@ func CalculateScore(t time.Time, up, down, collect, view, comment int) float64 {
 	numerator := logScore * DefaultConfig.ScaleFactor
 
 	// 5. 时间衰减 (分母)
-	decay := math.Pow(hours+2, DefaultConfig.Gravity)
+	// 使用时间基数防止新帖子分数虚高
+	decay := math.Pow(hours+DefaultConfig.TimeBase, DefaultConfig.Gravity)
 
 	return numerator / decay
 }

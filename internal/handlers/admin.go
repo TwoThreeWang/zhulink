@@ -212,3 +212,40 @@ func (h *AdminHandler) HandleReport(c *gin.Context) {
 
 	c.Status(http.StatusOK)
 }
+
+// AdminDeleteComment 管理员删除评论
+func (h *AdminHandler) AdminDeleteComment(c *gin.Context) {
+	if h.checkAdmin(c) == nil {
+		c.Status(http.StatusForbidden)
+		return
+	}
+
+	cid := c.Param("cid")
+	var comment models.Comment
+	// 预加载 Post 信息以获取文章链接
+	if err := db.DB.Preload("Post").Where("cid = ?", cid).First(&comment).Error; err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+
+	// 保存原评论内容用于通知
+	originalContent := comment.Content
+	postLink := "/p/" + comment.Post.Pid
+
+	// 1. 扣除评论作者积分 (-3分)
+	services.AddPointsAsync(comment.UserID, services.PointsCommentDeleted, "评论被管理员删除")
+
+	// 2. 发送系统通知给评论作者，附上原评论内容和文章链接
+	notification := models.Notification{
+		UserID: comment.UserID,
+		Type:   models.NotificationTypeSystem,
+		Reason: "很抱歉，您的评论因违规已被管理员删除。如有疑问请联系管理。<br><br>原评论内容：<br>" + originalContent + "<br><br>文章链接：<a href='" + postLink + "#comment-" + strconv.FormatUint(uint64(comment.ID), 10) + "'>" + postLink + "</a>",
+	}
+	db.DB.Create(&notification)
+
+	// 3. 软删除：只替换内容
+	comment.Content = "该评论已被管理员删除。"
+	db.DB.Save(&comment)
+
+	c.Status(http.StatusOK)
+}

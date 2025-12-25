@@ -204,10 +204,47 @@ func (h *UserHandler) ShowSettings(c *gin.Context) {
 		return
 	}
 
+	// 处理成功和错误消息
+	var successMsg, errorMsg string
+	if c.Query("success") == "1" {
+		successMsg = "设置已成功保存"
+	} else if c.Query("success") == "google_bound" {
+		successMsg = "Google 账号已成功绑定"
+	} else if c.Query("success") == "google_unbound" {
+		successMsg = "Google 账号已成功解除绑定"
+	}
+
+	if errParam := c.Query("error"); errParam != "" {
+		switch errParam {
+		case "invalid_state":
+			errorMsg = "无效的状态参数"
+		case "invalid_mode":
+			errorMsg = "无效的模式"
+		case "user_not_found":
+			errorMsg = "用户不存在"
+		case "no_code":
+			errorMsg = "未收到授权码"
+		case "token_exchange_failed":
+			errorMsg = "令牌交换失败"
+		case "get_userinfo_failed":
+			errorMsg = "获取用户信息失败"
+		case "google_already_bound":
+			errorMsg = "该 Google 账号已被其他用户绑定"
+		case "bind_failed":
+			errorMsg = "绑定失败"
+		case "unbind_failed":
+			errorMsg = "解除绑定失败"
+		default:
+			errorMsg = "操作失败"
+		}
+	}
+
 	Render(c, http.StatusOK, "dashboard/settings.html", gin.H{
 		"Title":        "设置",
 		"User":         user,
 		"CommonEmojis": utils.GetCommonEmojis(),
+		"Success":      successMsg,
+		"Error":        errorMsg,
 	})
 }
 

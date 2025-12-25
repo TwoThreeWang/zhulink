@@ -22,6 +22,11 @@
         <button type="button" hx-delete="/comment/{{ .Cid }}" hx-confirm="确定要删除这条评论吗？" hx-target="#comment-{{ .ID }}"
             hx-swap="outerHTML" class="hover:text-red-500 transition-colors cursor-pointer">删除</button>
         {{ end }}
+        {{ if and $.CurrentUser (eq $.CurrentUser.Role "admin") }}
+        <button type="button" hx-delete="/admin/comment/{{ .Cid }}" hx-confirm="管理员确定要删除这条评论吗？将扣除作者积分并发送通知。"
+            hx-target="#comment-{{ .ID }}" hx-swap="outerHTML"
+            class="hover:text-orange-500 transition-colors cursor-pointer font-medium">🛡️ 管理员删除</button>
+        {{ end }}
     </div>
 
     <!-- 内容 -->
