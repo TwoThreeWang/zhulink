@@ -43,6 +43,26 @@ func LoadUser() gin.HandlerFunc {
 			var user models.User
 			result := db.DB.First(&user, userID)
 			if result.Error == nil {
+				// 检查用户是否被封禁
+				if user.Status == 2 {
+					// 封禁用户,清除session并重定向到登录页
+					session.Clear()
+					session.Save()
+
+					// 如果是HTMX请求,返回重定向header
+					if c.GetHeader("HX-Request") == "true" {
+						c.Header("HX-Redirect", "/login")
+						c.Status(http.StatusOK)
+						c.Abort()
+						return
+					}
+
+					// 普通请求,直接重定向
+					c.Redirect(http.StatusFound, "/login")
+					c.Abort()
+					return
+				}
+
 				c.Set(CheckUserKey, &user)
 
 				// Fetch Unread Notification Count

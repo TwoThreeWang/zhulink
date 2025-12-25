@@ -379,6 +379,28 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
 	pid := c.Param("pid")
 
+	// 检查用户状态
+	if user.Status == 2 {
+		// 封禁用户无法发布评论
+		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您的账号已被封禁,无法发布评论。"})
+		return
+	}
+	if user.Status == 1 {
+		// 禁言用户,检查是否已过期
+		if user.PunishExpires != nil && time.Now().After(*user.PunishExpires) {
+			// 禁言已过期,恢复状态
+			db.DB.Model(user).Updates(map[string]interface{}{
+				"status":         0,
+				"punish_expires": nil,
+			})
+			user.Status = 0
+		} else {
+			// 仍在禁言期
+			Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态,暂时无法发布评论。"})
+			return
+		}
+	}
+
 	// 通过Pid查找文章
 	var post models.Post
 	if err := db.DB.Where("pid = ?", pid).First(&post).Error; err != nil {

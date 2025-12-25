@@ -89,6 +89,7 @@ func (h *AdminHandler) PunishUser(c *gin.Context) {
 	status, _ := strconv.Atoi(statusStr)
 	daysStr := c.PostForm("days")
 	days, _ := strconv.Atoi(daysStr)
+	reason := c.PostForm("reason") // 惩罚原因
 
 	updates := map[string]interface{}{
 		"status": status,
@@ -105,6 +106,41 @@ func (h *AdminHandler) PunishUser(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+
+	// 发送通知给被惩罚用户
+	go func() {
+		var notificationReason string
+		if status == 1 {
+			// 禁言
+			if days > 0 {
+				notificationReason = "您已被管理员禁言 " + strconv.Itoa(days) + " 天。"
+			} else {
+				notificationReason = "您已被管理员禁言。"
+			}
+		} else if status == 2 {
+			// 封禁
+			if days > 0 {
+				notificationReason = "您的账号已被管理员封禁 " + strconv.Itoa(days) + " 天。"
+			} else {
+				notificationReason = "您的账号已被管理员永久封禁。"
+			}
+		} else {
+			// 解除惩罚
+			notificationReason = "您的账号已恢复正常状态。"
+		}
+
+		// 如果有原因,添加到通知中
+		if reason != "" {
+			notificationReason += " 原因: " + reason
+		}
+
+		notification := models.Notification{
+			UserID: uint(userID),
+			Type:   models.NotificationTypeSystem,
+			Reason: notificationReason,
+		}
+		db.DB.Create(&notification)
+	}()
 
 	c.Header("HX-Refresh", "true")
 	c.Status(http.StatusOK)

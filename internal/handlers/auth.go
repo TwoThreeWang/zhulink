@@ -84,6 +84,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// 检查用户是否被封禁
+	if user.Status == 2 {
+		Render(c, http.StatusForbidden, "auth/login.html", gin.H{"Error": "您的账号已被封禁,无法登录。"})
+		return
+	}
+
 	session := sessions.Default(c)
 	session.Set("user_id", user.ID)
 	session.Save()
