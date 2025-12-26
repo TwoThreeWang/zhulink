@@ -83,8 +83,8 @@ pull_latest_code() {
 build_image() {
     log_info "构建 Docker 镜像..."
 
-    # 构建新镜像(不停止旧容器)
-    docker-compose build --no-cache
+    # 构建新镜像(使用缓存加速,不停止旧容器)
+    docker-compose build
 
     log_info "镜像构建完成"
 }
