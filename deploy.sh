@@ -97,8 +97,8 @@ restart_service() {
     # Docker Compose 会先启动新容器,确认健康后再停止旧容器
     docker-compose up -d --force-recreate --remove-orphans
 
-    log_info "等待服务启动..."
-    sleep 5
+    log_info "等待服务启动（约 10 秒）..."
+    sleep 10
 }
 
 # 检查服务健康状态
