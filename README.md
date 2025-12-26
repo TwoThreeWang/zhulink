@@ -34,10 +34,19 @@
 
 ### 👥 用户系统
 - **账号注册**: 邮箱注册,密码 Bcrypt 加密
+- **邮箱激活**: 新用户需要邮箱验证激活账号
+- **密码找回**: 通过邮箱验证码重置密码
 - **Google OAuth**: 支持 Google 账号登录和绑定
 - **积分系统**: 完善的积分奖惩系统
 - **通知中心**: 评论回复、点赞、系统通知等
 - **个人主页**: 展示用户发布的内容和活动
+
+### 📧 邮件系统
+- **异步发送**: 邮件发送异步执行,不阻塞用户操作
+- **注册激活**: 新用户注册后发送激活邮件
+- **密码重置**: 忘记密码时发送验证码邮件
+- **评论通知**: 评论被回复时发送上下文通知邮件
+- **可选配置**: 未配置 SMTP 时自动禁用邮件功能
 
 ### 🛡️ 管理功能
 - **内容管理**: 置顶、移动、删除帖子
@@ -84,6 +93,7 @@
 ### 外部服务
 - **LLM**: Google Gemini API
 - **OAuth**: Google OAuth 2.0
+- **邮件**: Amazon SES / SMTP
 
 ## 🚀 快速开始
 
@@ -125,6 +135,13 @@ LLM_TOKEN="your-gemini-api-key"
 # Google OAuth 配置 (可选)
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# SMTP 邮件配置 (可选, 使用 Amazon SES 或其他 SMTP 服务)
+SMTP_HOST="email-smtp.us-east-1.amazonaws.com"
+SMTP_PORT="587"
+SMTP_USER="your-smtp-username"
+SMTP_PASS="your-smtp-password"
+SMTP_FROM="no-reply@yourdomain.com"
 ```
 
 ### 3. 安装依赖

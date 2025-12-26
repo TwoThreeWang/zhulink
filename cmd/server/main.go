@@ -226,6 +226,9 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	// Manual registration to ensure keys match handler expectation
 	r.AddFromFilesFuncs("auth/login.html", funcMap, assemble(templatesDir+"/views/auth/login.html")...)
 	r.AddFromFilesFuncs("auth/register.html", funcMap, assemble(templatesDir+"/views/auth/register.html")...)
+	r.AddFromFilesFuncs("auth/activate.html", funcMap, assemble(templatesDir+"/views/auth/activate.html")...)
+	r.AddFromFilesFuncs("auth/forgot_password.html", funcMap, assemble(templatesDir+"/views/auth/forgot_password.html")...)
+	r.AddFromFilesFuncs("auth/reset_password.html", funcMap, assemble(templatesDir+"/views/auth/reset_password.html")...)
 	r.AddFromFilesFuncs("story/list.html", funcMap, assemble(templatesDir+"/views/story/list.html")...)
 	r.AddFromFilesFuncs("story/detail.html", funcMap, assemble(templatesDir+"/views/story/detail.html")...)
 	r.AddFromFilesFuncs("story/create.html", funcMap, assemble(templatesDir+"/views/story/create.html")...)

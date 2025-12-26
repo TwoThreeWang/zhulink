@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>New Reply</title>
+</head>
+
+<body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <p>你好！</p>
+        <p><strong>{{ .ActiveUser }}</strong> 回复了你在 《{{ .ArticleTitle }}》 下的评论：</p>
+
+        <div style="border-left: 4px solid #ddd; padding-left: 15px; margin: 15px 0; color: #555;">
+            "{{ .ReplyContent }}"
+        </div>
+
+        <p>你之前的评论：</p>
+        <div style="font-style: italic; color: #777; font-size: 0.9em; margin-bottom: 20px;">
+            "{{ .OriginalContent }}"
+        </div>
+
+        <a href="{{ .PostLink }}"
+            style="display: inline-block; padding: 10px 20px; background-color: #198240; color:white; text-decoration: none; border-radius: 4px;">查看完整对话</a>
+
+        <p style="margin-top: 30px; font-size: 0.8em; color: #999;">如果不想收到此类通知，请在设置中调整（功能开发中）。</p>
+    </div>
+</body>
+
+</html>

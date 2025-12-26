@@ -34,3 +34,12 @@ func RandStringBytesMaskImpr(n int) string {
 	}
 	return string(b)
 }
+
+// GenerateRandomCode generates a random numeric string of length n
+func GenerateRandomCode(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = byte(rand.Intn(10)) + '0'
+	}
+	return string(b)
+}

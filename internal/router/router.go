@@ -41,11 +41,19 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/nodes", nodeHandler.ListNodes)     // 所有节点列表
 	r.GET("/u/:id", userHandler.Profile)       // 用户主页
 
-	r.GET("/signup", authHandler.ShowRegister) // 注册页面
-	r.POST("/signup", authHandler.Register)    // 提交注册
-	r.GET("/login", authHandler.ShowLogin)     // 登录页面
-	r.POST("/login", authHandler.Login)        // 提交登录
-	r.GET("/logout", authHandler.Logout)       // 退出登录
+	r.GET("/signup", authHandler.ShowRegister)   // 注册页面
+	r.POST("/signup", authHandler.Register)      // 提交注册
+	r.GET("/activate", authHandler.ShowActivate) // 激活页面
+	r.POST("/activate", authHandler.Activate)    // 提交激活
+	r.GET("/login", authHandler.ShowLogin)       // 登录页面
+	r.POST("/login", authHandler.Login)          // 提交登录
+	r.GET("/logout", authHandler.Logout)         // 退出登录
+
+	r.GET("/forgot_password", authHandler.ShowForgotPassword) // 忘记密码页面
+	r.POST("/forgot_password", authHandler.ForgotPassword)    // 提交忘记密码
+	r.GET("/reset_password", authHandler.ShowResetPassword)   // 重置密码页面
+	r.POST("/reset_password", authHandler.ResetPassword)      // 提交重置密码
+	r.GET("/refresh_captcha", authHandler.RefreshCaptcha)     // 刷新验证码 (AJAX)
 
 	// Google OAuth 路由 (Google OAuth Routes)
 	r.GET("/auth/google", authHandler.GoogleLogin)             // Google 登录

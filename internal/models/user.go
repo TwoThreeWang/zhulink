@@ -17,6 +17,8 @@ type User struct {
 	PunishExpires *time.Time `json:"punish_expires"`                              // 惩罚到期时间
 	GoogleID      string     `gorm:"index" json:"google_id"`                      // Google OAuth ID
 	GoogleEmail   string     `gorm:"index" json:"google_email"`                   // Google 邮箱
+	IsActivated   bool       `gorm:"default:false" json:"is_activated"`           // 是否已激活
+	VerifyCode    string     `gorm:"size:20" json:"-"`                            // 验证码(激活/重置通用)
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	// No DeletedAt for hard delete

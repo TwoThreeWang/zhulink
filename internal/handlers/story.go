@@ -18,10 +18,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type StoryHandler struct{}
+type StoryHandler struct {
+	mailService *services.MailService
+}
 
 func NewStoryHandler() *StoryHandler {
-	return &StoryHandler{}
+	return &StoryHandler{
+		mailService: services.NewMailService(),
+	}
 }
 
 // fillCommentCounts 批量填充帖子的评论数量
@@ -461,7 +465,7 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 		// 如果是回复评论，只通知被回复者
 		if comment.ParentID != nil {
 			var parentComment models.Comment
-			if err := db.DB.First(&parentComment, *comment.ParentID).Error; err == nil {
+			if err := db.DB.Preload("User").First(&parentComment, *comment.ParentID).Error; err == nil {
 				// 不要通知自己
 				if parentComment.UserID != user.ID {
 					notification := models.Notification{
@@ -472,6 +476,17 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 							post.Pid, comment.ID, post.Title),
 					}
 					db.DB.Create(&notification)
+
+					// Send Email Notification
+					postLink := fmt.Sprintf("%s/p/%s#comment-%d", os.Getenv("SITE_URL"), post.Pid, comment.ID)
+					h.mailService.SendCommentNotification(
+						parentComment.User.Email,
+						user.Username,
+						post.Title,
+						content, // This includes "Reply to #X..." prefix which gives context
+						parentComment.Content,
+						postLink,
+					)
 				}
 			}
 		} else {
