@@ -13,7 +13,7 @@
 {{ template "prose_styles" . }}
 
 <!-- 双栏布局: 8:4 黄金比例 (与 list.html / detail.html 保持一致) -->
-<div class="grid grid-cols-12 gap-12">
+<div class="grid grid-cols-12 gap-6 md:gap-12">
 
     <!-- 主内容区: col-span-8 -->
     <main class="col-span-12 lg:col-span-8">
@@ -133,14 +133,6 @@
                     <p><span class="text-moss">> 引用</span> → 引用文字</p>
                 </div>
             </div>
-
-            <!-- Footer Links -->
-            <nav class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-stone-400 px-1">
-                <a href="/about" class="hover:text-moss transition-colors">关于</a>
-                <a href="/guidelines" class="hover:text-moss transition-colors">准则</a>
-                <a href="https://github.com/wangtwothree/zhulink" target="_blank" rel="noopener noreferrer"
-                    class="hover:text-moss transition-colors">GitHub</a>
-            </nav>
 
         </div>
     </aside>

@@ -4,7 +4,7 @@
 <!-- 节点列表页面 -->
 
 <!-- 双栏布局: 8:4 黄金比例 -->
-<div class="grid grid-cols-12 gap-12">
+<div class="grid grid-cols-12 gap-6 md:gap-12">
 
     <!-- 主内容区: col-span-8 -->
     <main class="col-span-12 lg:col-span-8">
@@ -29,19 +29,19 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {{ range .Nodes }}
             <a href="/t/{{ .Name }}"
-                class="group block bg-stone-50 hover:bg-moss/5 rounded-lg p-5 transition-colors border border-stone-100 hover:border-moss/30">
+                class="group block bg-stone-50 hover:bg-moss/5 rounded-lg p-4 md:p-5 transition-colors border border-stone-100 hover:border-moss/30">
 
                 <!-- 节点名称 -->
                 <div class="flex items-center gap-2 mb-2">
-                    <i data-lucide="hash" class="w-4 h-4 text-moss"></i>
-                    <h2 class="font-medium text-ink group-hover:text-moss transition-colors">
+                    <i data-lucide="hash" class="w-4 h-4 text-moss flex-shrink-0"></i>
+                    <h2 class="font-medium text-ink group-hover:text-moss transition-colors break-words">
                         {{ .Name }}
                     </h2>
                 </div>
 
                 <!-- 节点描述 -->
                 {{ if .Description }}
-                <p class="text-sm text-stone-500 leading-relaxed line-clamp-2">
+                <p class="text-sm text-stone-500 leading-relaxed line-clamp-2 break-words">
                     {{ .Description }}
                 </p>
                 {{ else }}
@@ -74,14 +74,6 @@
                     节点是内容分类的方式，帮助你快速找到感兴趣的话题领域。点击任意节点浏览相关内容。
                 </p>
             </div>
-
-            <!-- Component C: Footer Links -->
-            <nav class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-400">
-                <a href="/" class="hover:text-moss transition-colors">首页</a>
-                <a href="/new" class="hover:text-moss transition-colors">最新</a>
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer"
-                    class="hover:text-moss transition-colors">GitHub</a>
-            </nav>
 
         </div>
     </aside>

@@ -63,6 +63,16 @@ func main() {
 		secret = "secret_key_change_me"
 	}
 	store := cookie.NewStore([]byte(secret))
+
+	// 配置cookie选项以支持iOS等移动设备
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7,                          // 7天
+		HttpOnly: true,                               // 防止XSS攻击
+		Secure:   os.Getenv("GIN_MODE") == "release", // 生产环境使用HTTPS
+		SameSite: http.SameSiteLaxMode,               // Lax模式兼容性最好
+	})
+
 	r.Use(sessions.Sessions("zhulink_session", store))
 
 	// Load Templates using Multitemplate to avoid collision and allow handler names
@@ -162,6 +172,19 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 		},
 		"add": func(a, b int) int {
 			return a + b
+		},
+		"sub": func(a, b int) int {
+			return a - b
+		},
+		"iterate": func(count int) []int {
+			var items []int
+			for i := 1; i <= count; i++ {
+				items = append(items, i)
+			}
+			return items
+		},
+		"lt": func(a, b int) bool {
+			return a < b
 		},
 		"timeAgo": func(t interface{}) string {
 			var timeVal time.Time

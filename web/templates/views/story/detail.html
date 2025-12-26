@@ -415,6 +415,8 @@
 </div>
 
 
+
+
 <style>
     /* CSS 渲染优化：屏幕外的评论项不渲染 */
     .divide-y>article,
@@ -423,6 +425,106 @@
         contain-intrinsic-size: 0 120px;
         /* 预估评论高度 */
     }
+
+    /* 图片放大查看器样式 */
+    #image-viewer {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 9999;
+        cursor: pointer;
+        animation: fadeIn 0.2s ease;
+    }
+
+    #image-viewer.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #image-viewer img {
+        max-width: 90%;
+        max-height: 90vh;
+        object-fit: contain;
+        animation: zoomIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes zoomIn {
+        from {
+            transform: scale(0.9);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    /* 文章内图片添加点击提示 */
+    .article-content img {
+        cursor: zoom-in;
+        transition: opacity 0.2s;
+    }
+
+    .article-content img:hover {
+        opacity: 0.9;
+    }
 </style>
+
+<!-- 图片放大查看器 -->
+<div id="image-viewer">
+    <img src="" alt="">
+</div>
+
+<script>
+    // 图片放大功能
+    (function () {
+        const viewer = document.getElementById('image-viewer');
+        const viewerImg = viewer.querySelector('img');
+        const articleContent = document.querySelector('.article-content');
+
+        if (!articleContent) return;
+
+        // 为所有文章图片添加点击事件
+        articleContent.querySelectorAll('img').forEach(img => {
+            img.addEventListener('click', function (e) {
+                e.stopPropagation();
+                viewerImg.src = this.src;
+                viewerImg.alt = this.alt;
+                viewer.classList.add('show');
+                document.body.style.overflow = 'hidden'; // 防止背景滚动
+            });
+        });
+
+        // 点击遮罩层关闭
+        viewer.addEventListener('click', function () {
+            viewer.classList.remove('show');
+            document.body.style.overflow = '';
+        });
+
+        // ESC键关闭
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && viewer.classList.contains('show')) {
+                viewer.classList.remove('show');
+                document.body.style.overflow = '';
+            }
+        });
+    })();
+</script>
 
 {{ end }}

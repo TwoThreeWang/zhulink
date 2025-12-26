@@ -6,7 +6,7 @@ import (
 
 type Post struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
-	Pid        string    `gorm:"uniqueIndex;size:8;not null" json:"pid"`
+	Pid        string    `gorm:"uniqueIndex;size:20;not null" json:"pid"`
 	UserID     uint      `gorm:"not null;index" json:"user_id"`
 	User       User      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"user"`
 	NodeID     uint      `gorm:"not null;index;default:1" json:"node_id"`

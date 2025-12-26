@@ -26,6 +26,30 @@
     <!-- 主内容区: col-span-8 -->
     <main class="col-span-12 lg:col-span-8">
 
+        <!-- 节点信息展示 (仅在节点页面显示) -->
+        {{ if .Node }}
+        <header class="mb-6 pb-6 border-b border-stone-200">
+            <div class="flex items-start gap-3">
+                <div class="flex-shrink-0 w-12 h-12 bg-moss/10 rounded-lg flex items-center justify-center">
+                    <i data-lucide="hash" class="w-6 h-6 text-moss"></i>
+                </div>
+                <div class="flex-grow min-w-0">
+                    <h1 class="font-sans font-bold text-2xl md:text-3xl text-ink mb-2">
+                        {{ .Node.Name }}
+                    </h1>
+                    {{ if .Node.Description }}
+                    <p class="text-base text-stone-600 leading-relaxed">
+                        {{ .Node.Description }}
+                    </p>
+                    {{ else }}
+                    <p class="text-base text-stone-400 italic">
+                        暂无描述
+                    </p>
+                    {{ end }}
+                </div>
+            </div>
+        </header>
+        {{ end }}
 
         <!-- 帖子列表 -->
         <ul class="divide-y divide-stone-200/60">
@@ -94,6 +118,92 @@
             </li>
             {{ end }}
         </ul>
+
+        <!-- 分页组件 -->
+        {{ if gt .TotalPages 1 }}
+        <nav class="mt-8 flex justify-center items-center gap-2" aria-label="分页导航">
+            <!-- 上一页 -->
+            {{ if gt .CurrentPage 1 }}
+            <a href="?page={{ sub .CurrentPage 1 }}"
+                class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                <span>上一页</span>
+            </a>
+            {{ else }}
+            <span
+                class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-stone-300 bg-stone-50/50 rounded-md cursor-not-allowed">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                <span>上一页</span>
+            </span>
+            {{ end }}
+
+            <!-- 页码列表 -->
+            <div class="flex items-center gap-1">
+                {{ $currentPage := .CurrentPage }}
+                {{ $totalPages := .TotalPages }}
+                {{ $active := .Active }}
+
+                <!-- 始终显示第一页 -->
+                {{ if eq $currentPage 1 }}
+                <span class="px-3 py-2 text-sm font-bold text-white bg-moss rounded-md">1</span>
+                {{ else }}
+                <a href="?page=1"
+                    class="px-3 py-2 text-sm font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">1</a>
+                {{ end }}
+
+                <!-- 左侧省略号 -->
+                {{ if gt $currentPage 3 }}
+                <span class="px-2 text-stone-400">...</span>
+                {{ end }}
+
+                <!-- 当前页附近的页码 -->
+                {{ range $page := iterate $totalPages }}
+                {{ if and (gt $page 1) (lt $page $totalPages) }}
+                {{ if or (eq $page (sub $currentPage 1)) (eq $page $currentPage) (eq $page (add $currentPage 1)) }}
+                {{ if eq $page $currentPage }}
+                <span class="px-3 py-2 text-sm font-bold text-white bg-moss rounded-md">{{ $page }}</span>
+                {{ else }}
+                <a href="?page={{ $page }}"
+                    class="px-3 py-2 text-sm font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">{{
+                    $page }}</a>
+                {{ end }}
+                {{ end }}
+                {{ end }}
+                {{ end }}
+
+                <!-- 右侧省略号 -->
+                {{ if lt $currentPage (sub $totalPages 2) }}
+                <span class="px-2 text-stone-400">...</span>
+                {{ end }}
+
+                <!-- 始终显示最后一页 -->
+                {{ if gt $totalPages 1 }}
+                {{ if eq $currentPage $totalPages }}
+                <span class="px-3 py-2 text-sm font-bold text-white bg-moss rounded-md">{{ $totalPages }}</span>
+                {{ else }}
+                <a href="?page={{ $totalPages }}"
+                    class="px-3 py-2 text-sm font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">{{
+                    $totalPages }}</a>
+                {{ end }}
+                {{ end }}
+            </div>
+
+            <!-- 下一页 -->
+            {{ if lt .CurrentPage .TotalPages }}
+            <a href="?page={{ add .CurrentPage 1 }}"
+                class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">
+                <span>下一页</span>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </a>
+            {{ else }}
+            <span
+                class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-stone-300 bg-stone-50/50 rounded-md cursor-not-allowed">
+                <span>下一页</span>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </span>
+            {{ end }}
+        </nav>
+        {{ end }}
     </main>
 
     <!-- 侧边栏: col-span-4, sticky -->

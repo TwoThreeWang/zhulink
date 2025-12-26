@@ -89,7 +89,14 @@
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" @click.outside="open = false"
                         class="flex items-center space-x-2 hover:bg-stone-50 px-2 py-1 rounded-md transition-colors">
-                        <span class="text-lg leading-none">{{ .CurrentUser.Avatar }}</span>
+                        <!-- 头像容器,带未读消息小圆点 -->
+                        <span class="relative text-lg leading-none">
+                            {{ .CurrentUser.Avatar }}
+                            {{ if .UnreadCount }}
+                            <span
+                                class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                            {{ end }}
+                        </span>
                         <span class="text-ink-light">{{ .CurrentUser.Username }}</span>
                         <i data-lucide="chevron-down" class="w-4 h-4 transition-transform"
                             :class="{ 'rotate-180': open }"></i>
@@ -111,17 +118,6 @@
                             class="block px-3 py-1.5 text-ink-light hover:text-red-600 hover:bg-stone-50 transition-colors">退出</a>
                     </div>
                 </div>
-                <!-- 通知图标 -->
-                <a href="/dashboard/notifications" class="relative group ml-1">
-                    <div
-                        class="p-1.5 rounded-full hover:bg-stone-50 transition-colors text-ink-light group-hover:text-moss">
-                        <i data-lucide="bell" class="w-4 h-4"></i>
-                        {{ if .UnreadCount }}
-                        <span
-                            class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                        {{ end }}
-                    </div>
-                </a>
                 {{ else }}
                 <!-- 未登录 -->
                 <div class="flex items-center space-x-3 text-ink-light">
@@ -175,17 +171,14 @@
                 </a>
 
                 {{ if .CurrentUser }}
-                <!-- 通知 -->
-                <a href="/dashboard/notifications"
-                    class="flex items-center space-x-0.5 {{ if gt .UnreadCount 0 }}text-red-500{{ else }}text-ink-light{{ end }}">
-                    <i data-lucide="bell" class="w-4 h-4 {{ if gt .UnreadCount 0 }}fill-current{{ end }}"></i>
-                    {{ if gt .UnreadCount 0 }}<span class="text-[10px] font-bold">{{ .UnreadCount }}</span>{{ end }}
-                </a>
-
-                <!-- 已登录: emoji 头像 -->
+                <!-- 已登录: emoji 头像,带未读消息小圆点 -->
                 <a href="/dashboard"
-                    class="flex items-center justify-center text-xl hover:opacity-80 transition-opacity">
+                    class="relative flex items-center justify-center text-xl hover:opacity-80 transition-opacity">
                     {{ .CurrentUser.Avatar }}
+                    {{ if gt .UnreadCount 0 }}
+                    <span
+                        class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                    {{ end }}
                 </a>
                 {{ else }}
                 <!-- 未登录: 登录 -->

@@ -27,6 +27,38 @@
                 <p class="text-stone-400 italic mb-4 text-sm">这个人很懒，什么都没写...</p>
                 {{ end }}
 
+                <!-- 账号状态标识 -->
+                <div class="mb-4">
+                    {{ if eq .User.Status 0 }}
+                    <!-- 正常状态 -->
+                    <span
+                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-100">
+                        <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                        <span>账号正常</span>
+                    </span>
+                    {{ else if eq .User.Status 1 }}
+                    <!-- 禁言状态 -->
+                    <span
+                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">
+                        <i data-lucide="volume-x" class="w-3.5 h-3.5"></i>
+                        <span>禁言中</span>
+                        {{ if .User.PunishExpires }}
+                        <span class="text-amber-600">· 至 {{ .User.PunishExpires.Format "2006-01-02" }}</span>
+                        {{ end }}
+                    </span>
+                    {{ else if eq .User.Status 2 }}
+                    <!-- 封禁状态 -->
+                    <span
+                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 rounded-full text-xs font-medium border border-red-200">
+                        <i data-lucide="ban" class="w-3.5 h-3.5"></i>
+                        <span>账号封禁</span>
+                        {{ if .User.PunishExpires }}
+                        <span class="text-red-600">· 至 {{ .User.PunishExpires.Format "2006-01-02" }}</span>
+                        {{ end }}
+                    </span>
+                    {{ end }}
+                </div>
+
                 <!-- 杂志页码风格数据展示 -->
                 <div class="flex items-center justify-center md:justify-start gap-6 md:gap-10">
                     <div>
@@ -96,7 +128,7 @@
 
     <!-- Sticky Tab 导航 -->
     <nav
-        class="sticky top-[3.5rem] md:top-[4rem] z-10 bg-paper/95 backdrop-blur-md border-b border-stone-100 -mx-4 px-4 md:-mx-0 md:px-0 mb-6 overflow-x-auto no-scrollbar">
+        class="bg-paper/95 backdrop-blur-md border-b border-stone-100 -mx-4 px-4 md:-mx-0 md:px-0 mb-6 overflow-x-auto no-scrollbar">
         <div class="flex gap-6 min-w-max">
             <a href="/u/{{ .User.ID }}?tab=posts"
                 class="py-2.5 text-sm font-medium transition-colors border-b-2 {{ if eq .ActiveTab " posts" }}text-ink

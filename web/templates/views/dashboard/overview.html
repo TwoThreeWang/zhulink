@@ -43,6 +43,54 @@
                 </div>
             </header>
 
+            <!-- 账号状态标识 -->
+            <div class="mb-6">
+                {{ if eq .User.Status 0 }}
+                <!-- 正常状态 -->
+                <span
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium border border-emerald-100">
+                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                    <span>账号正常</span>
+                </span>
+                {{ else if eq .User.Status 1 }}
+                <!-- 禁言状态 -->
+                <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="volume-x" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"></i>
+                        <div class="flex-grow">
+                            <h3 class="text-sm font-bold text-amber-900 mb-1">您的账号已被禁言</h3>
+                            <p class="text-xs text-amber-700">
+                                {{ if .User.PunishExpires }}
+                                禁言将于 <span class="font-semibold">{{ .User.PunishExpires.Format "2006-01-02 15:04"
+                                    }}</span> 解除
+                                {{ else }}
+                                永久禁言
+                                {{ end }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {{ else if eq .User.Status 2 }}
+                <!-- 封禁状态 -->
+                <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="ban" class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"></i>
+                        <div class="flex-grow">
+                            <h3 class="text-sm font-bold text-red-900 mb-1">您的账号已被封禁</h3>
+                            <p class="text-xs text-red-700">
+                                {{ if .User.PunishExpires }}
+                                封禁将于 <span class="font-semibold">{{ .User.PunishExpires.Format "2006-01-02 15:04"
+                                    }}</span> 解除
+                                {{ else }}
+                                永久封禁
+                                {{ end }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {{ end }}
+            </div>
+
             <!-- 杂志风格数据统计 - 紧凑版 -->
             <section class="flex flex-wrap gap-8 md:gap-16 mb-10 pb-6 border-b border-stone-100">
                 <div>

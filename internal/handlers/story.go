@@ -88,6 +88,27 @@ func calculateRank(score int, createdAt time.Time) float64 {
 // Note: This prevents using index effectively. But for MVP it's fine.
 
 func (h *StoryHandler) ListTop(c *gin.Context) {
+	// 分页参数
+	page := 1
+	if p := c.Query("page"); p != "" {
+		if pageNum, err := strconv.Atoi(p); err == nil && pageNum > 0 {
+			page = pageNum
+		}
+	}
+
+	perPage := 30
+	offset := (page - 1) * perPage
+
+	// 查询总数
+	var total int64
+	db.DB.Model(&models.Post{}).Count(&total)
+
+	// 计算总页数
+	totalPages := int(math.Ceil(float64(total) / float64(perPage)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
 	var posts []models.Post
 	// Using SQL formula for ordering
 	// Ensure Score is at least 1 to avoid division issues or negative (though initialized 0).
@@ -97,28 +118,58 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 	// Hard delete means we don't worry about deleted_at.
 	db.DB.Preload("User").Preload("Node").
 		Order("is_top DESC, score / power((EXTRACT(EPOCH FROM NOW() - created_at)/3600) + 2, 1.8) DESC").
-		Limit(50).
+		Limit(perPage).
+		Offset(offset).
 		Find(&posts)
 
 	fillCommentCounts(posts)
 
 	Render(c, http.StatusOK, "story/list.html", gin.H{
-		"Posts":  posts,
-		"Active": "top",
-		"Title":  "热门",
+		"Posts":       posts,
+		"Active":      "top",
+		"Title":       "热门",
+		"CurrentPage": page,
+		"TotalPages":  totalPages,
 	})
 }
 
 func (h *StoryHandler) ListNew(c *gin.Context) {
+	// 分页参数
+	page := 1
+	if p := c.Query("page"); p != "" {
+		if pageNum, err := strconv.Atoi(p); err == nil && pageNum > 0 {
+			page = pageNum
+		}
+	}
+
+	perPage := 30
+	offset := (page - 1) * perPage
+
+	// 查询总数
+	var total int64
+	db.DB.Model(&models.Post{}).Count(&total)
+
+	// 计算总页数
+	totalPages := int(math.Ceil(float64(total) / float64(perPage)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
 	var posts []models.Post
-	db.DB.Preload("User").Preload("Node").Order("created_at DESC").Limit(50).Find(&posts)
+	db.DB.Preload("User").Preload("Node").
+		Order("created_at DESC").
+		Limit(perPage).
+		Offset(offset).
+		Find(&posts)
 
 	fillCommentCounts(posts)
 
 	Render(c, http.StatusOK, "story/list.html", gin.H{
-		"Posts":  posts,
-		"Active": "new",
-		"Title":  "新芽",
+		"Posts":       posts,
+		"Active":      "new",
+		"Title":       "新芽",
+		"CurrentPage": page,
+		"TotalPages":  totalPages,
 	})
 }
 
@@ -132,21 +183,45 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 		return
 	}
 
+	// 分页参数
+	page := 1
+	if p := c.Query("page"); p != "" {
+		if pageNum, err := strconv.Atoi(p); err == nil && pageNum > 0 {
+			page = pageNum
+		}
+	}
+
+	perPage := 30
+	offset := (page - 1) * perPage
+
+	// 查询该节点下的文章总数
+	var total int64
+	db.DB.Model(&models.Post{}).Where("node_id = ?", node.ID).Count(&total)
+
+	// 计算总页数
+	totalPages := int(math.Ceil(float64(total) / float64(perPage)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
 	// 查询该节点下的文章
 	var posts []models.Post
 	db.DB.Preload("User").Preload("Node").
 		Where("node_id = ?", node.ID).
 		Order("created_at DESC").
-		Limit(50).
+		Limit(perPage).
+		Offset(offset).
 		Find(&posts)
 
 	fillCommentCounts(posts)
 
 	Render(c, http.StatusOK, "story/list.html", gin.H{
-		"Posts":  posts,
-		"Active": "node",
-		"Title":  "" + node.Name,
-		"Node":   node,
+		"Posts":       posts,
+		"Active":      "node",
+		"Title":       "" + node.Name,
+		"Node":        node,
+		"CurrentPage": page,
+		"TotalPages":  totalPages,
 	})
 }
 
