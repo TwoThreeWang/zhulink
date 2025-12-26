@@ -47,7 +47,7 @@ docker-compose ps
 
 ### 3. 访问应用
 
-打开浏览器访问: `http://your-server-ip:8080`
+打开浏览器访问: `http://your-server-ip:32919`
 
 ### 4. 停止服务
 
@@ -87,7 +87,7 @@ make dev
    - 编译并压缩 CSS 文件
    - 输出: `web/static/css/style.css` (约 39KB)
 
-2. **阶段 2 - Go 编译** (`golang:1.23-alpine`):
+2. **阶段 2 - Go 编译** (`golang:1.25-alpine`):
    - 下载 Go 依赖
    - 编译静态链接的二进制文件
    - 使用 `-ldflags="-s -w"` 优化体积
@@ -186,7 +186,7 @@ server {
 
     # 反向代理到 ZhuLink
     location / {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:32919;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -195,7 +195,7 @@ server {
 
     # 静态资源缓存
     location /static/ {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:32919;
         proxy_cache_valid 200 30d;
         add_header Cache-Control "public, immutable";
     }
@@ -277,12 +277,12 @@ docker-compose exec postgres pg_isready -U zhulink
 docker-compose logs postgres
 
 # 测试连接
-docker-compose exec app wget -O- http://localhost:8080/
+docker-compose exec app wget -O- http://localhost:32919/
 ```
 
 ### 端口冲突
 
-如果 8080 端口被占用,修改 `.env.production`:
+如果 32919 端口被占用,修改 `.env.production`:
 ```bash
 APP_PORT=8081
 ```
@@ -325,9 +325,9 @@ docker image prune -f
 | `DB_USER` | 否 | `zhulink` | 数据库用户 |
 | `DB_PASSWORD` | **是** | - | 数据库密码 |
 | `DB_PORT` | 否 | `5432` | 数据库端口 |
-| `APP_PORT` | 否 | `8080` | 应用端口 |
+| `APP_PORT` | 否 | `32919` | 应用端口 |
 | `SESSION_SECRET` | **是** | - | Session 密钥 |
-| `SITE_URL` | 否 | `http://localhost:8080` | 网站 URL |
+| `SITE_URL` | 否 | `http://localhost:32919` | 网站 URL |
 | `LLM_BASE_URL` | 否 | - | LLM API 地址 |
 | `LLM_MODEL` | 否 | - | LLM 模型名称 |
 | `LLM_TOKEN` | 否 | - | LLM API 密钥 |

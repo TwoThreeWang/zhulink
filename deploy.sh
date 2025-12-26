@@ -110,7 +110,7 @@ check_health() {
 
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         if docker ps | grep -q "zhulink.*Up"; then
-            if curl -f http://localhost:8080 &> /dev/null; then
+            if curl -f http://localhost:32919 &> /dev/null; then
                 log_info "服务启动成功! ✓"
                 return 0
             fi

@@ -120,7 +120,7 @@ cp .env.example .env
 DATABASE_URL="host=localhost user=postgres password=yourpassword dbname=zhulink port=5432 sslmode=disable TimeZone=Asia/Shanghai"
 
 # 服务器配置
-PORT=8080
+PORT=32919
 GIN_MODE=release  # debug, release, or test
 SESSION_SECRET="your-secret-key-change-me"
 
@@ -166,7 +166,7 @@ make dev
 - Air (后端热重载)
 - Tailwind CSS (监听模式)
 
-访问: `http://localhost:8080`
+访问: `http://localhost:32919`
 
 ## 🐳 Docker 部署 (推荐生产环境)
 

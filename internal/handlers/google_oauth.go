@@ -25,7 +25,7 @@ var googleOauthConfig *oauth2.Config
 func InitGoogleOAuth() {
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
-		siteURL = "http://localhost:8080"
+		siteURL = "http://localhost:32919"
 	}
 
 	googleOauthConfig = &oauth2.Config{

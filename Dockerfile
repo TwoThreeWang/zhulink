@@ -20,7 +20,7 @@ RUN npm install && \
 # ============================================
 # 阶段 2: 构建 Go 应用
 # ============================================
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 
 WORKDIR /build
 
@@ -69,11 +69,11 @@ RUN addgroup -g 1000 appuser && \
 USER appuser
 
 # 暴露端口
-EXPOSE 8080
+EXPOSE 32919
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:32919/ || exit 1
 
 # 启动应用
 CMD ["./zhulink"]
