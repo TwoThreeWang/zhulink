@@ -31,6 +31,15 @@ func (h *UserHandler) Profile(c *gin.Context) {
 		return
 	}
 
+	// 获取当前登录用户
+	currentUser, _ := getCurrentUser(c)
+
+	// 判断访问者是否为用户本人
+	isOwner := false
+	if currentUser != nil && currentUser.ID == user.ID {
+		isOwner = true
+	}
+
 	// 计算用户等级和林龄
 	levelName, levelIcon := utils.GetUserLevel(user.Points)
 	daysSince := utils.GetDaysSinceJoined(user.CreatedAt)
@@ -60,6 +69,12 @@ func (h *UserHandler) Profile(c *gin.Context) {
 			Limit(50).
 			Find(&comments)
 	} else if tab == "bookmarks" {
+		// 收藏列表仅本人可见
+		if !isOwner {
+			// 非本人访问收藏页面，重定向到发布页面
+			c.Redirect(http.StatusFound, fmt.Sprintf("/u/%s?tab=posts", userID))
+			return
+		}
 		// 查询用户收藏的文章
 		var bookmarks []models.Bookmark
 		db.DB.Preload("Post").
@@ -86,6 +101,7 @@ func (h *UserHandler) Profile(c *gin.Context) {
 		"Comments":        comments,
 		"BookmarkedPosts": bookmarkedPosts,
 		"ActiveTab":       tab,
+		"IsOwner":         isOwner,
 	})
 }
 

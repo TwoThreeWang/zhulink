@@ -124,12 +124,25 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 
 	fillCommentCounts(posts)
 
+	// SEO 数据
+	siteURL := os.Getenv("SITE_URL")
+	if siteURL == "" {
+		siteURL = "https://zhulink.com"
+	}
+	fullURL := siteURL
+	if page > 1 {
+		fullURL = fmt.Sprintf("%s?page=%d", siteURL, page)
+	}
+
 	Render(c, http.StatusOK, "story/list.html", gin.H{
 		"Posts":       posts,
 		"Active":      "top",
-		"Title":       "热门",
+		"Title":       "热门话题",
 		"CurrentPage": page,
 		"TotalPages":  totalPages,
+		"Description": "汇聚 ZhuLink 社区近期热度最高的科技资讯、深度讨论与 RSS 精选。依靠用户“竹笋”共识筛选，拒绝算法推荐，只看最有价值的内容。",
+		"Keywords":    "ZhuLink, 竹林, 技术社区, 热门文章, 高质量内容, 去算法, 技术社区, RSS聚合, Go语言, 独立开发, 深度阅读, ZhuLink",
+		"FullURL":     fullURL,
 	})
 }
 
@@ -164,12 +177,25 @@ func (h *StoryHandler) ListNew(c *gin.Context) {
 
 	fillCommentCounts(posts)
 
+	// SEO 数据
+	siteURL := os.Getenv("SITE_URL")
+	if siteURL == "" {
+		siteURL = "https://zhulink.com"
+	}
+	fullURL := fmt.Sprintf("%s/new", siteURL)
+	if page > 1 {
+		fullURL = fmt.Sprintf("%s/new?page=%d", siteURL, page)
+	}
+
 	Render(c, http.StatusOK, "story/list.html", gin.H{
 		"Posts":       posts,
 		"Active":      "new",
-		"Title":       "新芽",
+		"Title":       "最新发布",
 		"CurrentPage": page,
 		"TotalPages":  totalPages,
+		"Description": "实时追踪 ZhuLink 社区的最新动态。第一时间获取 RSS 移栽的科技新闻、独立开发者的新作展示以及新鲜的技术问答。",
+		"Keywords":    "ZhuLink, 竹林, 最新文章, 技术分享, 社区动态, 最新资讯, 科技新闻, 实时动态, RSS更新",
+		"FullURL":     fullURL,
 	})
 }
 
@@ -215,6 +241,21 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 
 	fillCommentCounts(posts)
 
+	// SEO 数据
+	siteURL := os.Getenv("SITE_URL")
+	if siteURL == "" {
+		siteURL = "https://zhulink.com"
+	}
+	fullURL := fmt.Sprintf("%s/t/%s", siteURL, node.Name)
+	if page > 1 {
+		fullURL = fmt.Sprintf("%s/t/%s?page=%d", siteURL, node.Name, page)
+	}
+
+	description := fmt.Sprintf("ZhuLink 竹林 - %s节点的所有文章", node.Name)
+	if node.Description != "" {
+		description = fmt.Sprintf("ZhuLink 竹林 - %s节点: %s", node.Name, node.Description)
+	}
+
 	Render(c, http.StatusOK, "story/list.html", gin.H{
 		"Posts":       posts,
 		"Active":      "node",
@@ -222,6 +263,9 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 		"Node":        node,
 		"CurrentPage": page,
 		"TotalPages":  totalPages,
+		"Description": description,
+		"Keywords":    fmt.Sprintf("ZhuLink, 竹林, %s, 技术分享", node.Name),
+		"FullURL":     fullURL,
 	})
 }
 
@@ -242,11 +286,26 @@ func (h *StoryHandler) Search(c *gin.Context) {
 
 	fillCommentCounts(posts)
 
+	// SEO 数据
+	siteURL := os.Getenv("SITE_URL")
+	if siteURL == "" {
+		siteURL = "https://zhulink.com"
+	}
+	fullURL := fmt.Sprintf("%s/search?q=%s", siteURL, query)
+
+	description := "在 ZhuLink 竹林搜索优质内容和技术文章"
+	if query != "" {
+		description = fmt.Sprintf("在 ZhuLink 竹林搜索 '%s' 的结果", query)
+	}
+
 	Render(c, http.StatusOK, "search.html", gin.H{
-		"Posts":  posts,
-		"Query":  query,
-		"Active": "search",
-		"Title":  "搜索 - " + query,
+		"Posts":       posts,
+		"Query":       query,
+		"Active":      "search",
+		"Title":       "搜索 - " + query,
+		"Description": description,
+		"Keywords":    fmt.Sprintf("ZhuLink, 竹林, 搜索, %s", query),
+		"FullURL":     fullURL,
 	})
 }
 

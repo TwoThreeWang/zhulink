@@ -147,6 +147,7 @@
                     评论
                 </span>
             </a>
+            {{ if .IsOwner }}
             <a href="/u/{{ .User.ID }}?tab=bookmarks"
                 class="py-2.5 text-sm font-medium transition-colors border-b-2 {{ if eq .ActiveTab " bookmarks"
                 }}text-ink border-moss{{ else }}text-stone-400 border-transparent hover:text-ink
@@ -156,6 +157,7 @@
                     收藏
                 </span>
             </a>
+            {{ end }}
         </div>
     </nav>
 

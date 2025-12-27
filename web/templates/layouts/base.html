@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ if .Title }}{{ .Title }} - {{ end }}ZhuLink 竹林</title>
+    <title>{{ if .Title }}{{ .Title }} - {{ end }}ZhuLink 竹林 | 去算法的高质量资讯社区</title>
     <link rel="icon" type="image/svg+xml" href="/static/img/logo.svg">
     <link href="/static/css/style.css?v=4" rel="stylesheet">
     <!-- HTMX -->
@@ -26,6 +26,16 @@
             display: none !important;
         }
     </style>
+    <script async defer src="https://pingoo.c2v2.com/pingoo.js" site-id="5"></script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-S5DS6NFBR1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'G-S5DS6NFBR1');
+    </script>
 </head>
 
 <!-- 设计理念: 白纸墨字, 点翠成林 -->
@@ -252,6 +262,27 @@
             </button>
         </div>
     </div>
+
+    <!-- 返回顶部按钮 -->
+    <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
+        class="fixed bottom-8 right-8 w-12 h-12 bg-moss text-white rounded-full shadow-lg hover:bg-moss-dark transition-all opacity-0 pointer-events-none z-50"
+        onscroll="this.style.opacity=window.scrollY>300?'1':'0';this.style.pointerEvents=window.scrollY>300?'auto':'none'"
+        id="backToTop">
+        <i data-lucide="arrow-up" class="w-5 h-5 mx-auto"></i>
+    </button>
+
+    <script>
+        window.addEventListener('scroll', () => {
+            const btn = document.getElementById('backToTop');
+            if (window.scrollY > 300) {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else {
+                btn.style.opacity = '0';
+                btn.style.pointerEvents = 'none';
+            }
+        });
+    </script>
 
     <!-- 初始化 Lucide Icons -->
     <script>

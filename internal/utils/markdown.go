@@ -32,6 +32,11 @@ func init() {
 	policy.AddTargetBlankToFullyQualifiedLinks(true)
 	// Add noopener or noreferrer and follow security best practices
 	policy.RequireNoReferrerOnLinks(true)
+	// Allow iframe for video embedding
+	policy.AllowElements("iframe")
+	policy.AllowAttrs("src", "frameborder", "allowfullscreen", "allow", "width", "height", "style", "class").OnElements("iframe")
+	// Allow div with class and style for video containers
+	policy.AllowAttrs("class", "style").OnElements("div")
 }
 
 func RenderMarkdown(source string) template.HTML {
