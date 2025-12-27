@@ -1,0 +1,68 @@
+<!-- RSS 文章列表项 - 追加加载部分模板 -->
+{{ range .Items }}
+<article
+    class="rss-item group relative p-4 rounded-lg cursor-pointer {{ if .IsRead }}is-read text-stone-400 bg-stone-50/50 hover:bg-stone-100/50{{ else }}text-ink bg-white hover:bg-stone-50{{ end }}"
+    data-item-id="{{ .Item.ID }}" data-is-read="{{ .IsRead }}"
+    data-published-at='{{ .Item.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}'
+    @mouseenter="if (!$el.classList.contains('is-read') && window.readTracker) { window.readTracker.markAsRead($el); }"
+    onclick="loadArticle({{ .Item.ID }})">
+
+    <!-- 时间轴指示器 (左侧) -->
+    <div
+        class="item-indicator absolute left-0 top-0 bottom-0 w-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity {{ if .IsRead }}bg-stone-200{{ else }}bg-moss{{ end }}">
+    </div>
+
+    <!-- 文章内容 -->
+    <div class="flex items-start justify-between">
+        <div class="flex-1 min-w-0 pr-4">
+            <h3
+                class="item-title font-medium leading-snug line-clamp-2 {{ if .IsRead }}text-stone-500{{ else }}text-ink group-hover:text-moss{{ end }}">
+                {{ .Item.Title }}
+            </h3>
+            {{ if .Item.Description }}
+            <p
+                class="item-desc mt-1.5 text-sm line-clamp-2 {{ if .IsRead }}text-stone-400{{ else }}text-ink-light{{ end }}">
+                {{ stripHTML .Item.Description }}
+            </p>
+            {{ end }}
+        </div>
+        <div class="flex-shrink-0 text-right">
+            <time class="text-xs {{ if .IsRead }}text-stone-400{{ else }}text-ink-light{{ end }}">
+                {{ timeAgo .Item.PublishedAt }}
+            </time>
+        </div>
+    </div>
+
+    <!-- 已读标记 -->
+    <div
+        class="read-check absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity {{ if not .IsRead }}hidden{{ end }}">
+        <i data-lucide="check" class="w-4 h-4 text-stone-300"></i>
+    </div>
+</article>
+{{ end }}
+
+<!-- 加载更多按钮或结束提示 -->
+{{ if .HasMore }}
+<div id="load-more-container" class="mt-6 text-center">
+    <button
+        hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ .ShowAll }}&append=true&last_item_id={{ .LastItemID }}"
+        hx-target="#load-more-container" hx-swap="outerHTML"
+        class="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer text-sm text-ink">
+        加载更多
+    </button>
+</div>
+{{ else }}
+<div class="mt-6 text-center text-ink-light">
+    <p class="py-4 text-sm">📖 {{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</p>
+</div>
+{{ end }}
+
+<script>
+    // 渲染新追加内容的图标
+    (function () {
+        const container = document.getElementById('item-container');
+        if (container && window.renderLucideIconsIn) {
+            renderLucideIconsIn(container);
+        }
+    })();
+</script>

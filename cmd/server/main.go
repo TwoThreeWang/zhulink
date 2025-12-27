@@ -267,6 +267,7 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("rss/index.html", funcMap, assemble(templatesDir+"/views/rss/index.html")...)
 	r.AddFromFilesFuncs("rss/feed_list.html", funcMap, templatesDir+"/views/rss/feed_list.html")
 	r.AddFromFilesFuncs("rss/item_list.html", funcMap, templatesDir+"/views/rss/item_list.html")
+	r.AddFromFilesFuncs("rss/item_list_items.html", funcMap, templatesDir+"/views/rss/item_list_items.html")
 	r.AddFromFilesFuncs("rss/reader_content.html", funcMap, templatesDir+"/views/rss/reader_content.html")
 	r.AddFromFilesFuncs("rss/transplant_modal.html", funcMap, templatesDir+"/views/rss/transplant_modal.html")
 	r.AddFromFilesFuncs("rss/transplant_result.html", funcMap, templatesDir+"/views/rss/transplant_result.html")

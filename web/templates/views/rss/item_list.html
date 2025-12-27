@@ -60,16 +60,7 @@
                     <i data-lucide="refresh-cw" class="w-4 h-4 group-[.htmx-request]:animate-spin"></i>
                 </button>
 
-                {{ if .HasMore }}
-                <!-- 加载更多 -->
-                <button
-                    hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&page={{ add .CurrentPage 1 }}&show_all={{ .ShowAll }}"
-                    hx-target="#rss-item-list" hx-swap="outerHTML"
-                    class="flex items-center px-2.5 py-1.5 text-sm text-ink-light hover:text-ink hover:bg-stone-50 rounded-lg transition-colors cursor-pointer"
-                    title="加载更多">
-                    <i data-lucide="chevrons-down" class="w-4 h-4"></i>
-                </button>
-                {{ end }}
+
             </div>
         </div>
     </div>
@@ -80,7 +71,10 @@
         {{ range .Items }}
         <article
             class="rss-item group relative p-4 rounded-lg cursor-pointer {{ if .IsRead }}is-read text-stone-400 bg-stone-50/50 hover:bg-stone-100/50{{ else }}text-ink bg-white hover:bg-stone-50{{ end }}"
-            data-item-id="{{ .Item.ID }}" data-is-read="{{ .IsRead }}" onclick="handleItemClick(this, {{ .Item.ID }})">
+            data-item-id="{{ .Item.ID }}" data-is-read="{{ .IsRead }}"
+            data-published-at='{{ .Item.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}' @mouseenter="if (!$el.classList.contains('is-read') && window.readTracker) {
+                window.readTracker.markAsRead($el);
+            }" onclick="loadArticle({{ .Item.ID }})">
 
             <!-- 时间轴指示器 (左侧) -->
             <div
@@ -122,39 +116,42 @@
         {{ end }}
     </div>
 
-    <!-- 分页信息 -->
-    <div class="mt-6 text-center text-sm text-ink-light">
-        {{ if .HasMore }}
+    <!-- 加载更多按钮 -->
+    {{ if .HasMore }}
+    <div id="load-more-container" class="mt-6 text-center">
         <button
-            hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&page={{ add .CurrentPage 1 }}&show_all={{ .ShowAll }}"
-            hx-target="#rss-item-list" hx-swap="outerHTML"
-            class="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer">
-            加载更多（第 {{ .CurrentPage }}/{{ .TotalPages }} 页）
+            hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ .ShowAll }}&append=true&last_item_id={{ .LastItemID }}"
+            hx-target="#load-more-container" hx-swap="outerHTML"
+            class="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer text-sm text-ink">
+            加载更多
         </button>
-        {{ else }}
-        <p class="py-4">📖 {{ if .ShowAll }}已加载全部 {{ .TotalItems }} 篇文章{{ else }}已加载全部未读文章{{ end }}</p>
-        {{ end }}
     </div>
     {{ else }}
-    <!-- 空状态 -->
-    <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-        <div class="text-5xl mb-4">📄</div>
-        <h3 class="text-lg font-medium text-ink mb-2">{{ if .ShowAll }}暂无文章{{ else }}太棒了！暂无未读文章{{ end }}</h3>
-        <p class="text-sm">{{ if .ShowAll }}该订阅源还没有抓取到文章{{ else }}切换到“显示全部”可以查看历史记录{{ end }}</p>
-        {{ if .ShowAll }}
-        <button hx-post="/rss/refresh/{{ .Subscription.FeedID }}" hx-swap="none"
-            class="mt-4 px-4 py-2 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors cursor-pointer">
-            刷新订阅源
-        </button>
-        {{ else }}
-        <button hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all=true"
-            hx-target="#rss-item-list" hx-swap="outerHTML"
-            class="mt-4 px-4 py-2 bg-stone-100 text-ink hover:bg-stone-200 rounded-lg transition-colors cursor-pointer">
-            显示全部文章
-        </button>
-        {{ end }}
+    <div class="mt-6 text-center text-ink-light">
+        <p class="py-4 text-sm">📖 {{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</p>
     </div>
     {{ end }}
+</div>
+{{ else }}
+<!-- 空状态 -->
+<div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
+    <div class="text-5xl mb-4">📄</div>
+    <h3 class="text-lg font-medium text-ink mb-2">{{ if .ShowAll }}暂无文章{{ else }}太棒了！暂无未读文章{{ end }}</h3>
+    <p class="text-sm">{{ if .ShowAll }}该订阅源还没有抓取到文章{{ else }}切换到“显示全部”可以查看历史记录{{ end }}</p>
+    {{ if .ShowAll }}
+    <button hx-post="/rss/refresh/{{ .Subscription.FeedID }}" hx-swap="none"
+        class="mt-4 px-4 py-2 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors cursor-pointer">
+        刷新订阅源
+    </button>
+    {{ else }}
+    <button hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all=true"
+        hx-target="#rss-item-list" hx-swap="outerHTML"
+        class="mt-4 px-4 py-2 bg-stone-100 text-ink hover:bg-stone-200 rounded-lg transition-colors cursor-pointer">
+        显示全部文章
+    </button>
+    {{ end }}
+</div>
+{{ end }}
 </div>
 
 <style>
@@ -186,6 +183,103 @@
 </style>
 
 <script>
+    // 初始化已读追踪器(防抖批量更新版)
+    if (!window.readTracker) {
+        const feedId = parseInt(document.getElementById('rss-item-list').dataset.feedId);
+
+        window.readTracker = {
+            feedId: feedId,
+            latestItemId: null,
+            latestPublishedAt: null,
+            debounceTimer: null,
+
+            markAsRead(el) {
+                const itemId = parseInt(el.dataset.itemId);
+                const publishedAt = new Date(el.dataset.publishedAt);
+
+                // 前端立即变灰
+                el.classList.add('is-read');
+                el.classList.remove('text-ink', 'bg-white', 'hover:bg-stone-50');
+                el.classList.add('text-stone-400', 'bg-stone-50/50', 'hover:bg-stone-100/50');
+
+                const title = el.querySelector('.item-title');
+                if (title) {
+                    title.classList.remove('text-ink', 'group-hover:text-moss');
+                    title.classList.add('text-stone-500');
+                }
+
+                const desc = el.querySelector('.item-desc');
+                if (desc) {
+                    desc.classList.remove('text-ink-light');
+                    desc.classList.add('text-stone-400');
+                }
+
+                const indicator = el.querySelector('.item-indicator');
+                if (indicator) {
+                    indicator.classList.remove('bg-moss');
+                    indicator.classList.add('bg-stone-200');
+                }
+
+                const check = el.querySelector('.read-check');
+                if (check) {
+                    check.classList.remove('hidden');
+                }
+
+                // 更新最新已读的 item（按发布时间比较）
+                if (!this.latestPublishedAt || publishedAt > this.latestPublishedAt) {
+                    this.latestItemId = itemId;
+                    this.latestPublishedAt = publishedAt;
+                }
+
+                // 防抖: 停止hover 1秒后发送
+                clearTimeout(this.debounceTimer);
+                this.debounceTimer = setTimeout(() => {
+                    this.syncNow();
+                }, 1000);
+            },
+
+            syncNow() {
+                if (!this.latestItemId) return;
+
+                fetch(`/rss/update-read-anchor/${this.feedId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item_id: this.latestItemId })
+                }).then(response => {
+                    if (response.ok) {
+                        console.log('已读状态已同步, item_id:', this.latestItemId);
+                    }
+                }).catch(err => {
+                    console.error('同步失败:', err);
+                });
+
+                this.latestItemId = null;
+                this.latestPublishedAt = null;
+            }
+        };
+
+        // 页面卸载时立即同步
+        window.addEventListener('beforeunload', () => {
+            if (window.readTracker.latestItemId) {
+                const blob = new Blob(
+                    [JSON.stringify({ item_id: window.readTracker.latestItemId })],
+                    { type: 'application/json' }
+                );
+                navigator.sendBeacon(
+                    `/rss/update-read-anchor/${window.readTracker.feedId}`,
+                    blob
+                );
+            }
+        });
+
+        // 页面隐藏时也同步(切换标签页)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && window.readTracker.latestItemId) {
+                window.readTracker.syncNow();
+            }
+        });
+    }
+
     // 渲染图标
     (function () {
         const container = document.getElementById('rss-item-list');
@@ -193,42 +287,4 @@
             renderLucideIconsIn(container);
         }
     })();
-
-    // 点击文章条目
-    function handleItemClick(el, itemId) {
-        // 如果当前是“仅看未读”模式，且条目未读，点击后不需要立即隐藏（保持用户当前位置）
-        // 标记为已读（CSS 类）
-        el.classList.add('is-read');
-        el.dataset.isRead = 'true';
-
-        // 更新样式
-        el.classList.remove('text-ink', 'bg-white', 'hover:bg-stone-50');
-        el.classList.add('text-stone-400', 'bg-stone-50/50', 'hover:bg-stone-100/50');
-
-        const title = el.querySelector('.item-title');
-        if (title) {
-            title.classList.remove('text-ink', 'group-hover:text-moss');
-            title.classList.add('text-stone-500');
-        }
-
-        const desc = el.querySelector('.item-desc');
-        if (desc) {
-            desc.classList.remove('text-ink-light');
-            desc.classList.add('text-stone-400');
-        }
-
-        const indicator = el.querySelector('.item-indicator');
-        if (indicator) {
-            indicator.classList.remove('bg-moss');
-            indicator.classList.add('bg-stone-200');
-        }
-
-        const check = el.querySelector('.read-check');
-        if (check) {
-            check.classList.remove('hidden');
-        }
-
-        // 打开阅读器
-        loadArticle(itemId);
-    }
 </script>

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
@@ -123,7 +122,7 @@ func (h *RSSHandler) GetFeeds(c *gin.Context) {
 	})
 }
 
-// GetItems HTMX 接口，获取指定订阅源的文章列表（支持分页）
+// GetItems HTMX 接口，获取指定订阅源的文章列表（支持游标分页）
 func (h *RSSHandler) GetItems(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
 	feedIDStr := c.Query("feed_id")
@@ -136,21 +135,36 @@ func (h *RSSHandler) GetItems(c *gin.Context) {
 	// 过滤参数：默认不显示全部（即仅显示未读）
 	showAll := c.Query("show_all") == "true"
 
-	// 分页参数
-	pageStr := c.DefaultQuery("page", "1")
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		page = 1
-	}
-	pageSize := 30 // 每页 30 条，减少内存占用
+	// 追加加载参数
+	isAppend := c.Query("append") == "true"
 
-	// 获取用户订阅信息（包含已读锚点）
+	pageSize := 30
+
+	// 获取用户订阅信息
 	var subscription models.UserSubscription
 	if err := db.DB.Preload("Feed").
 		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
 		First(&subscription).Error; err != nil {
 		c.String(http.StatusNotFound, "未找到订阅")
 		return
+	}
+
+	// 如果是追加加载，先更新 last_read_anchor 为上一页最后一篇的时间
+	// 这样下面的查询就能基于最新的锚点
+	if isAppend {
+		lastItemIDStr := c.Query("last_item_id")
+		if lastItemID, err := strconv.Atoi(lastItemIDStr); err == nil && lastItemID > 0 {
+			// 通过 item_id 查询文章的发布时间
+			var lastItem models.FeedItem
+			if err := db.DB.Select("published_at").First(&lastItem, lastItemID).Error; err == nil {
+				db.DB.Model(&models.UserSubscription{}).
+					Where("user_id = ? AND feed_id = ?", user.ID, feedID).
+					Where("last_read_anchor IS NULL OR last_read_anchor < ?", lastItem.PublishedAt).
+					Update("last_read_anchor", lastItem.PublishedAt)
+				// 更新本地变量
+				subscription.LastReadAnchor = &lastItem.PublishedAt
+			}
+		}
 	}
 
 	// 构建查询基础
@@ -161,25 +175,18 @@ func (h *RSSHandler) GetItems(c *gin.Context) {
 		query = query.Where("published_at > ?", *subscription.LastReadAnchor)
 	}
 
-	// 获取符合过滤条件的文章总数
-	var totalItems int64
-	query.Count(&totalItems)
-
-	// 计算总页数
-	totalPages := int(totalItems) / pageSize
-	if int(totalItems)%pageSize > 0 {
-		totalPages++
-	}
-	if totalPages < 1 {
-		totalPages = 1
-	}
-
-	// 获取文章列表，按时间正序排列（旧的在上面，符合阅读流），分页
+	// 获取文章列表，按时间正序排列（旧的在上面，符合阅读流）
+	// 多查询1条用于判断是否还有更多
 	var items []models.FeedItem
 	query.Order("published_at ASC").
-		Offset((page - 1) * pageSize).
-		Limit(pageSize).
+		Limit(pageSize + 1).
 		Find(&items)
+
+	// 判断是否还有更多
+	hasMore := len(items) > pageSize
+	if hasMore {
+		items = items[:pageSize]
+	}
 
 	// 标记已读状态
 	type ItemWithReadStatus struct {
@@ -199,16 +206,26 @@ func (h *RSSHandler) GetItems(c *gin.Context) {
 		})
 	}
 
-	c.HTML(http.StatusOK, "rss/item_list.html", gin.H{
+	// 获取当前页最后一篇的 ID，作为下一页的游标
+	var lastItemID uint
+	if len(items) > 0 {
+		lastItemID = items[len(items)-1].ID
+	}
+
+	// 根据是否追加加载选择模板
+	templateName := "rss/item_list.html"
+	if isAppend {
+		templateName = "rss/item_list_items.html"
+	}
+
+	c.HTML(http.StatusOK, templateName, gin.H{
 		"Items":        itemsWithStatus,
 		"Subscription": subscription,
 		"FeedTitle":    subscription.GetDisplayTitle(),
 		"Category":     c.Query("category"),
-		"CurrentPage":  page,
-		"TotalPages":   totalPages,
-		"TotalItems":   int(totalItems),
-		"HasMore":      page < totalPages,
-		"ShowAll":      showAll, // 回传状态供模板使用
+		"HasMore":      hasMore,
+		"LastItemID":   lastItemID,
+		"ShowAll":      showAll,
 	})
 }
 
@@ -452,13 +469,51 @@ func (h *RSSHandler) UpdateAnchor(c *gin.Context) {
 	}
 
 	// 更新锚点为最新文章时间
-	now := time.Now()
 	db.DB.Model(&models.UserSubscription{}).
 		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
-		Update("last_read_anchor", now)
+		Update("last_read_anchor", latestItem.PublishedAt)
 
 	c.Header("HX-Trigger", "anchor-updated")
 	c.String(http.StatusOK, "已标记全部已读")
+}
+
+// UpdateReadAnchorBatch 批量更新已读锚点（用于hover标记已读）
+func (h *RSSHandler) UpdateReadAnchorBatch(c *gin.Context) {
+	user := c.MustGet(middleware.CheckUserKey).(*models.User)
+	feedIDStr := c.Param("id")
+	feedID, err := strconv.Atoi(feedIDStr)
+	if err != nil {
+		c.String(http.StatusBadRequest, "无效的订阅源 ID")
+		return
+	}
+
+	var req struct {
+		ItemID uint `json:"item_id"`
+	}
+	if err := c.BindJSON(&req); err != nil || req.ItemID == 0 {
+		c.String(http.StatusBadRequest, "无效的请求")
+		return
+	}
+
+	// 通过 item_id 查询文章的发布时间
+	var item models.FeedItem
+	if err := db.DB.Select("published_at").First(&item, req.ItemID).Error; err != nil {
+		c.String(http.StatusNotFound, "文章不存在")
+		return
+	}
+
+	// 仅当新时间更晚时才更新
+	result := db.DB.Model(&models.UserSubscription{}).
+		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
+		Where("last_read_anchor IS NULL OR last_read_anchor < ?", item.PublishedAt).
+		Update("last_read_anchor", item.PublishedAt)
+
+	if result.Error != nil {
+		c.String(http.StatusInternalServerError, "更新失败: "+result.Error.Error())
+		return
+	}
+
+	c.String(http.StatusOK, "")
 }
 
 // UpdateSubscription 更新订阅信息（标题、分类）

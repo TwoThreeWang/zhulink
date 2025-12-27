@@ -110,9 +110,10 @@ func RegisterRoutes(r *gin.Engine) {
 		rss.POST("/subscribe", rssHandler.Subscribe)           // 订阅新的 RSS 源
 		rss.DELETE("/unsubscribe/:id", rssHandler.Unsubscribe) // 取消订阅
 
-		rss.POST("/subscription/update", rssHandler.UpdateSubscription) // 更新订阅设置
-		rss.POST("/refresh/:id", rssHandler.RefreshFeed)                // 手动刷新订阅源
-		rss.POST("/anchor/:id", rssHandler.UpdateAnchor)                // 更新阅读进度
+		rss.POST("/subscription/update", rssHandler.UpdateSubscription)       // 更新订阅设置
+		rss.POST("/refresh/:id", rssHandler.RefreshFeed)                      // 手动刷新订阅源
+		rss.POST("/anchor/:id", rssHandler.UpdateAnchor)                      // 更新阅读进度
+		rss.POST("/update-read-anchor/:id", rssHandler.UpdateReadAnchorBatch) // 批量更新已读锚点（hover标记）
 
 		rss.POST("/transplant/:id", transplantHandler.Transplant)         // 提交推荐到社区
 		rss.GET("/transplant/:id", transplantHandler.ShowTransplantModal) // 显示推荐到社区的弹窗
