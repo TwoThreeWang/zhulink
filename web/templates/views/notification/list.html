@@ -30,7 +30,10 @@
             <div class="space-y-4">
                 {{ range .Notifications }}
                 <div id="notification-{{ .ID }}"
-                    class="relative pl-4 border-l-2 {{ if .IsRead }}border-stone-100 opacity-60{{ else }}border-moss bg-moss/5{{ end }} rounded-r py-3 px-3 transition-all hover:bg-stone-50 group">
+                    class="relative pl-4 border-l-2 {{ if .IsRead }}border-stone-100 opacity-60{{ else }}border-moss bg-moss/5{{ end }} rounded-r py-3 px-3 transition-all hover:bg-stone-50 group"
+                    {{ if not .IsRead }} hx-post="/notifications/{{ .ID }}/read" hx-swap="none" hx-trigger="click once"
+                    hx-on::after-request="this.classList.remove('border-moss', 'bg-moss/5'); this.classList.add('border-stone-100', 'opacity-60'); const btn = this.querySelector('.mark-read-btn'); if(btn) btn.remove();"
+                    {{ end }}>
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex-grow min-w-0">
                             <div class="text-sm text-stone-600 mb-1.5 leading-relaxed">
@@ -50,12 +53,13 @@
                         </div>
 
                         <!-- 操作按钮 -->
-                        <div
-                            class="flex-shrink-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div class="flex-shrink-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onclick="event.stopPropagation()">
                             {{ if not .IsRead }}
                             <button hx-post="/notifications/{{ .ID }}/read" hx-swap="none"
                                 hx-on::after-request="const item = this.closest('[id^=notification-]'); item.classList.remove('border-moss', 'bg-moss/5'); item.classList.add('border-stone-100', 'opacity-60'); this.remove()"
-                                class="p-1.5 text-moss hover:bg-moss/10 rounded transition-colors" title="标记为已读">
+                                class="mark-read-btn p-1.5 text-moss hover:bg-moss/10 rounded transition-colors"
+                                title="标记为已读">
                                 <i data-lucide="check" class="w-4 h-4"></i>
                             </button>
                             {{ end }}
