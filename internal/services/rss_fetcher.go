@@ -3,6 +3,9 @@ package services
 import (
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/models"
@@ -17,8 +20,23 @@ type RSSFetcher struct {
 
 // NewRSSFetcher 创建 RSS 抓取服务实例
 func NewRSSFetcher() *RSSFetcher {
+	// 创建自定义 HTTP 客户端，设置超时
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second, // 30 秒超时
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			IdleConnTimeout:     30 * time.Second,
+			DisableCompression:  false,
+			DisableKeepAlives:   false,
+			MaxIdleConnsPerHost: 2,
+		},
+	}
+
+	parser := gofeed.NewParser()
+	parser.Client = httpClient
+
 	return &RSSFetcher{
-		parser: gofeed.NewParser(),
+		parser: parser,
 	}
 }
 
@@ -33,8 +51,31 @@ func GetRSSFetcher() *RSSFetcher {
 	return rssFetcher
 }
 
+// normalizeRSSURL 规范化 RSS URL
+// 如果 URL 以 rsshub:// 开头,则替换为自定义的 RSSHub 实例地址
+func normalizeRSSURL(rssURL string) string {
+	if strings.HasPrefix(rssURL, "rsshub://") {
+		// 从环境变量获取 RSSHub 实例地址
+		rsshubInstance := os.Getenv("RSSHUB_INSTANCE_URL")
+		if rsshubInstance == "" {
+			// 默认使用官方实例
+			rsshubInstance = "https://rsshub.app"
+		}
+
+		// 移除 rsshub:// 前缀,替换为实例地址
+		path := strings.TrimPrefix(rssURL, "rsshub://")
+		// 确保实例地址不以 / 结尾
+		rsshubInstance = strings.TrimSuffix(rsshubInstance, "/")
+		return rsshubInstance + "/" + path
+	}
+	return rssURL
+}
+
 // DiscoverFeed 从 RSS URL 发现订阅源元信息
 func (f *RSSFetcher) DiscoverFeed(rssURL string) (*models.Feed, error) {
+	// 规范化 URL (处理 rsshub:// 前缀)
+	rssURL = normalizeRSSURL(rssURL)
+
 	feed, err := f.parser.ParseURL(rssURL)
 	if err != nil {
 		return nil, fmt.Errorf("解析 RSS 失败: %w", err)
@@ -55,6 +96,9 @@ func (f *RSSFetcher) DiscoverFeed(rssURL string) (*models.Feed, error) {
 
 // ParseAndStoreFeed 解析 RSS URL 并存储条目
 func (f *RSSFetcher) ParseAndStoreFeed(feedID uint, rssURL string) error {
+	// 规范化 URL (处理 rsshub:// 前缀)
+	rssURL = normalizeRSSURL(rssURL)
+
 	feed, err := f.parser.ParseURL(rssURL)
 	if err != nil {
 		return fmt.Errorf("解析 RSS 失败: %w", err)
@@ -136,6 +180,9 @@ func (f *RSSFetcher) RefreshAllFeeds() {
 // CreateOrGetFeed 创建或获取订阅源
 // 如果 URL 已存在则返回现有的，否则创建新的
 func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
+	// 规范化 URL (处理 rsshub:// 前缀)
+	rssURL = normalizeRSSURL(rssURL)
+
 	// 先检查是否已存在
 	var existingFeed models.Feed
 	if err := db.DB.Where("url = ?", rssURL).First(&existingFeed).Error; err == nil {

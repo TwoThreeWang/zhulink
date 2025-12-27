@@ -30,7 +30,8 @@ func RegisterRoutes(r *gin.Engine) {
 	// SEO路由 (SEO Routes)
 	r.GET("/robots.txt", seoHandler.RobotsTxt)   // robots.txt
 	r.GET("/sitemap.xml", seoHandler.SitemapXML) // sitemap.xml
-	r.GET("/feed.xml", seoHandler.RSSFeed)       // RSS feed
+	r.GET("/feed.xml", seoHandler.RSSFeed)       // RSS feed (旧路径,保持兼容)
+	r.GET("/feed", seoHandler.RSSFeed)           // RSS feed (新路径)
 
 	// 公共路由 (Public Routes)
 	r.GET("/", storyHandler.ListTop)           // 首页 - 热门文章
