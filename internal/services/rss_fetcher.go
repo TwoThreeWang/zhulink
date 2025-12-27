@@ -73,10 +73,13 @@ func normalizeRSSURL(rssURL string) string {
 
 // DiscoverFeed 从 RSS URL 发现订阅源元信息
 func (f *RSSFetcher) DiscoverFeed(rssURL string) (*models.Feed, error) {
-	// 规范化 URL (处理 rsshub:// 前缀)
-	rssURL = normalizeRSSURL(rssURL)
+	// 保存原始 URL (可能包含 rsshub:// 前缀)
+	originalURL := rssURL
 
-	feed, err := f.parser.ParseURL(rssURL)
+	// 规范化 URL 用于实际请求 (处理 rsshub:// 前缀)
+	actualURL := normalizeRSSURL(rssURL)
+
+	feed, err := f.parser.ParseURL(actualURL)
 	if err != nil {
 		return nil, fmt.Errorf("解析 RSS 失败: %w", err)
 	}
@@ -88,7 +91,7 @@ func (f *RSSFetcher) DiscoverFeed(rssURL string) (*models.Feed, error) {
 	}
 
 	return &models.Feed{
-		URL:     rssURL,
+		URL:     originalURL, // 保存原始 URL 到数据库
 		Title:   feed.Title,
 		IconURL: iconURL,
 	}, nil
@@ -96,10 +99,10 @@ func (f *RSSFetcher) DiscoverFeed(rssURL string) (*models.Feed, error) {
 
 // ParseAndStoreFeed 解析 RSS URL 并存储条目
 func (f *RSSFetcher) ParseAndStoreFeed(feedID uint, rssURL string) error {
-	// 规范化 URL (处理 rsshub:// 前缀)
-	rssURL = normalizeRSSURL(rssURL)
+	// 规范化 URL 用于实际请求 (处理 rsshub:// 前缀)
+	actualURL := normalizeRSSURL(rssURL)
 
-	feed, err := f.parser.ParseURL(rssURL)
+	feed, err := f.parser.ParseURL(actualURL)
 	if err != nil {
 		return fmt.Errorf("解析 RSS 失败: %w", err)
 	}
@@ -178,18 +181,15 @@ func (f *RSSFetcher) RefreshAllFeeds() {
 }
 
 // CreateOrGetFeed 创建或获取订阅源
-// 如果 URL 已存在则返回现有的，否则创建新的
+// 如果 URL 已存在则返回现有的,否则创建新的
 func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
-	// 规范化 URL (处理 rsshub:// 前缀)
-	rssURL = normalizeRSSURL(rssURL)
-
-	// 先检查是否已存在
+	// 先检查是否已存在 (使用原始 URL 检查)
 	var existingFeed models.Feed
 	if err := db.DB.Where("url = ?", rssURL).First(&existingFeed).Error; err == nil {
 		return &existingFeed, nil
 	}
 
-	// 发现新订阅源
+	// 发现新订阅源 (DiscoverFeed 内部会处理 rsshub:// 转换)
 	feed, err := f.DiscoverFeed(rssURL)
 	if err != nil {
 		return nil, err
@@ -200,9 +200,9 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 		return nil, fmt.Errorf("保存订阅源失败: %w", err)
 	}
 
-	// 异步抓取文章
+	// 异步抓取文章 (传递原始 URL,ParseAndStoreFeed 内部会处理转换)
 	go func() {
-		if err := f.ParseAndStoreFeed(feed.ID, rssURL); err != nil {
+		if err := f.ParseAndStoreFeed(feed.ID, feed.URL); err != nil {
 			log.Printf("抓取订阅源文章失败: %v", err)
 		}
 	}()
