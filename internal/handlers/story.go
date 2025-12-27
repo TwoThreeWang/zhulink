@@ -388,7 +388,7 @@ func (h *StoryHandler) Create(c *gin.Context) {
 		}
 	}()
 
-	c.Redirect(http.StatusFound, "/")
+	c.Redirect(http.StatusFound, "/p/"+post.Pid)
 }
 
 func (h *StoryHandler) Detail(c *gin.Context) {
