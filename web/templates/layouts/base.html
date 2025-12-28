@@ -288,8 +288,12 @@
 
     <!-- 初始化 Lucide Icons -->
     <script>
-        // 初始化页面上的图标（只执行一次）
-        lucide.createIcons();
+        // 等待 DOM 和 defer 脚本加载完成后再初始化图标
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
 
         // 防抖渲染 Lucide 图标（限制作用范围）
         window.__lucideTimeout = null;
