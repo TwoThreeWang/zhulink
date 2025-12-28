@@ -720,6 +720,11 @@ body {
   grid-column: span 8 / span 8;
 }
 
+.-mx-1 {
+  margin-left: -0.25rem;
+  margin-right: -0.25rem;
+}
+
 .-mx-4 {
   margin-left: -1rem;
   margin-right: -1rem;
@@ -748,11 +753,6 @@ body {
 .my-1 {
   margin-top: 0.25rem;
   margin-bottom: 0.25rem;
-}
-
-.-mx-1 {
-  margin-left: -0.25rem;
-  margin-right: -0.25rem;
 }
 
 .-ml-px {
@@ -875,18 +875,18 @@ body {
   margin-top: auto;
 }
 
-.line-clamp-2 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .line-clamp-1 {
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .block {
@@ -2003,6 +2003,10 @@ body {
   padding-left: 1rem;
 }
 
+.pl-5 {
+  padding-left: 1.25rem;
+}
+
 .pr-12 {
   padding-right: 3rem;
 }
@@ -2029,14 +2033,6 @@ body {
 
 .pt-8 {
   padding-top: 2rem;
-}
-
-.pl-6 {
-  padding-left: 1.5rem;
-}
-
-.pl-5 {
-  padding-left: 1.25rem;
 }
 
 .text-left {
@@ -2643,6 +2639,10 @@ body {
   background-color: rgb(250 250 249 / 0.5);
 }
 
+.hover\:bg-white\/50:hover {
+  background-color: rgb(255 255 255 / 0.5);
+}
+
 .hover\:bg-zinc-100:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(244 244 245 / var(--tw-bg-opacity, 1));
@@ -2651,10 +2651,6 @@ body {
 .hover\:bg-zinc-50:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(250 250 250 / var(--tw-bg-opacity, 1));
-}
-
-.hover\:bg-white\/50:hover {
-  background-color: rgb(255 255 255 / 0.5);
 }
 
 .hover\:text-ink:hover {

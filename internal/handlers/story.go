@@ -251,6 +251,10 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 
 	fillCommentCounts(posts)
 
+	// 获取节点列表（用于侧边栏导航）
+	var nodes []models.Node
+	db.DB.Order("id ASC").Find(&nodes)
+
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
@@ -268,6 +272,7 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 
 	Render(c, http.StatusOK, "story/list.html", gin.H{
 		"Posts":       posts,
+		"Nodes":       nodes,
 		"Active":      "node",
 		"Title":       "" + node.Name,
 		"Node":        node,
