@@ -1,3 +1,38 @@
+{{ template "base.html" . }}
+
+{{ define "scripts" }}
+<!-- SEO Meta标签 -->
+{{ if .Description }}
+<meta name="description" content="{{ .Description }}">
+{{ end }}
+{{ if .Keywords }}
+<meta name="keywords" content="{{ .Keywords }}">
+{{ end }}
+
+<!-- Open Graph标签 -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ .Title }} - ZhuLink 竹林">
+{{ if .Description }}
+<meta property="og:description" content="{{ .Description }}">
+{{ end }}
+{{ if .Canonical }}
+<meta property="og:url" content="https://zhulink.vip{{ .Canonical }}">
+{{ end }}
+<meta property="og:site_name" content="ZhuLink 竹林">
+
+<!-- Twitter Card标签 -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ .Title }} - ZhuLink 竹林">
+{{ if .Description }}
+<meta name="twitter:description" content="{{ .Description }}">
+{{ end }}
+
+<!-- Canonical链接 -->
+{{ if .Canonical }}
+<link rel="canonical" href="https://zhulink.vip{{ .Canonical }}">
+{{ end }}
+{{ end }}
+
 {{ define "content" }}
 <div class="min-h-[70vh]">
     <div class="max-w-4xl mx-auto">

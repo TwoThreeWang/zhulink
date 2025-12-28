@@ -634,6 +634,9 @@ func (h *RSSHandler) PopularFeeds(c *gin.Context) {
 
 	Render(c, http.StatusOK, "rss/popular.html", gin.H{
 		"Title":         "热门订阅 - RSS 发现",
+		"Description":   "发现全站最受欢迎的 RSS 订阅源，按订阅人数排序，一键订阅热门博客、科技媒体和独立创作者的内容。",
+		"Keywords":      "热门RSS,RSS订阅,热门博客,科技媒体,独立博客,订阅源推荐",
+		"Canonical":     "/rss/popular",
 		"Active":        "rss",
 		"Feeds":         feeds,
 		"CurrentPage":   page,
