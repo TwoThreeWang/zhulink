@@ -55,13 +55,11 @@ WORKDIR /app
 # 从构建阶段复制编译好的二进制文件
 COPY --from=go-builder /build/zhulink .
 
-# 从 CSS 构建阶段复制编译后的 CSS
-COPY --from=css-builder /build/web/static/css ./web/static/css
+# 复制静态资源（img、js、robots.txt、ads.txt 等）
+COPY web/static ./web/static
 
-# 复制其他静态资源（img、js、robots.txt 等）
-COPY web/static/img ./web/static/img
-COPY web/static/js ./web/static/js
-COPY web/static/robots.txt ./web/static/robots.txt
+# 从 CSS 构建阶段复制编译后的 CSS（覆盖上面复制的原始 CSS）
+COPY --from=css-builder /build/web/static/css ./web/static/css
 
 # 复制模板文件
 COPY web/templates ./web/templates

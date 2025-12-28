@@ -7,6 +7,8 @@
   "description": "**ZhuLink** 是一个去算法推荐的内容聚合社区 (类似 Hacker News)。",
   "main": "tailwind.config.js",
   "scripts": {
+    "dev:css": "npx tailwindcss -i ./web/assets/input.css -o ./web/static/css/style.css --watch",
+    "build:css": "npx tailwindcss -i ./web/assets/input.css -o ./web/static/css/style.css --minify",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
