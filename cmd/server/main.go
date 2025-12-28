@@ -19,6 +19,7 @@ import (
 	"zhulink/internal/router"
 	"zhulink/internal/services"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -75,10 +76,14 @@ func main() {
 
 	r.Use(sessions.Sessions("zhulink_session", store))
 
+	// Gzip 压缩中间件（对文本类型响应启用压缩）
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
+
 	// Load Templates using Multitemplate to avoid collision and allow handler names
 	r.HTMLRender = loadTemplates("./web/templates")
 
-	// Static Assets
+	// Static Assets with Cache Headers (1 year for versioned files)
+	r.Use(staticCacheMiddleware())
 	r.Static("/static", "./web/static")
 
 	// Middleware
@@ -274,4 +279,25 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("admin/reports.html", funcMap, assemble(templatesDir+"/views/admin/reports.html")...)
 
 	return r
+}
+
+// staticCacheMiddleware 为静态资源添加缓存头
+func staticCacheMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		// 只处理静态资源路径
+		if strings.HasPrefix(path, "/static/") {
+			// 检查是否带版本号（如 style.css?v=4）
+			if c.Query("v") != "" || strings.Contains(path, ".") {
+				// 带版本号的资源：缓存 1 年
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			} else {
+				// 无版本号：缓存 1 天
+				c.Header("Cache-Control", "public, max-age=86400")
+			}
+		}
+
+		c.Next()
+	}
 }
