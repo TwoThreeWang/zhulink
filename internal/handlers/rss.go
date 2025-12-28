@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 	"zhulink/internal/db"
@@ -106,6 +107,11 @@ func (h *RSSHandler) GetFeeds(c *gin.Context) {
 			UnreadCount:  int(count),
 		})
 	}
+
+	// 按未读数降序排列，未读多的在前面
+	sort.Slice(feedsWithCount, func(i, j int) bool {
+		return feedsWithCount[i].UnreadCount > feedsWithCount[j].UnreadCount
+	})
 
 	// 获取所有分类供编辑时选择
 	var allCategories []string
