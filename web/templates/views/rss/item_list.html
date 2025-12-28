@@ -71,8 +71,8 @@
         {{ range .Items }}
         <article
             class="rss-item group relative p-4 rounded-lg cursor-pointer {{ if .IsRead }}is-read text-stone-400 bg-stone-50/50 hover:bg-stone-100/50{{ else }}text-ink bg-white hover:bg-stone-50{{ end }}"
-            data-item-id="{{ .Item.ID }}" data-is-read="{{ .IsRead }}"
-            data-published-at='{{ .Item.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}' @mouseenter="if (!$el.classList.contains('is-read') && window.readTracker) {
+            data-item-id="{{ .Item.ID }}" data-published-at='{{ .Item.PublishedAt.Format "2006-01-02T15:04:05Z07:00" }}'
+            @mouseenter="if (!$el.classList.contains('is-read') && window.readTracker) {
                 window.readTracker.markAsRead($el);
             }" onclick="loadArticle({{ .Item.ID }})">
 
@@ -168,27 +168,27 @@
         display: none;
     } */
 
-    /* 显示全部时的按钮样式 */
-    .rss-item-list.show-all #toggle-read-btn {
-        background-color: rgb(74 93 35);
-        color: white;
-    }
-
     /* CSS 渲染优化：屏幕外的列表项不渲染 */
     .rss-item {
         content-visibility: auto;
         contain-intrinsic-size: 0 80px;
-        /* 预估高度，避免滚动条跳动 */
     }
 </style>
 
 <script>
+    // 辅助函数：获取当前订阅源 ID
+    function getCurrentFeedId() {
+        const listElement = document.getElementById('rss-item-list');
+        if (!listElement) {
+            console.error('无法获取 rss-item-list 元素');
+            return null;
+        }
+        return parseInt(listElement.dataset.feedId);
+    }
+
     // 初始化已读追踪器(防抖批量更新版)
     if (!window.readTracker) {
-        const feedId = parseInt(document.getElementById('rss-item-list').dataset.feedId);
-
         window.readTracker = {
-            feedId: feedId,
             latestItemId: null,
             latestPublishedAt: null,
             debounceTimer: null,
@@ -241,34 +241,40 @@
             syncNow() {
                 if (!this.latestItemId) return;
 
-                fetch(`/rss/update-read-anchor/${this.feedId}`, {
+                const feedId = getCurrentFeedId();
+                if (!feedId) return;
+
+                const itemIdToSync = this.latestItemId;  // 保存到局部变量，避免异步回调时值已被重置
+                this.latestItemId = null;
+                this.latestPublishedAt = null;
+
+                fetch(`/rss/update-read-anchor/${feedId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ item_id: this.latestItemId })
+                    body: JSON.stringify({ item_id: itemIdToSync })
                 }).then(response => {
                     if (response.ok) {
-                        console.log('已读状态已同步, item_id:', this.latestItemId);
+                        console.log('已读状态已同步, item_id:', itemIdToSync, 'feedId:', feedId);
                     }
                 }).catch(err => {
                     console.error('同步失败:', err);
                 });
-
-                this.latestItemId = null;
-                this.latestPublishedAt = null;
             }
         };
 
-        // 页面卸载时立即同步
         window.addEventListener('beforeunload', () => {
             if (window.readTracker.latestItemId) {
-                const blob = new Blob(
-                    [JSON.stringify({ item_id: window.readTracker.latestItemId })],
-                    { type: 'application/json' }
-                );
-                navigator.sendBeacon(
-                    `/rss/update-read-anchor/${window.readTracker.feedId}`,
-                    blob
-                );
+                const feedId = getCurrentFeedId();
+                if (feedId) {
+                    const blob = new Blob(
+                        [JSON.stringify({ item_id: window.readTracker.latestItemId })],
+                        { type: 'application/json' }
+                    );
+                    navigator.sendBeacon(
+                        `/rss/update-read-anchor/${feedId}`,
+                        blob
+                    );
+                }
             }
         });
 

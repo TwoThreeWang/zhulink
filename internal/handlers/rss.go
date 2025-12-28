@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
@@ -157,12 +158,14 @@ func (h *RSSHandler) GetItems(c *gin.Context) {
 			// 通过 item_id 查询文章的发布时间
 			var lastItem models.FeedItem
 			if err := db.DB.Select("published_at").First(&lastItem, lastItemID).Error; err == nil {
+				// 截断到秒级，避免微秒导致的比较问题
+				publishedAt := lastItem.PublishedAt.Truncate(time.Second)
 				db.DB.Model(&models.UserSubscription{}).
 					Where("user_id = ? AND feed_id = ?", user.ID, feedID).
-					Where("last_read_anchor IS NULL OR last_read_anchor < ?", lastItem.PublishedAt).
-					Update("last_read_anchor", lastItem.PublishedAt)
+					Where("last_read_anchor IS NULL OR last_read_anchor < ?", publishedAt).
+					Update("last_read_anchor", publishedAt)
 				// 更新本地变量
-				subscription.LastReadAnchor = &lastItem.PublishedAt
+				subscription.LastReadAnchor = &publishedAt
 			}
 		}
 	}
@@ -170,9 +173,20 @@ func (h *RSSHandler) GetItems(c *gin.Context) {
 	// 构建查询基础
 	query := db.DB.Model(&models.FeedItem{}).Where("feed_id = ?", feedID)
 
-	// 如果不是显示全部，且有已读锚点，则只查询锚点之后的文章
-	if !showAll && subscription.LastReadAnchor != nil {
-		query = query.Where("published_at > ?", *subscription.LastReadAnchor)
+	// 分页逻辑：
+	// 1. 首次加载 (isAppend=false):
+	//    - 显示未读模式：从 last_read_anchor 之后开始
+	//    - 显示全部模式：从最旧的开始
+	// 2. 追加加载 (isAppend=true):
+	//    - 总是从 last_read_anchor 之后开始（已在上面更新为上一页最后一篇的时间）
+	if subscription.LastReadAnchor != nil {
+		if !showAll && !isAppend {
+			// 首次加载，仅看未读：过滤已读文章
+			query = query.Where("published_at > ?", *subscription.LastReadAnchor)
+		} else if isAppend {
+			// 追加加载（显示全部或仅看未读）：使用锚点分页
+			query = query.Where("published_at > ?", *subscription.LastReadAnchor)
+		}
 	}
 
 	// 获取文章列表，按时间正序排列（旧的在上面，符合阅读流）
@@ -264,9 +278,11 @@ func (h *RSSHandler) ReadItem(c *gin.Context) {
 	var subscription models.UserSubscription
 	err = db.DB.Where("user_id = ? AND feed_id = ?", user.ID, item.FeedID).First(&subscription).Error
 	if err == nil {
+		// 截断到秒级，避免微秒导致的比较问题
+		publishedAt := item.PublishedAt.Truncate(time.Second)
 		// 仅当文章发布时间晚于当前已读锚点，或者还从未读过时才更新
-		if subscription.LastReadAnchor == nil || item.PublishedAt.After(*subscription.LastReadAnchor) {
-			db.DB.Model(&subscription).Update("last_read_anchor", item.PublishedAt)
+		if subscription.LastReadAnchor == nil || publishedAt.After(*subscription.LastReadAnchor) {
+			db.DB.Model(&subscription).Update("last_read_anchor", publishedAt)
 		}
 	}
 
@@ -468,10 +484,12 @@ func (h *RSSHandler) UpdateAnchor(c *gin.Context) {
 		return
 	}
 
+	// 截断到秒级，避免微秒导致的比较问题
+	publishedAt := latestItem.PublishedAt.Truncate(time.Second)
 	// 更新锚点为最新文章时间
 	db.DB.Model(&models.UserSubscription{}).
 		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
-		Update("last_read_anchor", latestItem.PublishedAt)
+		Update("last_read_anchor", publishedAt)
 
 	c.Header("HX-Trigger", "anchor-updated")
 	c.String(http.StatusOK, "已标记全部已读")
@@ -502,11 +520,14 @@ func (h *RSSHandler) UpdateReadAnchorBatch(c *gin.Context) {
 		return
 	}
 
+	// 截断到秒级，避免微秒导致的比较问题
+	publishedAt := item.PublishedAt.Truncate(time.Second)
+
 	// 仅当新时间更晚时才更新
 	result := db.DB.Model(&models.UserSubscription{}).
 		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
-		Where("last_read_anchor IS NULL OR last_read_anchor < ?", item.PublishedAt).
-		Update("last_read_anchor", item.PublishedAt)
+		Where("last_read_anchor IS NULL OR last_read_anchor < ?", publishedAt).
+		Update("last_read_anchor", publishedAt)
 
 	if result.Error != nil {
 		c.String(http.StatusInternalServerError, "更新失败: "+result.Error.Error())
