@@ -124,6 +124,10 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 
 	fillCommentCounts(posts)
 
+	// 获取节点列表（用于侧边栏导航）
+	var nodes []models.Node
+	db.DB.Order("id ASC").Find(&nodes)
+
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
@@ -136,6 +140,7 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 
 	Render(c, http.StatusOK, "story/list.html", gin.H{
 		"Posts":       posts,
+		"Nodes":       nodes,
 		"Active":      "top",
 		"Title":       "热门话题",
 		"CurrentPage": page,
@@ -177,6 +182,10 @@ func (h *StoryHandler) ListNew(c *gin.Context) {
 
 	fillCommentCounts(posts)
 
+	// 获取节点列表（用于侧边栏导航）
+	var nodes []models.Node
+	db.DB.Order("id ASC").Find(&nodes)
+
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
@@ -189,6 +198,7 @@ func (h *StoryHandler) ListNew(c *gin.Context) {
 
 	Render(c, http.StatusOK, "story/list.html", gin.H{
 		"Posts":       posts,
+		"Nodes":       nodes,
 		"Active":      "new",
 		"Title":       "最新发布",
 		"CurrentPage": page,

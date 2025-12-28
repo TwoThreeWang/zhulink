@@ -258,6 +258,30 @@
                 </p>
             </div>
 
+            <!-- Component C: 节点导航 -->
+            {{ if .Nodes }}
+            <div class="bg-stone-50 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-ink">节点导航</h3>
+                    <a href="/nodes" class="text-xs text-moss hover:underline">全部</a>
+                </div>
+                <div class="space-y-2">
+                    {{ range .Nodes }}
+                    <a href="/t/{{ .Name }}"
+                        class="block p-2 bg-white border border-stone-200 rounded-md hover:border-moss hover:bg-moss/5 transition-colors group">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="hash" class="w-4 h-4 text-moss flex-shrink-0"></i>
+                            <span class="font-medium text-sm text-ink group-hover:text-moss">{{ .Name }}</span>
+                        </div>
+                        {{ if .Description }}
+                        <p class="text-xs text-stone-500 mt-1 line-clamp-1 pl-6">{{ .Description }}</p>
+                        {{ end }}
+                    </a>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+
         </div>
     </aside>
 
