@@ -5,6 +5,8 @@ import (
 	"html"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/models"
@@ -191,26 +193,22 @@ func (h *SEOHandler) RSSFeed(c *gin.Context) {
 
 	// 添加文章项
 	for _, post := range posts {
-		// 截取内容前300字符
-		content := post.Content
-		runes := []rune(content)
-		if len(runes) > 300 {
-			content = string(runes[:300]) + "..."
-		}
-
-		// 转义XML特殊字符
-		content = escapeXML(content)
-		title := escapeXML(post.Title)
-		author := escapeXML(post.User.Username)
-
 		// 构建文章链接
 		link := fmt.Sprintf("%s/p/%s", siteURL, post.Pid)
 
-		// 添加item
+		// 按段落截取HTML内容（前3个块级元素）
+		content := truncateByParagraph(post.Content, 3)
+		// 添加查看更多链接
+		content += fmt.Sprintf(`<p><br><a href="%s">评论也是内容的一部分，点击查看完整内容与讨论 →</a></p>`, link)
+
+		title := escapeXML(post.Title)
+		author := escapeXML(post.User.Username)
+
+		// 添加item（使用CDATA包装HTML内容）
 		rss += `    <item>
       <title>` + title + `</title>
       <link>` + link + `</link>
-      <description>` + content + `</description>
+      <description><![CDATA[` + content + `]]></description>
       <author>` + author + `</author>
       <category>` + escapeXML(post.Node.Name) + `</category>
       <pubDate>` + post.CreatedAt.Format(time.RFC1123Z) + `</pubDate>
@@ -231,4 +229,28 @@ func (h *SEOHandler) RSSFeed(c *gin.Context) {
 func escapeXML(s string) string {
 	// 使用html.EscapeString处理XML转义,它能正确处理中文
 	return html.EscapeString(s)
+}
+
+// truncateByParagraph 按段落截取HTML，保留前几个完整块级元素
+func truncateByParagraph(content string, maxBlocks int) string {
+	// 匹配块级元素: <p>, <div>, <h1-6>, <ul>, <ol>, <blockquote>, <pre>
+	re := regexp.MustCompile(`(?s)(<(?:p|div|h[1-6]|ul|ol|blockquote|pre)[^>]*>.*?</(?:p|div|h[1-6]|ul|ol|blockquote|pre)>)`)
+	matches := re.FindAllString(content, maxBlocks)
+
+	if len(matches) == 0 {
+		// 没有匹配到块级元素，回退到纯文本截取
+		runes := []rune(stripHTML(content))
+		if len(runes) > 300 {
+			return string(runes[:300]) + "..."
+		}
+		return content
+	}
+
+	return strings.Join(matches, "\n")
+}
+
+// stripHTML 去除HTML标签
+func stripHTML(s string) string {
+	re := regexp.MustCompile(`<[^>]*>`)
+	return re.ReplaceAllString(s, "")
 }
