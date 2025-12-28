@@ -55,6 +55,10 @@ func main() {
 	rssFetcher.StartScheduledCleanup() // 每天凌晨 2 点清除过期文章
 	log.Println("RSS 定时任务已启动: 拉取间隔 30 分钟, 保留最近 30 天文章")
 
+	// 启动文章分数定时更新任务
+	services.GetRankingService().StartScheduledScoreUpdate() // 每天凌晨 3 点更新
+	log.Println("文章分数定时任务已启动: 每天凌晨 3 点更新")
+
 	// Initialize Gin
 	r := gin.Default()
 

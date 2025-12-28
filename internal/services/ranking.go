@@ -144,3 +144,50 @@ func (s *RankingService) updatePostScore(postID uint) {
 func UpdatePostScoreSync(postID uint) {
 	GetRankingService().updatePostScore(postID)
 }
+
+// StartScheduledScoreUpdate 启动定时分数更新任务（每天凌晨 3 点执行）
+func (s *RankingService) StartScheduledScoreUpdate() {
+	go func() {
+		for {
+			// 计算到下一个凌晨 3 点的时间
+			now := time.Now()
+			next := time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, now.Location())
+			if now.After(next) {
+				next = next.Add(24 * time.Hour)
+			}
+			time.Sleep(time.Until(next))
+
+			log.Println("开始定时更新文章分数...")
+			s.updateHotPosts()
+			log.Println("定时更新文章分数完成")
+		}
+	}()
+}
+
+// updateHotPosts 更新最近 7 天和分数最高的 30 篇文章的分数（边遍历边去重）
+func (s *RankingService) updateHotPosts() {
+	processed := make(map[uint]bool)
+	count := 0
+
+	// 1. 处理最近 7 天的帖子
+	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
+	var recentPosts []models.Post
+	db.DB.Where("created_at >= ?", sevenDaysAgo).Select("id").Find(&recentPosts)
+	for _, p := range recentPosts {
+		s.updatePostScore(p.ID)
+		processed[p.ID] = true
+		count++
+	}
+
+	// 2. 处理分数最高的 30 篇帖子（跳过已处理的）
+	var topPosts []models.Post
+	db.DB.Order("score DESC").Limit(30).Select("id").Find(&topPosts)
+	for _, p := range topPosts {
+		if !processed[p.ID] {
+			s.updatePostScore(p.ID)
+			count++
+		}
+	}
+
+	log.Printf("本次更新 %d 篇文章分数", count)
+}
