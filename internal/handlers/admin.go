@@ -249,3 +249,39 @@ func (h *AdminHandler) AdminDeleteComment(c *gin.Context) {
 
 	c.Status(http.StatusOK)
 }
+
+// ListUsers 用户列表（管理员）
+func (h *AdminHandler) ListUsers(c *gin.Context) {
+	if h.checkAdmin(c) == nil {
+		c.Redirect(http.StatusFound, "/")
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize := 20
+	offset := (page - 1) * pageSize
+
+	var users []models.User
+	var total int64
+	db.DB.Model(&models.User{}).Count(&total)
+	db.DB.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&users)
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	Render(c, http.StatusOK, "admin/users.html", gin.H{
+		"Title":       "用户管理",
+		"Users":       users,
+		"CurrentUser": h.checkAdmin(c),
+		"Page":        page,
+		"TotalPages":  totalPages,
+		"Total":       total,
+		"HasNext":     page < totalPages,
+		"HasPrev":     page > 1,
+	})
+}

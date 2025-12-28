@@ -1,25 +1,21 @@
 <nav class="w-full">
     <div class="space-y-1">
-        <a href="/dashboard"
-            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "overview" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+        <a href="/dashboard" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "overview" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
             <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
             <span>概览</span>
         </a>
-        <a href="/dashboard/notifications"
-            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "notifications" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+        <a href="/dashboard/notifications" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "notifications" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
             <i data-lucide="bell" class="w-4 h-4"></i>
             <span>消息中心</span>
             {{ if .UnreadCount }}
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{{ .UnreadCount }}</span>
             {{ end }}
         </a>
-        <a href="/dashboard/points"
-            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "points" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+        <a href="/dashboard/points" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "points" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
             <i data-lucide="trending-up" class="w-4 h-4"></i>
             <span>积分明细</span>
         </a>
-        <a href="/dashboard/settings"
-            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "settings" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+        <a href="/dashboard/settings" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "settings" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
             <i data-lucide="settings" class="w-4 h-4"></i>
             <span>设置</span>
         </a>
@@ -27,10 +23,13 @@
         {{ if and .CurrentUser (eq .CurrentUser.Role "admin") }}
         <div class="pt-4 mt-4 border-t border-stone-100">
             <p class="px-3 mb-2 text-[10px] font-bold text-stone-400 uppercase tracking-widest">管理面板</p>
-            <a href="/admin/reports"
-                class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "reports" }}bg-red-50 text-red-600{{ else }}text-stone-500 hover:bg-red-50 hover:text-red-700{{ end }}">
+            <a href="/admin/reports" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "reports" }}bg-red-50 text-red-600{{ else }}text-stone-500 hover:bg-red-50 hover:text-red-700{{ end }}">
                 <i data-lucide="shield-alert" class="w-4 h-4"></i>
                 <span>举报管理</span>
+            </a>
+            <a href="/admin/users" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors {{ if eq .Active "users" }}bg-moss/10 text-moss{{ else }}text-stone-500 hover:bg-stone-100 hover:text-ink{{ end }}">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>用户管理</span>
             </a>
         </div>
         {{ end }}

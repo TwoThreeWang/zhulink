@@ -1,0 +1,122 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<div class="max-w-5xl mx-auto py-8">
+    <div class="flex flex-col md:flex-row gap-8 md:gap-12">
+        <!-- 侧边栏 -->
+        <aside class="md:w-48 flex-shrink-0">
+            {{ template "dashboard_sidebar.html" dict "Active" "users" "UnreadCount" 0 "CurrentUser" .CurrentUser }}
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-grow min-w-0">
+            <div class="flex items-center justify-between mb-6 pl-1">
+                <h1 class="text-xl font-bold text-ink">用户管理</h1>
+                <span class="text-sm text-stone-400">共 {{ .Total }} 位用户</span>
+            </div>
+
+            {{ if .Users }}
+            <!-- 用户列表 -->
+            <div class="bg-white rounded-lg border border-stone-100 shadow-sm overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3 text-left">ID</th>
+                            <th class="px-4 py-3 text-left">用户</th>
+                            <th class="px-4 py-3 text-left hidden md:table-cell">邮箱</th>
+                            <th class="px-4 py-3 text-center">积分</th>
+                            <th class="px-4 py-3 text-center hidden sm:table-cell">角色</th>
+                            <th class="px-4 py-3 text-center hidden sm:table-cell">状态</th>
+                            <th class="px-4 py-3 text-right">注册时间</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-100">
+                        {{ range .Users }}
+                        <tr class="hover:bg-stone-50 transition-colors">
+                            <td class="px-4 py-3">
+                                <a href="/u/{{ .ID }}" target="_blank"
+                                    class="font-mono text-xs text-moss hover:underline">{{ .ID }}</a>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg">{{ if .Avatar }}{{ .Avatar }}{{ else }}🌱{{ end }}</span>
+                                    <span class="font-medium text-ink">{{ .Username }}</span>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 text-stone-500 hidden md:table-cell">{{ .Email }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="font-medium text-moss">{{ .Points }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-center hidden sm:table-cell">
+                                {{ if eq .Role "admin" }}
+                                <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">管理员</span>
+                                {{ else }}
+                                <span class="px-2 py-0.5 bg-stone-100 text-stone-500 rounded text-xs">用户</span>
+                                {{ end }}
+                            </td>
+                            <td class="px-4 py-3 text-center hidden sm:table-cell">
+                                {{ if eq .Status 0 }}
+                                <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">正常</span>
+                                {{ else if eq .Status 1 }}
+                                <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">禁言</span>
+                                {{ else if eq .Status 2 }}
+                                <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">封禁</span>
+                                {{ end }}
+                            </td>
+                            <td class="px-4 py-3 text-right text-stone-400 text-xs">
+                                {{ .CreatedAt.Format "2006-01-02 15:04" }}
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            {{ if or .HasPrev .HasNext }}
+            <div class="flex items-center justify-center gap-4 mt-6">
+                {{ if .HasPrev }}
+                <a href="/admin/users?page={{ sub .Page 1 }}"
+                    class="flex items-center gap-1 px-4 py-2 text-sm text-stone-600 hover:text-moss hover:bg-moss/10 rounded-lg transition-colors">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                    上一页
+                </a>
+                {{ else }}
+                <span class="flex items-center gap-1 px-4 py-2 text-sm text-stone-300 cursor-not-allowed">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                    上一页
+                </span>
+                {{ end }}
+
+                <span class="text-sm text-stone-500">
+                    第 <span class="font-medium text-ink">{{ .Page }}</span> / {{ .TotalPages }} 页
+                </span>
+
+                {{ if .HasNext }}
+                <a href="/admin/users?page={{ add .Page 1 }}"
+                    class="flex items-center gap-1 px-4 py-2 text-sm text-stone-600 hover:text-moss hover:bg-moss/10 rounded-lg transition-colors">
+                    下一页
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </a>
+                {{ else }}
+                <span class="flex items-center gap-1 px-4 py-2 text-sm text-stone-300 cursor-not-allowed">
+                    下一页
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </span>
+                {{ end }}
+            </div>
+            {{ end }}
+
+            {{ else }}
+            <div class="py-12 text-center bg-stone-50/50 rounded-2xl border border-dashed border-stone-200">
+                <div
+                    class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-sm mb-3 text-stone-300">
+                    <i data-lucide="users" class="w-6 h-6"></i>
+                </div>
+                <p class="text-stone-400 text-sm font-medium">暂无用户</p>
+            </div>
+            {{ end }}
+        </main>
+    </div>
+</div>
+{{ end }}

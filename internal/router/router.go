@@ -131,5 +131,6 @@ func RegisterRoutes(r *gin.Engine) {
 		admin.DELETE("/comment/:cid", adminHandler.AdminDeleteComment) // 管理员删除评论
 		admin.GET("/reports", adminHandler.ListReports)                // 举报列表
 		admin.DELETE("/reports/:id", adminHandler.HandleReport)        // 处理举报
+		admin.GET("/users", adminHandler.ListUsers)                    // 用户管理
 	}
 }
