@@ -24,7 +24,7 @@ func NewSEOHandler() *SEOHandler {
 func getSiteURL() string {
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
-		siteURL = "https://zhulink.com"
+		siteURL = "https://zhulink.vip"
 	}
 	return siteURL
 }
@@ -78,16 +78,7 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
   </url>
 `, siteURL, now)
 
-	// 2. 热门页
-	xml += fmt.Sprintf(`  <url>
-    <loc>%s/</loc>
-    <lastmod>%s</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.9</priority>
-  </url>
-`, siteURL, now)
-
-	// 3. 最新页
+	// 2. 最新页
 	xml += fmt.Sprintf(`  <url>
     <loc>%s/new</loc>
     <lastmod>%s</lastmod>
@@ -96,7 +87,7 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
   </url>
 `, siteURL, now)
 
-	// 4. 节点列表页
+	// 3. 节点列表页
 	xml += fmt.Sprintf(`  <url>
     <loc>%s/nodes</loc>
     <lastmod>%s</lastmod>
@@ -105,7 +96,7 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
   </url>
 `, siteURL, now)
 
-	// 5. 搜索页
+	// 4. 搜索页
 	xml += fmt.Sprintf(`  <url>
     <loc>%s/search</loc>
     <lastmod>%s</lastmod>
@@ -114,16 +105,7 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
   </url>
 `, siteURL, now)
 
-	// 6. RSS苗圃页
-	xml += fmt.Sprintf(`  <url>
-    <loc>%s/rss</loc>
-    <lastmod>%s</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-`, siteURL, now)
-
-	// 7. 所有节点页面
+	// 5. 所有节点页面
 	var nodes []models.Node
 	db.DB.Find(&nodes)
 	for _, node := range nodes {
@@ -136,7 +118,7 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
 `, siteURL, node.Name, now)
 	}
 
-	// 8. 最近的文章详情页(限制500篇,避免sitemap过大)
+	// 6. 最近的文章详情页(限制500篇,避免sitemap过大)
 	var posts []models.Post
 	db.DB.Order("created_at DESC").Limit(500).Find(&posts)
 	for _, post := range posts {

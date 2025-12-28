@@ -127,7 +127,7 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
-		siteURL = "https://zhulink.com"
+		siteURL = "https://zhulink.vip"
 	}
 	fullURL := siteURL
 	if page > 1 {
@@ -180,7 +180,7 @@ func (h *StoryHandler) ListNew(c *gin.Context) {
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
-		siteURL = "https://zhulink.com"
+		siteURL = "https://zhulink.vip"
 	}
 	fullURL := fmt.Sprintf("%s/new", siteURL)
 	if page > 1 {
@@ -244,7 +244,7 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
-		siteURL = "https://zhulink.com"
+		siteURL = "https://zhulink.vip"
 	}
 	fullURL := fmt.Sprintf("%s/t/%s", siteURL, node.Name)
 	if page > 1 {
@@ -289,7 +289,7 @@ func (h *StoryHandler) Search(c *gin.Context) {
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
-		siteURL = "https://zhulink.com"
+		siteURL = "https://zhulink.vip"
 	}
 	fullURL := fmt.Sprintf("%s/search?q=%s", siteURL, query)
 
@@ -480,7 +480,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	// 从环境变量获取网站URL,如果未设置则使用默认值
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
-		siteURL = "https://zhulink.com"
+		siteURL = "https://zhulink.vip"
 	}
 	fullURL := fmt.Sprintf("%s/p/%s", siteURL, post.Pid)
 

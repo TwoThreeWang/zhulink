@@ -125,7 +125,7 @@ GIN_MODE=release  # debug, release, or test
 SESSION_SECRET="your-secret-key-change-me"
 
 # 站点配置
-SITE_URL="https://zhulink.com"
+SITE_URL="https://zhulink.vip"
 
 # LLM 配置 (可选)
 LLM_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"

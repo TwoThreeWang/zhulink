@@ -15,7 +15,7 @@ Disallow: /bookmark/
 Disallow: /report/
 
 # Sitemap位置
-Sitemap: https://zhulink.com/sitemap.xml
+Sitemap: https://zhulink.vip/sitemap.xml
 
 # 爬取延迟(可选,避免服务器压力)
 Crawl-delay: 1
