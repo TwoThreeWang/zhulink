@@ -582,3 +582,63 @@ func (h *RSSHandler) UpdateSubscription(c *gin.Context) {
 	c.Header("HX-Trigger", "subscription-updated")
 	c.String(http.StatusOK, "更新成功")
 }
+
+// PopularFeeds 热门订阅页面（公开，无需登录）
+func (h *RSSHandler) PopularFeeds(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize := 20
+
+	// 统计有订阅的 Feed 总数
+	var total int64
+	db.DB.Model(&models.UserSubscription{}).
+		Select("COUNT(DISTINCT feed_id)").
+		Scan(&total)
+
+	// 查询每个 Feed 的订阅人数，按人数降序排列
+	type FeedWithCount struct {
+		models.Feed
+		SubscriberCount int `gorm:"column:subscriber_count"`
+	}
+
+	var feeds []FeedWithCount
+	db.DB.Table("feeds").
+		Select("feeds.*, COUNT(user_subscriptions.id) as subscriber_count").
+		Joins("LEFT JOIN user_subscriptions ON feeds.id = user_subscriptions.feed_id").
+		Group("feeds.id").
+		Having("COUNT(user_subscriptions.id) > 0").
+		Order("subscriber_count DESC, feeds.created_at DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Scan(&feeds)
+
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize > 0 {
+		totalPages++
+	}
+
+	// 获取当前登录用户已订阅的 feed_id 集合
+	subscribedMap := make(map[uint]bool)
+	if user, exists := c.Get(middleware.CheckUserKey); exists && user != nil {
+		currentUser := user.(*models.User)
+		var subscribedIDs []uint
+		db.DB.Model(&models.UserSubscription{}).
+			Where("user_id = ?", currentUser.ID).
+			Pluck("feed_id", &subscribedIDs)
+		for _, id := range subscribedIDs {
+			subscribedMap[id] = true
+		}
+	}
+
+	Render(c, http.StatusOK, "rss/popular.html", gin.H{
+		"Title":         "热门订阅 - RSS 发现",
+		"Active":        "rss",
+		"Feeds":         feeds,
+		"CurrentPage":   page,
+		"TotalPages":    totalPages,
+		"Total":         total,
+		"SubscribedMap": subscribedMap,
+	})
+}

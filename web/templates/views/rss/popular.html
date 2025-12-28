@@ -1,0 +1,135 @@
+{{ define "content" }}
+<div class="min-h-[70vh]">
+    <div class="max-w-4xl mx-auto">
+        <!-- 面包屑导航 -->
+        <nav class="flex items-center space-x-2 text-sm text-ink-light mb-4">
+            <a href="/rss" class="hover:text-moss transition-colors">🌱 苗圃</a>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            <span class="text-ink">热门订阅</span>
+        </nav>
+
+        <!-- 页面标题 -->
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-stone-100">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-moss/10 rounded-lg flex items-center justify-center">
+                    <i data-lucide="flame" class="w-5 h-5 text-moss"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-ink">热门订阅</h1>
+                    <p class="text-sm text-ink-light">发现全站热门 RSS 订阅源</p>
+                </div>
+            </div>
+            <div class="text-sm text-ink-light">
+                共 {{ .Total }} 个订阅源
+            </div>
+        </div>
+
+        {{ if .Feeds }}
+        <!-- 订阅源列表 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            {{ range .Feeds }}
+            {{ $feedID := .ID }}
+            <div
+                class="bg-white border border-stone-100 rounded-xl p-4 hover:shadow-md hover:border-moss/30 transition-all">
+                <div class="flex items-start space-x-3">
+                    <!-- 图标 -->
+                    <div
+                        class="flex-shrink-0 w-12 h-12 bg-stone-100 rounded-lg flex items-center justify-center overflow-hidden">
+                        {{ if .IconURL }}
+                        <img src="{{ .IconURL }}" alt="" class="w-full h-full object-cover">
+                        {{ else }}
+                        <span class="text-2xl">📰</span>
+                        {{ end }}
+                    </div>
+
+                    <!-- 标题和信息 -->
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-medium text-ink truncate">{{ .Title }}</h3>
+                        <p class="text-xs text-ink-light truncate mt-0.5" title="{{ .URL }}">
+                            {{ .URL }}
+                        </p>
+                        <!-- 订阅人数和订阅按钮 -->
+                        <div class="flex items-center justify-between mt-2">
+                            <div class="flex items-center text-sm text-ink-light">
+                                <i data-lucide="users" class="w-4 h-4 mr-1"></i>
+                                <span>{{ .SubscriberCount }} 人订阅</span>
+                            </div>
+                            {{ if $.CurrentUser }}
+                            {{ if index $.SubscribedMap $feedID }}
+                            <!-- 已订阅状态 -->
+                            <span class="px-3 py-1 text-xs bg-stone-100 text-ink-light rounded-full">
+                                已订阅
+                            </span>
+                            {{ else }}
+                            <!-- 一键订阅按钮 -->
+                            <form hx-post="/rss/subscribe" hx-swap="none"
+                                hx-on::after-request="if(event.detail.xhr.status === 200) { window.location.reload(); }">
+                                <input type="hidden" name="url" value="{{ .URL }}">
+                                <button type="submit"
+                                    class="px-3 py-1 text-xs bg-moss text-white rounded-full hover:bg-moss-dark transition-colors cursor-pointer">
+                                    + 订阅
+                                </button>
+                            </form>
+                            {{ end }}
+                            {{ else }}
+                            <!-- 未登录 - 登录提示 -->
+                            <a href="/login"
+                                class="px-3 py-1 text-xs border border-moss text-moss rounded-full hover:bg-moss hover:text-white transition-colors">
+                                登录订阅
+                            </a>
+                            {{ end }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{ end }}
+        </div>
+
+        <!-- 分页 -->
+        {{ if gt .TotalPages 1 }}
+        <div class="flex items-center justify-center space-x-2 py-6 border-t border-stone-100">
+            <!-- 上一页 -->
+            {{ if gt .CurrentPage 1 }}
+            <a href="/rss/popular?page={{ add .CurrentPage -1 }}"
+                class="px-4 py-2 text-sm border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors">
+                <i data-lucide="chevron-left" class="w-4 h-4 inline-block"></i>
+                上一页
+            </a>
+            {{ else }}
+            <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-ink-lighter cursor-not-allowed">
+                <i data-lucide="chevron-left" class="w-4 h-4 inline-block"></i>
+                上一页
+            </span>
+            {{ end }}
+
+            <!-- 页码信息 -->
+            <span class="px-4 py-2 text-sm text-ink-light">
+                第 {{ .CurrentPage }} / {{ .TotalPages }} 页
+            </span>
+
+            <!-- 下一页 -->
+            {{ if lt .CurrentPage .TotalPages }}
+            <a href="/rss/popular?page={{ add .CurrentPage 1 }}"
+                class="px-4 py-2 text-sm border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors">
+                下一页
+                <i data-lucide="chevron-right" class="w-4 h-4 inline-block"></i>
+            </a>
+            {{ else }}
+            <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-ink-lighter cursor-not-allowed">
+                下一页
+                <i data-lucide="chevron-right" class="w-4 h-4 inline-block"></i>
+            </span>
+            {{ end }}
+        </div>
+        {{ end }}
+        {{ else }}
+        <!-- 空状态 -->
+        <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
+            <div class="text-6xl mb-4">📭</div>
+            <h2 class="text-xl font-medium text-ink mb-2">暂无热门订阅</h2>
+            <p class="text-sm">还没有用户添加 RSS 订阅</p>
+        </div>
+        {{ end }}
+    </div>
+</div>
+{{ end }}

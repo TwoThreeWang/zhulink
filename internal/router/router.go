@@ -35,13 +35,14 @@ func RegisterRoutes(r *gin.Engine) {
 	r.StaticFile("/ads.txt", "./web/static/ads.txt") // Google AdSense 验证
 
 	// 公共路由 (Public Routes)
-	r.GET("/", storyHandler.ListTop)           // 首页 - 热门文章
-	r.GET("/new", storyHandler.ListNew)        // 最新文章
-	r.GET("/search", storyHandler.Search)      // 搜索页面
-	r.GET("/p/:pid", storyHandler.Detail)      // 文章详情页
-	r.GET("/t/:name", storyHandler.ListByNode) // 节点下的文章列表
-	r.GET("/nodes", nodeHandler.ListNodes)     // 所有节点列表
-	r.GET("/u/:id", userHandler.Profile)       // 用户主页
+	r.GET("/", storyHandler.ListTop)               // 首页 - 热门文章
+	r.GET("/new", storyHandler.ListNew)            // 最新文章
+	r.GET("/search", storyHandler.Search)          // 搜索页面
+	r.GET("/p/:pid", storyHandler.Detail)          // 文章详情页
+	r.GET("/t/:name", storyHandler.ListByNode)     // 节点下的文章列表
+	r.GET("/nodes", nodeHandler.ListNodes)         // 所有节点列表
+	r.GET("/u/:id", userHandler.Profile)           // 用户主页
+	r.GET("/rss/popular", rssHandler.PopularFeeds) // 热门订阅（公开）
 
 	r.GET("/signup", authHandler.ShowRegister)   // 注册页面
 	r.POST("/signup", authHandler.Register)      // 提交注册

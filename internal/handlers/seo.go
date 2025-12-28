@@ -105,7 +105,16 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
   </url>
 `, siteURL, now)
 
-	// 5. 所有节点页面
+	// 5. 热门订阅页
+	xml += fmt.Sprintf(`  <url>
+    <loc>%s/rss/popular</loc>
+    <lastmod>%s</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+`, siteURL, now)
+
+	// 6. 所有节点页面
 	var nodes []models.Node
 	db.DB.Find(&nodes)
 	for _, node := range nodes {

@@ -16,14 +16,21 @@
                 </div>
                 <!-- 添加订阅按钮 -->
                 <button @click="showAddModal = true"
-                    class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 mb-6 text-sm bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors cursor-pointer">
+                    class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 mb-2 text-sm bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors cursor-pointer">
                     <i data-lucide="plus" class="w-4 h-4"></i>
                     <span>添加订阅</span>
                 </button>
 
+                <!-- 发现热门入口 -->
+                <a href="/rss/popular"
+                    class="w-full flex items-center justify-center space-x-2 px-4 py-2.5 mb-6 text-sm border border-stone-200 text-ink-light hover:text-moss hover:border-moss rounded-lg transition-colors">
+                    <i data-lucide="flame" class="w-4 h-4"></i>
+                    <span>发现热门订阅</span>
+                </a>
+
                 <!-- 分类列表 -->
                 {{ if .Categories }}
-                <div class="px-4 py-2 text-xs font-semibold text-ink-lighter uppercase tracking-wider mb-1">
+                <div class="px-4 py-2 text-sm font-semibold text-ink-light tracking-wider mb-1">
                     订阅分类
                 </div>
                 <nav class="space-y-0.5">
@@ -32,7 +39,7 @@
                         @click="selectedCategory = '{{ $cat }}'" :class="selectedCategory === '{{ $cat }}'
                             ? 'text-ink font-medium border-l-2 border-moss bg-stone-50'
                             : 'text-ink-light hover:text-ink hover:bg-stone-50 border-l-2 border-transparent'"
-                        class="w-full text-left px-4 py-2.5 transition-colors cursor-pointer">
+                        class="w-full text-left px-4 py-2 transition-colors cursor-pointer">
                         <span>{{ $cat }}</span>
                     </button>
                     {{ end }}
@@ -70,11 +77,18 @@
                             {{ .CurrentRSSCount }}{{ if ne .MaxRSSCount -1 }}/{{ .MaxRSSCount }}{{ end }}
                         </div>
                     </div>
-                    <button @click="showAddModal = true"
-                        class="flex items-center space-x-1 px-3 py-1.5 text-sm bg-moss text-white rounded-lg">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
-                        <span>订阅</span>
-                    </button>
+                    <div class="flex items-center space-x-2">
+                        <a href="/rss/popular"
+                            class="flex items-center space-x-1 px-3 py-1.5 text-sm border border-orange-200 text-orange-600 rounded-lg">
+                            <i data-lucide="flame" class="w-4 h-4"></i>
+                            <span>热门</span>
+                        </a>
+                        <button @click="showAddModal = true"
+                            class="flex items-center space-x-1 px-3 py-1.5 text-sm bg-moss text-white rounded-lg">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>订阅</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 横向滚动分类胶囊 (小圆角) -->
