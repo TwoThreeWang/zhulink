@@ -22,11 +22,18 @@ func NewUserHandler() *UserHandler {
 
 // Profile - 用户主页 /u/:id
 func (h *UserHandler) Profile(c *gin.Context) {
-	userID := c.Param("id")
+	userIDStr := c.Param("id")
+
+	// 将 userID 转换为 uint，防止非数字输入导致 SQL 错误
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		Render(c, http.StatusNotFound, "error.html", gin.H{"Error": "用户不存在"})
+		return
+	}
 
 	// 查找用户
 	var user models.User
-	if err := db.DB.First(&user, userID).Error; err != nil {
+	if err := db.DB.First(&user, uint(userID)).Error; err != nil {
 		Render(c, http.StatusNotFound, "error.html", gin.H{"Error": "用户不存在"})
 		return
 	}
