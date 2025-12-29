@@ -105,6 +105,7 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 ### Content: %s
 
 # Absolute Reminder
+必须返回简体中文，不要返回其他语言。
 如果你因任何原因无法提供摘要，请务必返回 "CONTENT_UNSUITABLE"。
 `
 	prompt := fmt.Sprintf(promptTemplate, title, content)
