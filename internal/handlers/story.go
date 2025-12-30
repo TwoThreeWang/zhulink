@@ -117,7 +117,7 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 	// Since we haven't added a dedicated Rank column, we'll do dynamic calculation.
 	// Hard delete means we don't worry about deleted_at.
 	db.DB.Preload("User").Preload("Node").
-		Order("is_top DESC, score / power((EXTRACT(EPOCH FROM NOW() - created_at)/3600) + 2, 1.8) DESC").
+		Order("is_top DESC, score DESC, created_at DESC").
 		Limit(perPage).
 		Offset(offset).
 		Find(&posts)

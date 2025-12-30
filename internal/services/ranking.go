@@ -145,18 +145,19 @@ func UpdatePostScoreSync(postID uint) {
 	GetRankingService().updatePostScore(postID)
 }
 
-// StartScheduledScoreUpdate 启动定时分数更新任务（每天凌晨 3 点执行）
+// StartScheduledScoreUpdate 启动定时分数更新任务（每小时执行一次）
 func (s *RankingService) StartScheduledScoreUpdate() {
 	go func() {
-		for {
-			// 计算到下一个凌晨 3 点的时间
-			now := time.Now()
-			next := time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, now.Location())
-			if now.After(next) {
-				next = next.Add(24 * time.Hour)
-			}
-			time.Sleep(time.Until(next))
+		// 启动时先执行一次
+		log.Println("启动时执行首次文章分数更新...")
+		s.updateHotPosts()
+		log.Println("首次文章分数更新完成")
 
+		// 每小时执行一次
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+
+		for range ticker.C {
 			log.Println("开始定时更新文章分数...")
 			s.updateHotPosts()
 			log.Println("定时更新文章分数完成")
