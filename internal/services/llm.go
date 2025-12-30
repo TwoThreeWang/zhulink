@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -133,11 +134,13 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
+		log.Printf("[LLM] API 请求失败: %v", err)
 		return "", fmt.Errorf("api request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[LLM] API 返回非 200 状态码: %s", resp.Status)
 		return "", fmt.Errorf("api returned non-200 status: %s", resp.Status)
 	}
 

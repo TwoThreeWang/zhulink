@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"zhulink/internal/db"
@@ -84,6 +86,7 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 		if err == nil {
 			if strings.Contains(summary, "CONTENT_UNSUITABLE") {
 				// 内容不适宜逻辑
+				log.Printf("[Transplant] AI 判定内容不适宜 (user_id=%d, item_id=%d)", user.ID, itemID)
 				go services.AddPoints(user.ID, services.PointsContentViolation, services.ActionContentVioloation)
 
 				c.HTML(http.StatusOK, "rss/transplant_result.html", gin.H{
@@ -94,7 +97,20 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 			}
 			content = summary
 		} else {
-			content = item.Description // 降级方案
+			// LLM 调用失败，记录日志并使用降级方案
+			log.Printf("[Transplant] LLM 调用失败 (user_id=%d, item_id=%d): %v", user.ID, itemID, err)
+
+			// 清理 Description 作为降级方案
+			content = cleanHTMLAndTruncate(item.Description, 500)
+
+			// 如果清理后仍然为空，返回错误提示
+			if strings.TrimSpace(content) == "" {
+				c.HTML(http.StatusOK, "rss/transplant_result.html", gin.H{
+					"Success": false,
+					"Message": "AI 摘要生成失败，且文章内容为空，请手动填写推荐语后重试。",
+				})
+				return
+			}
 		}
 	}
 
@@ -111,7 +127,11 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 	}
 
 	if err := db.DB.Create(&post).Error; err != nil {
-		c.String(http.StatusInternalServerError, "发布失败")
+		log.Printf("[Transplant] 发布失败 (user_id=%d, item_id=%d): %v", user.ID, itemID, err)
+		c.HTML(http.StatusOK, "rss/transplant_result.html", gin.H{
+			"Success": false,
+			"Message": "发布失败，请稍后重试或手动填写推荐语。",
+		})
 		return
 	}
 
@@ -154,4 +174,36 @@ func (h *TransplantHandler) autoUpvote(userID uint, postID uint) {
 			go services.AddPoints(post.UserID, services.PointsPostLiked, services.ActionPostLiked)
 		}
 	}
+}
+
+// cleanHTMLAndTruncate 清理 HTML 标签并截断文本
+func cleanHTMLAndTruncate(html string, maxLength int) string {
+	// 移除 HTML 标签
+	re := regexp.MustCompile("<[^>]*>")
+	text := re.ReplaceAllString(html, "")
+
+	// 解码 HTML 实体
+	text = strings.ReplaceAll(text, "&nbsp;", " ")
+	text = strings.ReplaceAll(text, "&amp;", "&")
+	text = strings.ReplaceAll(text, "&lt;", "<")
+	text = strings.ReplaceAll(text, "&gt;", ">")
+	text = strings.ReplaceAll(text, "&quot;", "\"")
+	text = strings.ReplaceAll(text, "&#39;", "'")
+
+	// 清理多余空白
+	text = strings.TrimSpace(text)
+	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+
+	// 截断
+	if len(text) > maxLength {
+		// 尝试在句子边界截断
+		text = text[:maxLength]
+		if lastPeriod := strings.LastIndexAny(text, "。.!！?？"); lastPeriod > maxLength/2 {
+			text = text[:lastPeriod+1]
+		} else {
+			text = text + "..."
+		}
+	}
+
+	return text
 }
