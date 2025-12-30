@@ -11,7 +11,7 @@ type RankConfig struct {
 	WeightComment  float64 // 2.0
 	WeightUpvote   float64 // 1.0
 	WeightDownvote float64 // 1.5
-	WeightView     float64 // 0.005 (浏览量权重极小)
+	WeightView     float64 // 0.05 (浏览量权重)
 	ScaleFactor    float64 // 放大系数 (1000)
 	TimeBase       float64 // 时间基数 (24)
 }
@@ -22,7 +22,7 @@ var DefaultConfig = RankConfig{
 	WeightComment:  2.0,
 	WeightUpvote:   1.0,
 	WeightDownvote: 1.5,
-	WeightView:     0.005,  // 浏览量权重极小,1000 次浏览 ≈ 5 分互动值
+	WeightView:     0.05,   // 浏览量权重,1000 次浏览 ≈ 50 分互动值
 	ScaleFactor:    1000.0, // 让分数落在 0-999 区间
 	TimeBase:       24.0,   // 时间基数,防止新帖分数虚高
 }
