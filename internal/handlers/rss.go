@@ -395,7 +395,7 @@ func (h *RSSHandler) Subscribe(c *gin.Context) {
 	// 返回成功响应，触发Toast和页面刷新
 	payload := map[string]interface{}{
 		"show-success": map[string]string{
-			"message": "订阅成功",
+			"message": "订阅成功,文章正在后台加载中...",
 		},
 	}
 	if jsonBytes, err := json.Marshal(payload); err == nil {

@@ -210,10 +210,38 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 		return &existingFeed, nil
 	}
 
-	// 发现新订阅源 (DiscoverFeed 内部会处理 rsshub:// 转换)
-	feed, err := f.DiscoverFeed(rssURL)
+	// 规范化 URL (处理 rsshub:// 前缀)
+	actualURL := normalizeRSSURL(rssURL)
+
+	// 快速验证 URL 可访问性 (HTTP HEAD 请求,超时 5 秒)
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &customTransport{
+			base: &http.Transport{
+				MaxIdleConns:        2,
+				IdleConnTimeout:     5 * time.Second,
+				DisableCompression:  false,
+				DisableKeepAlives:   false,
+				MaxIdleConnsPerHost: 1,
+			},
+		},
+	}
+
+	resp, err := client.Get(actualURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("无法访问 RSS 地址: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("RSS 地址返回错误状态: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	// 快速创建订阅,标题暂时为"正在加载..."
+	feed := &models.Feed{
+		URL:     rssURL,
+		Title:   "正在加载...",
+		IconURL: "",
 	}
 
 	// 保存到数据库
@@ -221,13 +249,44 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 		return nil, fmt.Errorf("保存订阅源失败: %w", err)
 	}
 
-	// 异步抓取文章 (传递原始 URL,ParseAndStoreFeed 内部会处理转换)
+	// 后台异步获取真实标题和抓取文章
 	go func() {
-		if err := f.ParseAndStoreFeed(feed.ID, feed.URL); err != nil {
-			log.Printf("抓取订阅源文章失败: %v", err)
+		feedID := feed.ID
+
+		// 1. 获取真实的 Feed 信息(标题、图标)
+		realFeed, err := f.DiscoverFeed(rssURL)
+		if err != nil {
+			// 更新为错误状态
+			log.Printf("获取 RSS 源信息失败 (ID: %d, URL: %s): %v", feedID, rssURL, err)
+
+			// 截断错误信息,避免过长
+			errMsg := err.Error()
+			if len(errMsg) > 35 {
+				errMsg = errMsg[:35] + "..."
+			}
+
+			db.DB.Model(&models.Feed{}).Where("id = ?", feedID).Updates(map[string]interface{}{
+				"title": "抓取失败: " + errMsg,
+			})
+			return
+		}
+
+		// 2. 更新数据库中的标题和图标
+		log.Printf("更新 RSS 源信息 (ID: %d): %s", feedID, realFeed.Title)
+		db.DB.Model(&models.Feed{}).Where("id = ?", feedID).Updates(map[string]interface{}{
+			"title":    realFeed.Title,
+			"icon_url": realFeed.IconURL,
+		})
+
+		// 3. 抓取文章内容
+		if err := f.ParseAndStoreFeed(feedID, rssURL); err != nil {
+			log.Printf("抓取订阅源文章失败 (ID: %d): %v", feedID, err)
+		} else {
+			log.Printf("RSS 源抓取完成 (ID: %d): %s", feedID, realFeed.Title)
 		}
 	}()
 
+	// 立即返回,不等待后台任务完成
 	return feed, nil
 }
 

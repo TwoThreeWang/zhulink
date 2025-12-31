@@ -141,7 +141,7 @@
             </div>
 
             <form hx-post="/rss/subscribe" hx-indicator="#add-loading"
-                @htmx:after-request="if(event.detail.successful && event.detail.xhr.status === 200) { showAddModal = false; location.reload(); }"
+                @htmx:after-request="if(event.detail.successful && event.detail.xhr.status === 200) { showAddModal = false; setTimeout(() => location.reload(), 1500); }"
                 @htmx:timeout="window.dispatchEvent(new CustomEvent('show-error', { detail: { message: '请求超时，RSS 订阅源可能响应较慢，请稍后重试' } }))">
 
                 <div class="space-y-4">
