@@ -74,7 +74,17 @@ func GetRSSFetcher() *RSSFetcher {
 
 // normalizeRSSURL 规范化 RSS URL
 // 如果 URL 以 rsshub:// 开头,则替换为自定义的 RSSHub 实例地址
+// 如果 URL 以 [proxy] 开头,则使用代理服务访问
 func normalizeRSSURL(rssURL string) string {
+	// 处理 [proxy] 前缀
+	if strings.HasPrefix(rssURL, "[proxy]") {
+		// 移除 [proxy] 前缀
+		actualURL := strings.TrimPrefix(rssURL, "[proxy]")
+		// 通过代理服务访问
+		return "https://rssreader.error.workers.dev/proxy?url=" + actualURL
+	}
+
+	// 处理 rsshub:// 前缀
 	if strings.HasPrefix(rssURL, "rsshub://") {
 		// 从环境变量获取 RSSHub 实例地址
 		rsshubInstance := os.Getenv("RSSHUB_INSTANCE_URL")
@@ -89,6 +99,7 @@ func normalizeRSSURL(rssURL string) string {
 		rsshubInstance = strings.TrimSuffix(rsshubInstance, "/")
 		return rsshubInstance + "/" + path
 	}
+
 	return rssURL
 }
 
@@ -210,10 +221,10 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 		return &existingFeed, nil
 	}
 
-	// 规范化 URL (处理 rsshub:// 前缀)
+	// 规范化 URL (处理 rsshub:// 和 [proxy] 前缀)
 	actualURL := normalizeRSSURL(rssURL)
 
-	// 快速验证 URL 可访问性 (HTTP HEAD 请求,超时 5 秒)
+	// 快速验证 URL 可访问性 (HTTP GET 请求,超时 5 秒)
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &customTransport{
@@ -228,18 +239,66 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 	}
 
 	resp, err := client.Get(actualURL)
+	needProxy := false
+
+	// 如果直接访问失败且未使用代理,尝试通过代理访问
+	if (err != nil || resp == nil || resp.StatusCode != 200) && !strings.HasPrefix(rssURL, "[proxy]") {
+		if resp != nil {
+			resp.Body.Close()
+		}
+
+		// 构造代理 URL
+		proxyURL := "https://rssreader.error.workers.dev/proxy?url=" + actualURL
+		log.Printf("直接访问失败,尝试代理: %s", proxyURL)
+
+		// 尝试代理访问
+		proxyResp, proxyErr := client.Get(proxyURL)
+		if proxyErr == nil && proxyResp != nil && proxyResp.StatusCode == 200 {
+			// 代理成功
+			needProxy = true
+			resp = proxyResp
+			err = nil
+			log.Printf("代理访问成功,将使用代理订阅")
+		} else {
+			// 代理也失败
+			if proxyResp != nil {
+				proxyResp.Body.Close()
+			}
+			// 返回原始错误
+			if err != nil {
+				return nil, fmt.Errorf("无法访问 RSS 地址: %w", err)
+			}
+			// If resp is nil here, it means the original client.Get also failed with a non-HTTP error.
+			// If resp is not nil, it means original client.Get got a non-200 status.
+			// We need to handle the case where resp might be nil if the original request failed before getting a response.
+			if resp != nil {
+				return nil, fmt.Errorf("RSS 地址返回错误状态: %d", resp.StatusCode)
+			}
+			return nil, fmt.Errorf("无法访问 RSS 地址 (代理也失败)")
+		}
+	}
+
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("无法访问 RSS 地址: %w", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("RSS 地址返回错误状态: %d %s", resp.StatusCode, resp.Status)
 	}
 
+	// 如果需要代理,在原 URL 前添加 [proxy] 标记
+	finalURL := rssURL
+	if needProxy {
+		finalURL = "[proxy]" + rssURL
+	}
+
 	// 快速创建订阅,标题暂时为"正在加载..."
 	feed := &models.Feed{
-		URL:     rssURL,
+		URL:     finalURL, // 保存带 [proxy] 前缀的 URL (如果需要)
 		Title:   "正在加载...",
 		IconURL: "",
 	}
