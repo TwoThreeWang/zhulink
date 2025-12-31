@@ -18,17 +18,38 @@ type RSSFetcher struct {
 	parser *gofeed.Parser
 }
 
+// customTransport 自定义 HTTP 传输层,为每个请求添加友好的 User-Agent
+type customTransport struct {
+	base http.RoundTripper
+}
+
+func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// 设置友好的 User-Agent,模拟常见的 RSS 阅读器
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ZhuLink RSS Reader/1.0; +https://zhulink.vip)")
+	// 设置接受的内容类型
+	req.Header.Set("Accept", "application/rss+xml, application/xml, text/xml, application/atom+xml, */*")
+	// 设置接受的语言
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,*;q=0.5")
+
+	return t.base.RoundTrip(req)
+}
+
 // NewRSSFetcher 创建 RSS 抓取服务实例
 func NewRSSFetcher() *RSSFetcher {
-	// 创建自定义 HTTP 客户端，设置超时
+	// 创建基础传输层
+	baseTransport := &http.Transport{
+		MaxIdleConns:        10,
+		IdleConnTimeout:     30 * time.Second,
+		DisableCompression:  false,
+		DisableKeepAlives:   false,
+		MaxIdleConnsPerHost: 2,
+	}
+
+	// 创建自定义 HTTP 客户端，设置超时和自定义请求头
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second, // 30 秒超时
-		Transport: &http.Transport{
-			MaxIdleConns:        10,
-			IdleConnTimeout:     30 * time.Second,
-			DisableCompression:  false,
-			DisableKeepAlives:   false,
-			MaxIdleConnsPerHost: 2,
+		Transport: &customTransport{
+			base: baseTransport,
 		},
 	}
 

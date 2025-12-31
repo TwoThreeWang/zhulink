@@ -142,18 +142,6 @@
 
             <form hx-post="/rss/subscribe" hx-indicator="#add-loading"
                 @htmx:after-request="if(event.detail.successful && event.detail.xhr.status === 200) { showAddModal = false; location.reload(); }"
-                @htmx:response-error="
-                    const status = event.detail.xhr.status;
-                    let message = '订阅失败，请稍后重试';
-                    if (status === 504) {
-                        message = 'RSS 订阅源响应超时，请检查地址是否正确或稍后重试';
-                    } else if (status === 503) {
-                        message = '服务暂时不可用，请稍后重试';
-                    } else if (status === 0) {
-                        message = '网络连接失败，请检查网络后重试';
-                    }
-                    window.dispatchEvent(new CustomEvent('show-error', { detail: { message: message } }));
-                "
                 @htmx:timeout="window.dispatchEvent(new CustomEvent('show-error', { detail: { message: '请求超时，RSS 订阅源可能响应较慢，请稍后重试' } }))">
 
                 <div class="space-y-4">
