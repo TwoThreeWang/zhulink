@@ -39,7 +39,7 @@ func NewRSSFetcher() *RSSFetcher {
 	// 创建基础传输层
 	baseTransport := &http.Transport{
 		MaxIdleConns:        10,
-		IdleConnTimeout:     30 * time.Second,
+		IdleConnTimeout:     60 * time.Second,
 		DisableCompression:  false,
 		DisableKeepAlives:   false,
 		MaxIdleConnsPerHost: 2,
@@ -47,7 +47,7 @@ func NewRSSFetcher() *RSSFetcher {
 
 	// 创建自定义 HTTP 客户端，设置超时和自定义请求头
 	httpClient := &http.Client{
-		Timeout: 30 * time.Second, // 30 秒超时
+		Timeout: 60 * time.Second, // 60 秒超时
 		Transport: &customTransport{
 			base: baseTransport,
 		},
