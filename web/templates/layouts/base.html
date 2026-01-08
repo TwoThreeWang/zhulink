@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ if .Title }}{{ .Title }} - {{ end }}ZhuLink 竹林 | 去算法的高质量资讯社区</title>
+    <title>{{ if eq .Active "top" }}ZhuLink 竹林 | 去算法的高质量资讯社区{{ else }}{{ if .Title }}{{ .Title }} - {{ end }}ZhuLink
+        竹林{{ end }}</title>
     <link rel="icon" type="image/svg+xml" href="/static/img/logo.svg">
     <link href="/static/css/style.css?v=5" rel="stylesheet">
     <!-- HTMX -->

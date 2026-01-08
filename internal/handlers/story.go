@@ -403,6 +403,25 @@ func (h *StoryHandler) Create(c *gin.Context) {
 		}
 	}()
 
+	// 异步生成 SEO 元数据（关键词和描述）
+	go func(postID uint, postTitle, postContent string) {
+		seoMeta, err := services.GetLLMService().GenerateSEOMetadata(postTitle, postContent)
+		if err != nil {
+			// SEO 生成失败不影响主流程，仅记录日志
+			fmt.Printf("[SEO] 生成 SEO 元数据失败 (postID=%d): %v\n", postID, err)
+			return
+		}
+		// 更新数据库
+		if err := db.DB.Model(&models.Post{}).Where("id = ?", postID).Updates(map[string]interface{}{
+			"seo_keywords":    seoMeta.Keywords,
+			"seo_description": seoMeta.Description,
+		}).Error; err != nil {
+			fmt.Printf("[SEO] 更新 SEO 元数据失败 (postID=%d): %v\n", postID, err)
+			return
+		}
+		fmt.Printf("[SEO] 已更新帖子 %d 的 SEO 元数据\n", postID)
+	}(post.ID, title, content)
+
 	c.Redirect(http.StatusFound, "/p/"+post.Pid)
 }
 
@@ -472,24 +491,30 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	var nodes []models.Node
 	db.DB.Order("id ASC").Find(&nodes)
 
-	// 生成SEO相关数据
-	// 1. 文章摘要: 从内容中提取前150个字符作为description
-	description := post.Content
-	if len(description) > 150 {
-		// 按字符截取,避免截断中文
-		runes := []rune(description)
-		if len(runes) > 150 {
-			description = string(runes[:150]) + "..."
-		}
+	// SEO 数据：优先使用数据库存储的 AI 生成值
+	// 1. 关键词: 优先用数据库中的 AI 生成值，否则降级
+	keywords := post.SEOKeywords
+	if keywords == "" {
+		keywords = fmt.Sprintf("%s, ZhuLink, 竹林, 技术分享", post.Node.Name)
 	}
-	// 移除markdown标记,简化摘要
-	description = strings.ReplaceAll(description, "#", "")
-	description = strings.ReplaceAll(description, "*", "")
-	description = strings.ReplaceAll(description, "`", "")
-	description = strings.TrimSpace(description)
 
-	// 2. 关键词: 使用节点名称和网站名称
-	keywords := fmt.Sprintf("%s, ZhuLink, 竹林, 技术分享", post.Node.Name)
+	// 2. 页面描述: 优先用数据库中的 AI 生成值，否则降级
+	description := post.SEODescription
+	if description == "" {
+		// 降级: 从内容中提取前150个字符作为description
+		description = post.Content
+		if len(description) > 150 {
+			runes := []rune(description)
+			if len(runes) > 150 {
+				description = string(runes[:150]) + "..."
+			}
+		}
+		// 移除markdown标记,简化摘要
+		description = strings.ReplaceAll(description, "#", "")
+		description = strings.ReplaceAll(description, "*", "")
+		description = strings.ReplaceAll(description, "`", "")
+		description = strings.TrimSpace(description)
+	}
 
 	// 3. 完整URL (用于og:url和canonical)
 	// 从环境变量获取网站URL,如果未设置则使用默认值

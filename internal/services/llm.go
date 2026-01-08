@@ -164,3 +164,115 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 	// 连 Choices 都没有，极可能也是安全拦截
 	return "[✨AI 摘要] CONTENT_UNSUITABLE", nil
 }
+
+// SEOMetadata 包含生成的 SEO 元数据
+type SEOMetadata struct {
+	Keywords    string // 逗号分隔的关键词列表
+	Description string // 150 字以内的页面描述
+}
+
+// GenerateSEOMetadata 调用 LLM 生成 SEO 关键词和描述
+func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, error) {
+	if s.config.Token == "" {
+		return nil, fmt.Errorf("LLM_TOKEN 未配置")
+	}
+
+	// 构造提示词
+	promptTemplate := `
+# Role
+你是一个专业的 SEO 优化专家，精通搜索引擎优化和内容营销。
+
+# Task
+基于提供的文章标题和内容，生成有利于 SEO 的关键词和页面描述。
+
+# Output Requirements
+请严格按照以下 JSON 格式返回，不要包含任何其他文字：
+{"keywords":"关键词1,关键词2,关键词3,...","description":"页面描述"}
+
+## Keywords 要求:
+1. 生成 5-8 个与文章高度相关的中文关键词
+2. 关键词之间用英文逗号分隔
+3. 包含文章的核心主题、技术栈、行业术语
+
+## Description 要求:
+1. 100-150 个中文字符
+2. 简洁概括文章的核心内容和价值
+3. 语言流畅自然，适合在搜索结果中展示
+4. 不要包含 emoji 或特殊符号
+
+# Input Data
+### Title: %s
+### Content: %s
+
+# Reminder
+只返回 JSON，不要有任何其他文字。
+`
+	// 截取内容，避免过长
+	contentForPrompt := content
+	if len([]rune(content)) > 500 {
+		contentForPrompt = string([]rune(content)[:500]) + "..."
+	}
+
+	prompt := fmt.Sprintf(promptTemplate, title, contentForPrompt)
+
+	reqBody := ChatRequest{
+		Model: s.config.Model,
+		Messages: []ChatMessage{
+			{Role: "user", Content: prompt},
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request failed: %v", err)
+	}
+
+	apiURL := strings.TrimSuffix(s.config.BaseURL, "/") + "/chat/completions"
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request failed: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.config.Token)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Printf("[LLM-SEO] API 请求失败: %v", err)
+		return nil, fmt.Errorf("api request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[LLM-SEO] API 返回非 200 状态码: %s", resp.Status)
+		return nil, fmt.Errorf("api returned non-200 status: %s", resp.Status)
+	}
+
+	var chatResp ChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
+		return nil, fmt.Errorf("decode response failed: %v", err)
+	}
+
+	if len(chatResp.Choices) == 0 {
+		return nil, fmt.Errorf("no choices in response")
+	}
+
+	responseContent := strings.TrimSpace(chatResp.Choices[0].Message.Content)
+
+	// 尝试提取 JSON（有时候 LLM 会在 JSON 前后添加文字）
+	startIdx := strings.Index(responseContent, "{")
+	endIdx := strings.LastIndex(responseContent, "}")
+	if startIdx == -1 || endIdx == -1 || startIdx > endIdx {
+		log.Printf("[LLM-SEO] 无法解析响应: %s", responseContent)
+		return nil, fmt.Errorf("invalid JSON response")
+	}
+	jsonStr := responseContent[startIdx : endIdx+1]
+
+	var seoResult SEOMetadata
+	if err := json.Unmarshal([]byte(jsonStr), &seoResult); err != nil {
+		log.Printf("[LLM-SEO] JSON 解析失败: %v, 原始内容: %s", err, jsonStr)
+		return nil, fmt.Errorf("parse SEO metadata failed: %v", err)
+	}
+
+	return &seoResult, nil
+}
