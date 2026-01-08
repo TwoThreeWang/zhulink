@@ -21,6 +21,7 @@ func RegisterRoutes(r *gin.Engine) {
 	transplantHandler := handlers.NewTransplantHandler()
 	adminHandler := handlers.NewAdminHandler()
 	seoHandler := handlers.NewSEOHandler()
+	imageHandler := handlers.NewImageHandler()
 
 	// 404 Handler
 	r.NoRoute(func(c *gin.Context) {
@@ -43,6 +44,7 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/nodes", nodeHandler.ListNodes)         // 所有节点列表
 	r.GET("/u/:id", userHandler.Profile)           // 用户主页
 	r.GET("/rss/popular", rssHandler.PopularFeeds) // 热门订阅（公开）
+	r.GET("/img/:id", imageHandler.Proxy)          // Imgur 图片反代（公开，带防盗链）
 
 	r.GET("/signup", authHandler.ShowRegister)   // 注册页面
 	r.POST("/signup", authHandler.Register)      // 提交注册
@@ -82,6 +84,8 @@ func RegisterRoutes(r *gin.Engine) {
 		authorized.POST("/notifications/:id/read", notificationHandler.Read)    // 标记单条通知为已读
 		authorized.DELETE("/notifications/:id", notificationHandler.Delete)     // 删除单条通知
 		authorized.POST("/notifications/read-all", notificationHandler.ReadAll) // 全部通知标记为已读
+
+		authorized.POST("/api/upload", imageHandler.Upload) // 图片上传
 	}
 
 	// 仪表盘路由 (Dashboard Routes)

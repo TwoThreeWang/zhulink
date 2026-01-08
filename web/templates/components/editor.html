@@ -72,8 +72,15 @@ Parameters:
                     <i data-lucide="link" class="w-4 h-4"></i>
                 </button>
                 <button type="button" @click="insertText('![](', ')')"
-                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="图片">
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="图片链接">
                     <i data-lucide="image" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="triggerImageUpload()" :disabled="isUploading"
+                    class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors relative"
+                    :class="isUploading ? 'opacity-50 cursor-wait' : ''" title="上传图片 (Ctrl+V 粘贴)">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span x-show="isUploading"
+                        class="absolute -top-1 -right-1 w-2 h-2 bg-moss rounded-full animate-pulse"></span>
                 </button>
                 <button type="button" @click="insertText('\n---\n', '')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="分割线">
@@ -114,6 +121,7 @@ Parameters:
             @keydown.ctrl.i.prevent="insertText('*', '*')" @keydown.meta.i.prevent="insertText('*', '*')"
             @keydown.ctrl.k.prevent="insertText('[', '](url)')" @keydown.meta.k.prevent="insertText('[', '](url)')"
             @keydown.escape="if(isFullScreen) toggleFullScreen()" @input="autoResize($event.target)"
+            @paste="handlePaste($event)"
             class="w-full p-4 md:p-6 bg-white border-0 focus:ring-0 outline-none resize-none font-mono text-sm leading-relaxed text-ink placeholder-stone-400"
             :class="[
                 isFullScreen ? 'h-full' : 'min-h-[200px]',
@@ -127,5 +135,8 @@ Parameters:
             :class="isSplitView ? 'bg-white block' : ''" x-html="renderMarkdown(content)">
         </div>
     </div>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" x-ref="imageInput" @change="handleImageUpload($event)" accept="image/*" class="hidden">
 </div>
 {{ end }}
