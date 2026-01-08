@@ -26,6 +26,15 @@ func EnhanceHTMLContent(htmlStr string) template.HTML {
 		s.SetAttr("onerror", "this.onerror=null; this.src='/static/img/imgerr.svg'")
 	})
 
+	// 增强链接属性: 设置 noopener(安全) 和 nofollow(SEO)
+	doc.Find("a").Each(func(i int, s *goquery.Selection) {
+		href, _ := s.Attr("href")
+		// 只处理外部链接，忽略内部锚点或相对路径
+		if strings.HasPrefix(href, "http") {
+			s.SetAttr("rel", "noopener nofollow")
+		}
+	})
+
 	// 转换视频链接为嵌入式播放器
 	doc.Find("p").Each(func(i int, s *goquery.Selection) {
 		text := strings.TrimSpace(s.Text())

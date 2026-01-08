@@ -30,8 +30,9 @@ func init() {
 	policy.AllowImages()
 	// Force links to open in new tab
 	policy.AddTargetBlankToFullyQualifiedLinks(true)
-	// Add noopener or noreferrer and follow security best practices
-	policy.RequireNoReferrerOnLinks(true)
+	// Add noopener and follow security best practices, but don't force no-referrer to keep referrer data for targets
+	// We will handle rel attributes manually in EnhanceHTMLContent
+	policy.RequireNoReferrerOnLinks(false)
 	// Allow iframe for video embedding
 	policy.AllowElements("iframe")
 	policy.AllowAttrs("src", "frameborder", "allowfullscreen", "allow", "width", "height", "style", "class").OnElements("iframe")
