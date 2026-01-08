@@ -533,6 +533,20 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	// 6. 修改时间
 	modifiedTime := post.UpdatedAt.Format(time.RFC3339)
 
+	// 查询上一篇文章（创建时间更早的第一篇）
+	var prevPost models.Post
+	hasPrev := db.DB.Select("pid, title").
+		Where("created_at < ?", post.CreatedAt).
+		Order("created_at DESC").
+		First(&prevPost).Error == nil
+
+	// 查询下一篇文章（创建时间更晚的第一篇）
+	var nextPost models.Post
+	hasNext := db.DB.Select("pid, title").
+		Where("created_at > ?", post.CreatedAt).
+		Order("created_at ASC").
+		First(&nextPost).Error == nil
+
 	Render(c, http.StatusOK, "story/detail.html", gin.H{
 		"Post":          post,
 		"PostContent":   postContentHTML,
@@ -550,6 +564,11 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"Author":        author,
 		"PublishedTime": publishedTime,
 		"ModifiedTime":  modifiedTime,
+		// 上一篇/下一篇
+		"HasPrev":  hasPrev,
+		"PrevPost": prevPost,
+		"HasNext":  hasNext,
+		"NextPost": nextPost,
 	})
 }
 
