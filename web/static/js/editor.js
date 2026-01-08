@@ -1,5 +1,9 @@
-document.addEventListener('alpine:init', () => {
-    Alpine.data('markdownEditor', () => ({
+// Markdown Editor Component for Alpine.js
+// 确保无论脚本加载顺序如何，组件都能正确注册
+
+// 定义组件工厂函数
+function markdownEditor() {
+    return {
         content: '',
         isPreview: false,
         isFullScreen: false,
@@ -189,5 +193,5 @@ document.addEventListener('alpine:init', () => {
                 textarea.selectionStart = textarea.selectionEnd = start + text.length;
             });
         }
-    }));
-});
+    };
+}
