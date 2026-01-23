@@ -16,6 +16,7 @@ import (
 	"zhulink/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"regexp"
 )
 
 type StoryHandler struct {
@@ -86,6 +87,16 @@ func calculateRank(score int, createdAt time.Time) float64 {
 // SQL approximation: score / power(extract(epoch from age(created_at))/3600 + 2, 1.8)
 // PostgreSQL: `score / power((EXTRACT(EPOCH FROM NOW() - created_at)/3600) + 2, 1.8)`
 // Note: This prevents using index effectively. But for MVP it's fine.
+
+// extractFirstImage 从 Markdown 内容中提取第一张图片的 URL
+func extractFirstImage(content string) string {
+	re := regexp.MustCompile(`!\[.*?\]\((.*?)\)`)
+	match := re.FindStringSubmatch(content)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
 
 func (h *StoryHandler) ListTop(c *gin.Context) {
 	// 分页参数
@@ -547,6 +558,23 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		Order("created_at ASC").
 		First(&nextPost).Error == nil
 
+	// 7. SEO 图片逻辑
+	firstImage := extractFirstImage(post.Content)
+	imageURL := firstImage
+	if imageURL == "" {
+		imageURL = "/static/img/logo.svg"
+	}
+
+	// 转换为绝对 URL
+	if !strings.HasPrefix(imageURL, "http://") && !strings.HasPrefix(imageURL, "https://") {
+		// 确保 siteURL 不以 / 结尾，而 imageURL 以 / 开头
+		base := strings.TrimSuffix(siteURL, "/")
+		if !strings.HasPrefix(imageURL, "/") {
+			imageURL = "/" + imageURL
+		}
+		imageURL = base + imageURL
+	}
+
 	Render(c, http.StatusOK, "story/detail.html", gin.H{
 		"Post":          post,
 		"PostContent":   postContentHTML,
@@ -561,6 +589,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"Description":   description,
 		"Keywords":      keywords,
 		"FullURL":       fullURL,
+		"ImageURL":      imageURL,
 		"Author":        author,
 		"PublishedTime": publishedTime,
 		"ModifiedTime":  modifiedTime,
