@@ -79,7 +79,7 @@ func (h *UserHandler) Profile(c *gin.Context) {
 		// 收藏列表仅本人可见
 		if !isOwner {
 			// 非本人访问收藏页面，重定向到发布页面
-			c.Redirect(http.StatusFound, fmt.Sprintf("/u/%s?tab=posts", userID))
+			c.Redirect(http.StatusFound, fmt.Sprintf("/u/%d?tab=posts", userID))
 			return
 		}
 		// 查询用户收藏的文章

@@ -8,6 +8,7 @@ import (
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
 	"zhulink/internal/services"
+	"zhulink/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -99,6 +100,25 @@ func (h *VoteHandler) Vote(c *gin.Context) {
 	}
 
 	tx.Commit()
+
+	// 主动失效详情页缓存
+	go func() {
+		var postPid string
+		if itemType == "post" {
+			var post models.Post
+			if err := db.DB.First(&post, uID).Error; err == nil {
+				postPid = post.Pid
+			}
+		} else {
+			var comment models.Comment
+			if err := db.DB.Preload("Post").First(&comment, uID).Error; err == nil {
+				postPid = comment.Post.Pid
+			}
+		}
+		if postPid != "" {
+			utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", postPid))
+		}
+	}()
 
 	// 异步更新帖子 Score
 	if itemType == "post" {
@@ -214,6 +234,25 @@ func (h *VoteHandler) Downvote(c *gin.Context) {
 	}
 
 	tx.Commit()
+
+	// 主动失效详情页缓存
+	go func() {
+		var postPid string
+		if itemType == "post" {
+			var post models.Post
+			if err := db.DB.First(&post, uID).Error; err == nil {
+				postPid = post.Pid
+			}
+		} else {
+			var comment models.Comment
+			if err := db.DB.Preload("Post").First(&comment, uID).Error; err == nil {
+				postPid = comment.Post.Pid
+			}
+		}
+		if postPid != "" {
+			utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", postPid))
+		}
+	}()
 
 	// 异步更新帖子 Score
 	if itemType == "post" {

@@ -8,6 +8,7 @@ import (
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
 	"zhulink/internal/services"
+	"zhulink/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -64,6 +65,9 @@ func (h *BookmarkHandler) Toggle(c *gin.Context) {
 			services.AddPointsAsync(post.UserID, services.PointsPostBookmarked, services.ActionPostBookmarked)
 		}
 	}
+
+	// 主动失效详情页缓存
+	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
 
 	// 异步更新帖子 Score
 	services.GetRankingService().ScheduleUpdate(postID)

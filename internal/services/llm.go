@@ -18,8 +18,9 @@ type LLMConfig struct {
 }
 
 type LLMService struct {
-	config LLMConfig
-	client *http.Client
+	config    LLMConfig
+	client    *http.Client
+	semaphore chan struct{}
 }
 
 type ChatMessage struct {
@@ -63,6 +64,7 @@ func GetLLMService() *LLMService {
 			client: &http.Client{
 				Timeout: 30 * time.Second,
 			},
+			semaphore: make(chan struct{}, 5), // 限制同时并发请求数为 5
 		}
 	}
 	return llmService
@@ -118,6 +120,10 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 如果你因任何原因无法提供摘要，请务必返回 "CONTENT_UNSUITABLE"。
 `
 	prompt := fmt.Sprintf(promptTemplate, title, content)
+
+	// 并发限流
+	s.semaphore <- struct{}{}
+	defer func() { <-s.semaphore }()
 
 	reqBody := ChatRequest{
 		Model: s.config.Model,

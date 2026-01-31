@@ -15,8 +15,10 @@ import (
 	"zhulink/internal/services"
 	"zhulink/internal/utils"
 
-	"github.com/gin-gonic/gin"
 	"regexp"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type StoryHandler struct {
@@ -107,6 +109,14 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 		}
 	}
 
+	cacheKey := fmt.Sprintf("story:top:page:%d", page)
+	if cachedData := utils.GetCache().Get(cacheKey); cachedData != nil {
+		if hData, ok := cachedData.(gin.H); ok {
+			Render(c, http.StatusOK, "story/list.html", hData)
+			return
+		}
+	}
+
 	perPage := 30
 	offset := (page - 1) * perPage
 
@@ -121,12 +131,6 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 	}
 
 	var posts []models.Post
-	// Using SQL formula for ordering
-	// Ensure Score is at least 1 to avoid division issues or negative (though initialized 0).
-	// Actually typical HN starts at 1. Our model defaults 0. Let's assume (score + 1).
-
-	// Since we haven't added a dedicated Rank column, we'll do dynamic calculation.
-	// Hard delete means we don't worry about deleted_at.
 	db.DB.Preload("User").Preload("Node").
 		Order("is_top DESC, score DESC, created_at DESC").
 		Limit(perPage).
@@ -149,7 +153,7 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 		fullURL = fmt.Sprintf("%s?page=%d", siteURL, page)
 	}
 
-	Render(c, http.StatusOK, "story/list.html", gin.H{
+	renderData := gin.H{
 		"Posts":       posts,
 		"Nodes":       nodes,
 		"Active":      "top",
@@ -159,7 +163,12 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 		"Description": "汇聚 ZhuLink 社区近期热度最高的科技资讯、深度讨论与 RSS 精选。依靠用户“竹笋”共识筛选，拒绝算法推荐，只看最有价值的内容。",
 		"Keywords":    "ZhuLink, 竹林, 技术社区, 热门文章, 高质量内容, 去算法, 技术社区, RSS聚合, Go语言, 独立开发, 深度阅读, ZhuLink",
 		"FullURL":     fullURL,
-	})
+	}
+
+	// 写入缓存，有效期 1 分钟
+	utils.GetCache().Set(cacheKey, renderData, 1*time.Minute)
+
+	Render(c, http.StatusOK, "story/list.html", renderData)
 }
 
 func (h *StoryHandler) ListNew(c *gin.Context) {
@@ -438,6 +447,40 @@ func (h *StoryHandler) Create(c *gin.Context) {
 
 func (h *StoryHandler) Detail(c *gin.Context) {
 	pid := c.Param("pid")
+
+	// 获取当前用户 ID 用于实时状态查询
+	userID := uint(0)
+	if user, exists := c.Get(middleware.CheckUserKey); exists && user != nil {
+		userID = user.(*models.User).ID
+	}
+
+	// 共享缓存逻辑：不再区分用户
+	cacheKey := fmt.Sprintf("story:detail:shared:%s", pid)
+	if cachedData := utils.GetCache().Get(cacheKey); cachedData != nil {
+		if hData, ok := cachedData.(gin.H); ok {
+			// 即使是缓存，也要增加浏览量
+			if postData, ok := hData["Post"].(models.Post); ok {
+				db.DB.Model(&models.Post{}).Where("id = ?", postData.ID).UpdateColumn("views", gorm.Expr("views + 1"))
+				services.GetRankingService().ScheduleUpdate(postData.ID)
+			}
+
+			// 实时查询当前用户的私有状态（如是否已收藏）
+			isBookmarked := false
+			if userID > 0 {
+				if postData, ok := hData["Post"].(models.Post); ok {
+					var bookmark models.Bookmark
+					if err := db.DB.Where("user_id = ? AND post_id = ?", userID, postData.ID).First(&bookmark).Error; err == nil {
+						isBookmarked = true
+					}
+				}
+			}
+			hData["IsBookmarked"] = isBookmarked
+
+			Render(c, http.StatusOK, "story/detail.html", hData)
+			return
+		}
+	}
+
 	var post models.Post
 	if err := db.DB.Preload("User").Preload("Node").Where("pid = ?", pid).First(&post).Error; err != nil {
 		Render(c, http.StatusNotFound, "error.html", gin.H{"Error": "文章不存在"})
@@ -446,73 +489,54 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 
 	// 增加浏览量
 	db.DB.Model(&post).UpdateColumn("views", post.Views+1)
-	post.Views++ // 同步更新本地变量
+	post.Views++
 
-	// 异步更新帖子 Score（浏览量变化）
+	// 异步更新帖子 Score
 	services.GetRankingService().ScheduleUpdate(post.ID)
 
-	// Load comments - 平铺展示，按创建时间排序
+	// Load comments
 	var comments []models.Comment
 	db.DB.Preload("User").Where("post_id = ?", post.ID).Order("created_at ASC").Find(&comments)
 
-	// 平铺评论结构
 	type FlatComment struct {
 		models.Comment
 		ContentHTML template.HTML
-		Floor       int // 楼层号，前端使用
+		Floor       int
 	}
 
-	// 转换为平铺列表
 	flatComments := make([]FlatComment, len(comments))
 	for i, com := range comments {
 		htmlContent := utils.RenderMarkdown(com.Content)
 		flatComments[i] = FlatComment{
 			Comment:     com,
 			ContentHTML: htmlContent,
-			Floor:       i + 1, // 楼层从1开始
+			Floor:       i + 1,
 		}
 	}
 
-	// Post content markdown
 	postContentHTML := utils.RenderMarkdown(post.Content)
 
-	// 获取收藏数
 	var bookmarkCount int64
 	db.DB.Model(&models.Bookmark{}).Where("post_id = ?", post.ID).Count(&bookmarkCount)
 
-	// 获取点赞数（统计 value=1 的投票）
 	var upvoteCount int64
 	db.DB.Model(&models.Vote{}).Where("post_id = ? AND value = 1", post.ID).Count(&upvoteCount)
 
-	// 获取踩数（统计 value=-1 的投票）
 	var downvoteCount int64
 	db.DB.Model(&models.Vote{}).Where("post_id = ? AND value = -1", post.ID).Count(&downvoteCount)
 
-	// 检查当前用户是否已收藏
-	isBookmarked := false
-	if user, exists := c.Get(middleware.CheckUserKey); exists {
-		currentUser := user.(*models.User)
-		var bookmark models.Bookmark
-		if err := db.DB.Where("user_id = ? AND post_id = ?", currentUser.ID, post.ID).First(&bookmark).Error; err == nil {
-			isBookmarked = true
-		}
-	}
-
-	// 查询所有节点供管理员移动帖子使用
+	// 注意：在存入缓存的 renderData 中不包含 IsBookmarked，因为它随请求变化
+	// 查询所有节点
 	var nodes []models.Node
 	db.DB.Order("id ASC").Find(&nodes)
 
-	// SEO 数据：优先使用数据库存储的 AI 生成值
-	// 1. 关键词: 优先用数据库中的 AI 生成值，否则降级
 	keywords := post.SEOKeywords
 	if keywords == "" {
 		keywords = fmt.Sprintf("%s, ZhuLink, 竹林, 技术分享", post.Node.Name)
 	}
 
-	// 2. 页面描述: 优先用数据库中的 AI 生成值，否则降级
 	description := post.SEODescription
 	if description == "" {
-		// 降级: 从内容中提取前150个字符作为description
 		description = post.Content
 		if len(description) > 150 {
 			runes := []rune(description)
@@ -520,54 +544,40 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 				description = string(runes[:150]) + "..."
 			}
 		}
-		// 移除markdown标记,简化摘要
 		description = strings.ReplaceAll(description, "#", "")
 		description = strings.ReplaceAll(description, "*", "")
 		description = strings.ReplaceAll(description, "`", "")
 		description = strings.TrimSpace(description)
 	}
 
-	// 3. 完整URL (用于og:url和canonical)
-	// 从环境变量获取网站URL,如果未设置则使用默认值
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
 		siteURL = "https://zhulink.vip"
 	}
 	fullURL := fmt.Sprintf("%s/p/%s", siteURL, post.Pid)
-
-	// 4. 作者信息
 	author := post.User.Username
-
-	// 5. 发布时间 (ISO 8601格式)
 	publishedTime := post.CreatedAt.Format(time.RFC3339)
-
-	// 6. 修改时间
 	modifiedTime := post.UpdatedAt.Format(time.RFC3339)
 
-	// 查询上一篇文章（创建时间更早的第一篇）
 	var prevPost models.Post
 	hasPrev := db.DB.Select("pid, title").
 		Where("created_at < ?", post.CreatedAt).
 		Order("created_at DESC").
 		First(&prevPost).Error == nil
 
-	// 查询下一篇文章（创建时间更晚的第一篇）
 	var nextPost models.Post
 	hasNext := db.DB.Select("pid, title").
 		Where("created_at > ?", post.CreatedAt).
 		Order("created_at ASC").
 		First(&nextPost).Error == nil
 
-	// 7. SEO 图片逻辑
 	firstImage := extractFirstImage(post.Content)
 	imageURL := firstImage
 	if imageURL == "" {
 		imageURL = "/static/img/logo.svg"
 	}
 
-	// 转换为绝对 URL
 	if !strings.HasPrefix(imageURL, "http://") && !strings.HasPrefix(imageURL, "https://") {
-		// 确保 siteURL 不以 / 结尾，而 imageURL 以 / 开头
 		base := strings.TrimSuffix(siteURL, "/")
 		if !strings.HasPrefix(imageURL, "/") {
 			imageURL = "/" + imageURL
@@ -575,7 +585,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		imageURL = base + imageURL
 	}
 
-	Render(c, http.StatusOK, "story/detail.html", gin.H{
+	renderData := gin.H{
 		"Post":          post,
 		"PostContent":   postContentHTML,
 		"Comments":      flatComments,
@@ -583,9 +593,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"BookmarkCount": bookmarkCount,
 		"UpvoteCount":   upvoteCount,
 		"DownvoteCount": downvoteCount,
-		"IsBookmarked":  isBookmarked,
 		"Nodes":         nodes,
-		// SEO相关数据
 		"Description":   description,
 		"Keywords":      keywords,
 		"FullURL":       fullURL,
@@ -593,12 +601,26 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"Author":        author,
 		"PublishedTime": publishedTime,
 		"ModifiedTime":  modifiedTime,
-		// 上一篇/下一篇
-		"HasPrev":  hasPrev,
-		"PrevPost": prevPost,
-		"HasNext":  hasNext,
-		"NextPost": nextPost,
-	})
+		"HasPrev":       hasPrev,
+		"PrevPost":      prevPost,
+		"HasNext":       hasNext,
+		"NextPost":      nextPost,
+	}
+
+	// 写入共享缓存，有效期延长至 5 分钟
+	utils.GetCache().Set(cacheKey, renderData, 5*time.Minute)
+
+	// 为当前请求注入 IsBookmarked
+	isBookmarked := false
+	if userID > 0 {
+		var bookmark models.Bookmark
+		if err := db.DB.Where("user_id = ? AND post_id = ?", userID, post.ID).First(&bookmark).Error; err == nil {
+			isBookmarked = true
+		}
+	}
+	renderData["IsBookmarked"] = isBookmarked
+
+	Render(c, http.StatusOK, "story/detail.html", renderData)
 }
 
 func (h *StoryHandler) CreateComment(c *gin.Context) {
@@ -671,6 +693,9 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 	if err := db.DB.Create(&comment).Error; err != nil {
 		// handle error
 	}
+
+	// 主动失效详情页缓存
+	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
 
 	// 异步更新帖子 Score（新增评论）
 	services.GetRankingService().ScheduleUpdate(post.ID)
@@ -750,6 +775,12 @@ func (h *StoryHandler) DeleteComment(c *gin.Context) {
 	comment.Content = "该评论已删除。"
 	db.DB.Save(&comment)
 
+	// 主动失效详情页缓存
+	var post models.Post
+	if err := db.DB.First(&post, comment.PostID).Error; err == nil {
+		utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
+	}
+
 	// 异步扣除积分
 	services.AddPointsAsync(user.ID, services.PointsCommentDeleted, services.ActionCommentDeleted)
 
@@ -774,6 +805,12 @@ func (h *StoryHandler) Delete(c *gin.Context) {
 
 	// Hard Delete
 	db.DB.Unscoped().Delete(&post)
+
+	// 主动失效详情页等相关缓存
+	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
+	// 列表页第一页也失效
+	utils.GetCache().Delete("story:top:page:1")
+	utils.GetCache().Delete("story:new:page:1")
 
 	// 异步扣除积分
 	services.AddPointsAsync(user.ID, services.PointsPostDeleted, services.ActionPostDeleted)

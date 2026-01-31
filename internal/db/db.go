@@ -3,6 +3,7 @@ package db
 import (
 	"log"
 	"os"
+	"time"
 	"zhulink/internal/models"
 
 	"gorm.io/driver/postgres"
@@ -25,6 +26,17 @@ func Init() {
 	}
 
 	log.Println("Database connection established")
+
+	// 配置连接池
+	sqlDB, err := DB.DB()
+	if err != nil {
+		log.Printf("Failed to get underlying sql.DB: %v", err)
+	} else {
+		sqlDB.SetMaxOpenConns(100)          // 最大打开连接数
+		sqlDB.SetMaxIdleConns(10)           // 最大空闲连接数
+		sqlDB.SetConnMaxLifetime(time.Hour) // 连接最大存活时间
+		log.Println("Database connection pool configured: MaxOpen=100, MaxIdle=10, MaxLifetime=1h")
+	}
 
 	// Auto Migrate
 	err = DB.AutoMigrate(

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -589,6 +590,20 @@ func (h *RSSHandler) PopularFeeds(c *gin.Context) {
 	if page < 1 {
 		page = 1
 	}
+
+	// 由于热门订阅列表对于已登录用户会显示“已订阅”状态，因此缓存 Key 需要区分用户 ID 或登录状态
+	userID := uint(0)
+	if user, exists := c.Get(middleware.CheckUserKey); exists && user != nil {
+		userID = user.(*models.User).ID
+	}
+
+	cacheKey := fmt.Sprintf("rss:popular:page:%d:user:%d", page, userID)
+	if cachedData := utils.GetCache().Get(cacheKey); cachedData != nil {
+		if hData, ok := cachedData.(gin.H); ok {
+			Render(c, http.StatusOK, "rss/popular.html", hData)
+			return
+		}
+	}
 	pageSize := 20
 
 	// 统计有订阅的 Feed 总数
@@ -632,7 +647,7 @@ func (h *RSSHandler) PopularFeeds(c *gin.Context) {
 		}
 	}
 
-	Render(c, http.StatusOK, "rss/popular.html", gin.H{
+	renderData := gin.H{
 		"Title":         "热门订阅 - RSS 发现",
 		"Description":   "发现全站最受欢迎的 RSS 订阅源，按订阅人数排序，一键订阅热门博客、科技媒体和独立创作者的内容。",
 		"Keywords":      "热门RSS,RSS订阅,热门博客,科技媒体,独立博客,订阅源推荐",
@@ -643,5 +658,10 @@ func (h *RSSHandler) PopularFeeds(c *gin.Context) {
 		"TotalPages":    totalPages,
 		"Total":         total,
 		"SubscribedMap": subscribedMap,
-	})
+	}
+
+	// 写入缓存，有效期 5 分钟
+	utils.GetCache().Set(cacheKey, renderData, 5*time.Minute)
+
+	Render(c, http.StatusOK, "rss/popular.html", renderData)
 }
