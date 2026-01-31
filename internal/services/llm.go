@@ -71,33 +71,41 @@ func GetLLMService() *LLMService {
 // GenerateSummary 调用 LLM 生成摘要
 func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 	if s.config.Token == "" {
-		return "[✨AI 摘要] 未配置 LLM_TOKEN，请在 .env 文件中配置以使用真实 AI 功能。", nil
+		return "未配置 LLM_TOKEN，请在 .env 文件中配置以使用真实 AI 功能。", nil
 	}
 
 	// 构造提示词
 	promptTemplate := `
 # Role
-你是一个专业的资讯分析师和摘要生成专家，专注于为技术和知识社区提供简洁、客观、易懂的中文摘要。
+你是一个专业资深科技编辑，你的专长是将冗长的技术文档、新闻或观点文章，改写成一篇**结构完整、见解独到、细节详实的博客文章**。
 
 # Safety First (安全第一 - 优先级最高)
 在处理内容前，必须先评估。如果原文内容包含以下任一特征，**绝对不允许生成摘要**，必须**仅**返回字符串 "CONTENT_UNSUITABLE"：
-- 垃圾信息、广告、推广内容
-- 色情、暴力、血腥或恐怖内容
-- 仇恨言语、歧视或人身攻击
-- 任何不适合在纯净技术社区传播的违规内容
-- 原文内容乱码或无法理解
+- **纯垃圾广告**：毫无信息增量的博彩、灰产、纯SEO堆砌内容（注：包含具体技术参数或行业动态的商业/产品新闻**不在**此列，应正常处理）。
+- **严重违规**：色情、血腥暴力、恐怖主义、违禁品交易、明显的仇恨言论。
+- **不可读**：纯乱码或无法提取有效信息的片段。
 
-# Task
-为 ZhuLink 社区生成一段约 100-120 字的纯文本中文摘要。
+# Writing Guidelines (去 AI 味 & 深度化)
+1.  **沉浸式写作**：
+    - 彻底摒弃“摘要”感。不要说“本文介绍了...”、“作者认为...”。
+    - **直接以第一方或观察者的口吻叙述**。例如：“OpenAI 昨晚再次引爆了科技圈，发布的 Sora 模型展示了惊人的能力...”
+2.  **保留高价值细节**：
+    - 文章必须包含具体的**数据**（性能提升50%）、**版本号**（v1.2.3）、**代码逻辑概念**、**人物引用**等。不要泛泛而谈。
+	- 如果原文正文中有相关图片，可以适当保留，以 **Markdown** 格式的图片引用方式保留。
+3.  **起承转合**：
+    - **摘要**：生成一段简短、吸引眼球但不出格的摘要（不要震惊体，要专业感）。
+    - **开头**：用背景或痛点引入，不要上来就堆参数。
+    - **正文**：逻辑分层，将原来的碎片信息串联成通顺的段落。
+    - **结尾**：给出行业影响分析或对开发者的建议。
 
 # Output Requirements (输出要求)
-1.  **字数控制**: 严格在 **100 到 120 字**之间（原文极短除外，但不少于 50 字）。
+1.  **字数控制**: 根据原文信息密度，弹性控制在 **100 - 600 字**之间（确保内容充实）。
 2.  **内容提炼**:
     - 技术文章：核心点、解决的问题、实现方法。
     - 新闻报道：核心要素（时、地、人、因、果）。
     - 观点分析：主要论点和核心洞察。
 3.  **格式限制**:
-    - **必须是纯文本**：禁止 HTML、Markdown（粗体、标题、列表等）、表情符号、代码块。
+    - 使用标准的 **Markdown** 格式，适当使用 **加粗** 强调关键技术点，段落之间要留空行。
     - **中立客观**：不加入个人评价或推荐。
     - **去除干扰**：自动过滤免责声明、版权、广告等无关内容。
 
@@ -153,16 +161,16 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 		content := strings.TrimSpace(chatResp.Choices[0].Message.Content)
 		if content == "" {
 			// 如果返回内容为空，通常是由于 API 安全拦截，降级处理
-			return "[✨AI 摘要] CONTENT_UNSUITABLE", nil
+			return "CONTENT_UNSUITABLE", nil
 		}
 		if content == "CONTENT_UNSUITABLE" {
-			return "[✨AI 摘要] CONTENT_UNSUITABLE", nil
+			return "CONTENT_UNSUITABLE", nil
 		}
-		return "[✨AI 摘要] " + content, nil
+		return content, nil
 	}
 
 	// 连 Choices 都没有，极可能也是安全拦截
-	return "[✨AI 摘要] CONTENT_UNSUITABLE", nil
+	return "CONTENT_UNSUITABLE", nil
 }
 
 // SEOMetadata 包含生成的 SEO 元数据
