@@ -135,10 +135,17 @@ cleanup_old_images() {
     docker image prune -f
 
     # 只保留最近 1 个备份镜像,删除其他所有备份
-    OLD_BACKUPS=$(docker images | grep "zhulink-backup" | awk '{print $1":"$2}' | tail -n +2)
-    if [ -n "$OLD_BACKUPS" ]; then
-        echo "$OLD_BACKUPS" | xargs docker rmi 2>/dev/null || true
-        log_info "已清理旧备份镜像(保留最新 1 个)"
+    BACKUP_COUNT=$(docker images --filter "reference=zhulink-backup*" --quiet | wc -l)
+    
+    if [ "$BACKUP_COUNT" -gt 1 ]; then
+        docker images \
+            --filter "reference=zhulink-backup*" \
+            --format "{{.ID}} {{.CreatedAt}}" | \
+            sort -k2 -r | \
+            tail -n +2 | \
+            awk '{print $1}' | \
+            xargs docker rmi --force 2>/dev/null || true
+        log_info "已清理旧备份镜像(保留最新 1 个，删除 $((BACKUP_COUNT - 1)) 个)"
     fi
 }
 
