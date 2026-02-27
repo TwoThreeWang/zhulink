@@ -25,6 +25,11 @@ func Init() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	// 启用 pgvector 扩展
+	if err := DB.Exec("CREATE EXTENSION IF NOT EXISTS vector").Error; err != nil {
+		log.Printf("Failed to enable pgvector extension: %v", err)
+	}
+
 	log.Println("Database connection established")
 
 	// 配置连接池

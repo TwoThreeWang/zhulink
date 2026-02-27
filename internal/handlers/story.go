@@ -18,6 +18,7 @@ import (
 	"regexp"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pgvector/pgvector-go"
 	"gorm.io/gorm"
 )
 
@@ -423,26 +424,64 @@ func (h *StoryHandler) Create(c *gin.Context) {
 		}
 	}()
 
-	// 异步生成 SEO 元数据（关键词和描述）
-	go func(postID uint, postTitle, postContent string) {
-		seoMeta, err := services.GetLLMService().GenerateSEOMetadata(postTitle, postContent)
-		if err != nil {
-			// SEO 生成失败不影响主流程，仅记录日志
-			fmt.Printf("[SEO] 生成 SEO 元数据失败 (postID=%d): %v\n", postID, err)
-			return
-		}
-		// 更新数据库
-		if err := db.DB.Model(&models.Post{}).Where("id = ?", postID).Updates(map[string]interface{}{
-			"seo_keywords":    seoMeta.Keywords,
-			"seo_description": seoMeta.Description,
-		}).Error; err != nil {
-			fmt.Printf("[SEO] 更新 SEO 元数据失败 (postID=%d): %v\n", postID, err)
-			return
-		}
-		fmt.Printf("[SEO] 已更新帖子 %d 的 SEO 元数据\n", postID)
-	}(post.ID, title, content)
+	// 异步生成 SEO 元数据和向量
+	go h.asyncGeneratePostMeta(post.ID, title, content)
 
 	c.Redirect(http.StatusFound, "/p/"+post.Pid)
+}
+
+// asyncGeneratePostMeta 异步生成 SEO 元数据和向量
+func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent string) {
+	llm := services.GetLLMService()
+	seoMeta, err := llm.GenerateSEOMetadata(postTitle, postContent)
+	if err != nil {
+		// SEO 生成失败不影响主流程，仅记录日志
+		fmt.Printf("[SEO] 生成 SEO 元数据失败 (postID=%d): %v\n", postID, err)
+		// 继续生成向量，不因为 SEO 失败而终止
+	}
+
+	updateFields := map[string]interface{}{}
+	if seoMeta != nil {
+		updateFields["seo_keywords"] = seoMeta.Keywords
+		updateFields["seo_description"] = seoMeta.Description
+	}
+
+	// 生成向量文本并获取向量
+	keywords := ""
+	description := ""
+	if seoMeta != nil {
+		keywords = seoMeta.Keywords
+		description = seoMeta.Description
+	}
+
+	// 截取正文前 200 字用于向量生成
+	contentRunes := []rune(postContent)
+	shortContent := postContent
+	if len(contentRunes) > 200 {
+		shortContent = string(contentRunes[:200])
+	}
+
+	vectorText := fmt.Sprintf("标题：%s\n关键词：%s\n摘要：%s\n正文：%s", postTitle, keywords, description, shortContent)
+	embedding, err := llm.GetEmbedding(vectorText)
+	if err != nil {
+		fmt.Printf("[Vector] 生成向量失败 (postID=%d): %v\n", postID, err)
+	} else {
+		updateFields["vector_text"] = vectorText
+		updateFields["embedding"] = pgvector.NewVector(embedding)
+	}
+
+	if len(updateFields) > 0 {
+		var post models.Post
+		if err := db.DB.Model(&models.Post{}).Where("id = ?", postID).Updates(updateFields).Error; err != nil {
+			fmt.Printf("[Async] 更新帖子 %d 异步数据失败: %v\n", postID, err)
+			return
+		}
+		// 获取最新的 Pid 以便清除缓存
+		if err := db.DB.Select("pid").First(&post, postID).Error; err == nil {
+			utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
+		}
+		fmt.Printf("[Async] 已更新帖子 %d 的 SEO 和向量数据\n", postID)
+	}
 }
 
 func (h *StoryHandler) Detail(c *gin.Context) {
@@ -490,6 +529,11 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	// 增加浏览量
 	db.DB.Model(&post).UpdateColumn("views", post.Views+1)
 	post.Views++
+
+	// 如果 SEO 描述或向量为空，异步生成
+	if post.SEODescription == "" || len(post.Embedding.Slice()) == 0 {
+		h.asyncGeneratePostMeta(post.ID, post.Title, post.Content)
+	}
 
 	// 异步更新帖子 Score
 	services.GetRankingService().ScheduleUpdate(post.ID)
@@ -571,6 +615,18 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		Order("created_at ASC").
 		First(&nextPost).Error == nil
 
+	// 相关文章推荐 (向量相似度 > 0.7)
+	// pgvector 相似度公式: 1 - (embedding <=> query_embedding) > 0.7 => embedding <=> query_embedding < 0.3
+	var relatedPosts []models.Post
+	if len(post.Embedding.Slice()) > 0 {
+		db.DB.Model(&models.Post{}).
+			Select("pid, title, (1 - (embedding <=> ?)) as similarity", post.Embedding).
+			Where("id != ? AND (1 - (embedding <=> ?)) > 0.7", post.ID, post.Embedding).
+			Order("embedding <=> ?").
+			Limit(6).
+			Find(&relatedPosts)
+	}
+
 	firstImage := extractFirstImage(post.Content)
 	imageURL := firstImage
 	if imageURL == "" {
@@ -605,6 +661,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"PrevPost":      prevPost,
 		"HasNext":       hasNext,
 		"NextPost":      nextPost,
+		"RelatedPosts":  relatedPosts,
 	}
 
 	// 写入共享缓存，有效期延长至 5 分钟

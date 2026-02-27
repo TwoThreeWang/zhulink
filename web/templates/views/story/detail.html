@@ -438,6 +438,44 @@
             </nav>
             {{ end }}
 
+            <!-- 相关文章推荐 (向量搜索 - SEO 友好结构) -->
+            {{ if .RelatedPosts }}
+            <aside class="mt-12 pt-8 related-posts-section" aria-labelledby="related-heading">
+                <h2 id="related-heading" class="font-bold text-ink text-lg mb-6">
+                    延伸阅读
+                </h2>
+                <ul class="space-y-6 related-posts-list">
+                    {{ range .RelatedPosts }}
+                    <li class="related-post-card group">
+                        <article>
+                            <h3 class="text-base text-ink group-hover:text-moss transition-colors leading-snug mb-2">
+                                <a href="/p/{{ .Pid }}" title="{{ .Title }}">
+                                    {{ .Title }}
+                                </a>
+                            </h3>
+                            
+                            {{ if .SEODescription }}
+                            <p class="text-sm text-stone-500 line-clamp-2 leading-relaxed mb-3">
+                                {{ .SEODescription }}
+                            </p>
+                            {{ end }}
+
+                            <div class="flex items-center text-xs text-stone-400 gap-3">
+                                <span class="flex items-center">
+                                    {{ .Views }} 阅读
+                                </span>
+                                <span class="text-stone-300">·</span>
+                                <time datetime="{{ .CreatedAt.Format "2006-01-02" }}">
+                                    {{ .CreatedAt.Format "2006-01-02" }}
+                                </time>
+                            </div>
+                        </article>
+                    </li>
+                    {{ end }}
+                </ul>
+            </aside>
+            {{ end }}
+
         </article>
 
         <!-- Divider -->

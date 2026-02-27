@@ -12,9 +12,11 @@ import (
 )
 
 type LLMConfig struct {
-	BaseURL string
-	Model   string
-	Token   string
+	BaseURL       string
+	Model         string
+	Token         string
+	OllamaBaseURL string
+	OllamaModel   string
 }
 
 type LLMService struct {
@@ -46,9 +48,11 @@ var llmService *LLMService
 func GetLLMService() *LLMService {
 	if llmService == nil {
 		config := LLMConfig{
-			BaseURL: os.Getenv("LLM_BASE_URL"),
-			Model:   os.Getenv("LLM_MODEL"),
-			Token:   os.Getenv("LLM_TOKEN"),
+			BaseURL:       os.Getenv("LLM_BASE_URL"),
+			Model:         os.Getenv("LLM_MODEL"),
+			Token:         os.Getenv("LLM_TOKEN"),
+			OllamaBaseURL: os.Getenv("OLLAMA_BASE_URL"),
+			OllamaModel:   os.Getenv("OLLAMA_MODEL"),
 		}
 
 		// 默认配置
@@ -57,6 +61,12 @@ func GetLLMService() *LLMService {
 		}
 		if config.Model == "" {
 			config.Model = "gemini-1.5-flash"
+		}
+		if config.OllamaBaseURL == "" {
+			config.OllamaBaseURL = "http://localhost:11434"
+		}
+		if config.OllamaModel == "" {
+			config.OllamaModel = "quentinz/bge-base-zh-v1.5"
 		}
 
 		llmService = &LLMService{
@@ -311,4 +321,61 @@ func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, e
 	}
 
 	return &seoResult, nil
+}
+
+// GetEmbedding 调用 Ollama 获取文本向量
+func (s *LLMService) GetEmbedding(text string) ([]float32, error) {
+	if s.config.OllamaBaseURL == "" {
+		return nil, fmt.Errorf("OLLAMA_BASE_URL 未配置")
+	}
+
+	type OllamaEmbeddingRequest struct {
+		Model  string `json:"model"`
+		Prompt string `json:"prompt"`
+	}
+
+	type OllamaEmbeddingResponse struct {
+		Embedding []float32 `json:"embedding"`
+	}
+
+	reqBody := OllamaEmbeddingRequest{
+		Model:  s.config.OllamaModel,
+		Prompt: text,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request failed: %v", err)
+	}
+
+	apiURL := strings.TrimSuffix(s.config.OllamaBaseURL, "/") + "/api/embeddings"
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request failed: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Printf("[Ollama] API 请求失败: %v", err)
+		return nil, fmt.Errorf("ollama api request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[Ollama] API 返回非 200 状态码: %s", resp.Status)
+		return nil, fmt.Errorf("ollama api returned non-200 status: %s", resp.Status)
+	}
+
+	var embeddingResp OllamaEmbeddingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&embeddingResp); err != nil {
+		return nil, fmt.Errorf("decode response failed: %v", err)
+	}
+
+	if len(embeddingResp.Embedding) == 0 {
+		return nil, fmt.Errorf("received empty embedding from ollama")
+	}
+
+	return embeddingResp.Embedding, nil
 }
