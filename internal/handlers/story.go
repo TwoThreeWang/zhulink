@@ -532,7 +532,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 
 	// 如果 SEO 描述或向量为空，异步生成
 	if post.SEODescription == "" || len(post.Embedding.Slice()) == 0 {
-		h.asyncGeneratePostMeta(post.ID, post.Title, post.Content)
+		go h.asyncGeneratePostMeta(post.ID, post.Title, post.Content)
 	}
 
 	// 异步更新帖子 Score
