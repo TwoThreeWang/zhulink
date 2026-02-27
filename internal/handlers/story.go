@@ -620,9 +620,9 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	var relatedPosts []models.Post
 	if len(post.Embedding.Slice()) > 0 {
 		db.DB.Model(&models.Post{}).
-			Select("pid, title, (1 - (embedding <=> ?)) as similarity", post.Embedding).
+			Select("pid, title, seo_description, views, created_at, (1 - (embedding <=> ?)) as similarity", post.Embedding).
 			Where("id != ? AND (1 - (embedding <=> ?)) > 0.7", post.ID, post.Embedding).
-			Order("embedding <=> ?").
+			Order("similarity DESC").
 			Limit(6).
 			Find(&relatedPosts)
 	}
