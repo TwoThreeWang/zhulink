@@ -23,7 +23,7 @@ type Post struct {
 	SEOKeywords    string          `gorm:"type:text" json:"seo_keywords"`    // AI 生成的 SEO 关键词
 	SEODescription string          `gorm:"type:text" json:"seo_description"` // AI 生成的 SEO 页面描述
 	VectorText     string          `gorm:"type:text" json:"-"`               // 用于生成向量的拼接文本
-	Embedding      pgvector.Vector `gorm:"type:vector(768)" json:"-"`         // 向量数据 (nomic-embed-text 为 768 维)
+	Embedding      *pgvector.Vector `gorm:"type:vector(768)" json:"-"`         // 向量数据 (nomic-embed-text 为 768 维)
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 

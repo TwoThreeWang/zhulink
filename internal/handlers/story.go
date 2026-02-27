@@ -467,7 +467,8 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 		fmt.Printf("[Vector] 生成向量失败 (postID=%d): %v\n", postID, err)
 	} else {
 		updateFields["vector_text"] = vectorText
-		updateFields["embedding"] = pgvector.NewVector(embedding)
+		vec := pgvector.NewVector(embedding)
+		updateFields["embedding"] = &vec
 	}
 
 	if len(updateFields) > 0 {
@@ -531,7 +532,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	post.Views++
 
 	// 如果 SEO 描述或向量为空，异步生成
-	if post.SEODescription == "" || len(post.Embedding.Slice()) == 0 {
+	if post.SEODescription == "" || post.Embedding == nil || len(post.Embedding.Slice()) == 0 {
 		go h.asyncGeneratePostMeta(post.ID, post.Title, post.Content)
 	}
 
@@ -618,7 +619,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	// 相关文章推荐 (向量相似度 > 0.7)
 	// pgvector 相似度公式: 1 - (embedding <=> query_embedding) > 0.7 => embedding <=> query_embedding < 0.3
 	var relatedPosts []models.Post
-	if len(post.Embedding.Slice()) > 0 {
+	if post.Embedding != nil && len(post.Embedding.Slice()) > 0 {
 		db.DB.Model(&models.Post{}).
 			Select("pid, title, seo_description, views, created_at, (1 - (embedding <=> ?)) as similarity", post.Embedding).
 			Where("id != ? AND (1 - (embedding <=> ?)) > 0.7", post.ID, post.Embedding).
