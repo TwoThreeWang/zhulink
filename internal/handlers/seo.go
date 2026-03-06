@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"html"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -250,22 +251,24 @@ func stripHTML(s string) string {
 // IndexNowKeyFile 返回 IndexNow 验证文件内容
 // 路由格式: /{apiKey}.txt
 func (h *SEOHandler) IndexNowKeyFile(c *gin.Context) {
-	key := c.Param("key")
+	key := c.Param("key.txt")
 	// 去除 .txt 后缀
 	key = strings.TrimSuffix(key, ".txt")
+	log.Printf("Request IndexNow key: %s", key)
 
 	indexNowService := services.GetIndexNowService()
 	expectedKey := indexNowService.GetKey()
+	log.Printf("IndexNow expected key: %s", expectedKey)
 
 	// 如果未配置 IndexNow API Key，返回 404
 	if expectedKey == "" {
-		c.String(http.StatusNotFound, "Not Found")
+		c.String(http.StatusNotFound, "Not Found IndexNow API Key")
 		return
 	}
 
 	// 验证请求的 key 是否匹配配置的 key
 	if key != expectedKey {
-		c.String(http.StatusNotFound, "Not Found")
+		c.String(http.StatusNotFound, "IndexNow API Key Error")
 		return
 	}
 
