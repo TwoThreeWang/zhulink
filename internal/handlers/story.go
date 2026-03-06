@@ -427,6 +427,9 @@ func (h *StoryHandler) Create(c *gin.Context) {
 	// 异步生成 SEO 元数据和向量
 	go h.asyncGeneratePostMeta(post.ID, title, content)
 
+	// 异步提交到 IndexNow
+	services.GetIndexNowService().SubmitURL(post.Pid)
+
 	c.Redirect(http.StatusFound, "/p/"+post.Pid)
 }
 

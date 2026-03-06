@@ -10,6 +10,7 @@ import (
 	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/models"
+	"zhulink/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -244,4 +245,31 @@ func truncateByParagraph(content string, maxBlocks int) string {
 func stripHTML(s string) string {
 	re := regexp.MustCompile(`<[^>]*>`)
 	return re.ReplaceAllString(s, "")
+}
+
+// IndexNowKeyFile 返回 IndexNow 验证文件内容
+// 路由格式: /{apiKey}.txt
+func (h *SEOHandler) IndexNowKeyFile(c *gin.Context) {
+	key := c.Param("key")
+	// 去除 .txt 后缀
+	key = strings.TrimSuffix(key, ".txt")
+
+	indexNowService := services.GetIndexNowService()
+	expectedKey := indexNowService.GetKey()
+
+	// 如果未配置 IndexNow API Key，返回 404
+	if expectedKey == "" {
+		c.String(http.StatusNotFound, "Not Found")
+		return
+	}
+
+	// 验证请求的 key 是否匹配配置的 key
+	if key != expectedKey {
+		c.String(http.StatusNotFound, "Not Found")
+		return
+	}
+
+	// 返回 key 作为文件内容（IndexNow 协议要求文件内容就是 key 本身）
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.String(http.StatusOK, expectedKey)
 }
