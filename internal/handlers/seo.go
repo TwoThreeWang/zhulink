@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"html"
-	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -254,11 +253,9 @@ func (h *SEOHandler) IndexNowKeyFile(c *gin.Context) {
 	key := c.Param("key.txt")
 	// 去除 .txt 后缀
 	key = strings.TrimSuffix(key, ".txt")
-	log.Printf("Request IndexNow key: %s", key)
 
 	indexNowService := services.GetIndexNowService()
 	expectedKey := indexNowService.GetKey()
-	log.Printf("IndexNow expected key: %s", expectedKey)
 
 	// 如果未配置 IndexNow API Key，返回 404
 	if expectedKey == "" {
