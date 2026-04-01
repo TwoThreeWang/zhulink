@@ -126,7 +126,7 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
    - 适度在括号中加入技术点评，例如：(实测这步不能省)、(虽然官方没说，但其实可以这样优化)。
    - 不要写“摘要/正文/结论”这种死板标题。
 
-6. **格式**: 
+6. **格式**:
    - 使用标准的 Markdown。
    - 关键技术名词、数据**加粗**。
    - 段落排版要疏密有致，方便手机阅读。
@@ -227,11 +227,13 @@ func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, e
 # Role
 你是一个专业的 SEO 优化专家，精通搜索引擎优化和内容营销。
 
-# Task
-基于提供的文章标题和内容，生成有利于 SEO 的关键词和页面描述。
+# Tasks
+1. 评估提供的文章标题和内容。如果内容属于【纯垃圾广告】（如博彩、灰产、营销推销、纯 SEO 堆砌、无技术含量的推广等），请**直接且仅**返回字符串 "AD"。
+2. 如果是正常技术或社区讨论内容，基于其生成有利于 SEO 的关键词和页面描述。
 
 # Output Requirements
-请严格按照以下 JSON 格式返回，不要包含任何其他文字：
+- 如果判定为广告：仅返回 "AD"。
+- 如果判定为正常内容：请严格按照以下 JSON 格式返回，不要包含任何其他文字：
 {"keywords":"关键词1,关键词2,关键词3,...","description":"页面描述"}
 
 ## Keywords 要求:
@@ -250,7 +252,8 @@ func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, e
 ### Content: %s
 
 # Reminder
-只返回 JSON，不要有任何其他文字。
+- 如果判定为广告：仅返回 "AD"。
+- 如果判定为正常内容：只返回 JSON，不要有任何其他文字。
 `
 	// 截取内容，避免过长
 	contentForPrompt := content
@@ -303,6 +306,11 @@ func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, e
 	}
 
 	responseContent := strings.TrimSpace(chatResp.Choices[0].Message.Content)
+
+	// 首先检查是否被判定为广告
+	if strings.ToUpper(responseContent) == "AD" {
+		return &SEOMetadata{Keywords: "AD"}, nil
+	}
 
 	// 尝试提取 JSON（有时候 LLM 会在 JSON 前后添加文字）
 	startIdx := strings.Index(responseContent, "{")

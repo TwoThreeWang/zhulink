@@ -364,6 +364,18 @@ func (h *StoryHandler) Create(c *gin.Context) {
 		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您的账号已被封禁，无法发布内容。"})
 		return
 	}
+
+	// 阶梯频率与权限检查
+	if err := services.CheckPostPermission(user, false); err != nil {
+		var nodes []models.Node
+		db.DB.Order("id ASC").Find(&nodes)
+		Render(c, http.StatusBadRequest, "story/create.html", gin.H{
+			"Error": err.Error(),
+			"Nodes": nodes,
+		})
+		return
+	}
+
 	if user.Status == 1 {
 		if user.PunishExpires != nil && time.Now().After(*user.PunishExpires) {
 			// 惩罚已过期，恢复状态（实际应该在 middleware 或单独逻辑中处理，这里简单处理）
@@ -443,6 +455,12 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 		// 继续生成向量，不因为 SEO 失败而终止
 	}
 
+	// 检查是否被判定为广告
+	if seoMeta != nil && seoMeta.Keywords == "AD" {
+		h.handleAdPostPunishment(postID)
+		return
+	}
+
 	updateFields := map[string]interface{}{}
 	if seoMeta != nil {
 		updateFields["seo_keywords"] = seoMeta.Keywords
@@ -486,6 +504,49 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 		}
 		fmt.Printf("[Async] 已更新帖子 %d 的 SEO 和向量数据\n", postID)
 	}
+}
+
+// handleAdPostPunishment 处理 AI 识别出的广告贴惩罚
+func (h *StoryHandler) handleAdPostPunishment(postID uint) {
+	var post models.Post
+	if err := db.DB.Preload("User").First(&post, postID).Error; err != nil {
+		return
+	}
+
+	fmt.Printf("[AL-AntiSpam] 自动拦截广告贴: postID=%d, UserID=%d, Title=%s\n", postID, post.UserID, post.Title)
+
+	// 1. 禁言用户 1 天
+	expires := time.Now().AddDate(0, 0, 1)
+	db.DB.Model(&models.User{}).Where("id = ?", post.UserID).Updates(map[string]interface{}{
+		"status":         1, // 禁言
+		"punish_expires": &expires,
+	})
+
+	// 2. 发送通知给用户
+	userNotification := models.Notification{
+		UserID: post.UserID,
+		Type:   models.NotificationTypeSystem,
+		Reason: "系统检测到您发布的帖子《" + post.Title + "》包含广告信息。根据社区规则，您的账号已被自动禁言 1 天。如有误判请联系管理员。",
+	}
+	db.DB.Create(&userNotification)
+
+	// 3. 发送通知给所有管理员
+	var admins []models.User
+	db.DB.Where("role = ?", "admin").Find(&admins)
+	for _, admin := range admins {
+		adminNotification := models.Notification{
+			UserID: admin.ID,
+			Type:   models.NotificationTypeSystem,
+			Reason: fmt.Sprintf("AI 自动拦截了一条来自用户 @%s 的广告贴《%s》，已自动执行禁言 1 天处理。", post.User.Username, post.Title),
+		}
+		db.DB.Create(&adminNotification)
+	}
+
+	// 4. 删除帖子
+	db.DB.Delete(&post)
+
+	// 5. 失效缓存
+	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
 }
 
 func (h *StoryHandler) Detail(c *gin.Context) {
@@ -694,6 +755,13 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您的账号已被封禁,无法发布评论。"})
 		return
 	}
+
+	// 阶梯频率检查
+	if err := services.CheckPostPermission(user, true); err != nil {
+		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": err.Error()})
+		return
+	}
+
 	if user.Status == 1 {
 		// 禁言用户,检查是否已过期
 		if user.PunishExpires != nil && time.Now().After(*user.PunishExpires) {

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 	"zhulink/internal/db"
@@ -111,6 +112,55 @@ func CanEarnPostPoints(userID uint) bool {
 func CanEarnCommentPoints(userID uint) bool {
 	count := countTodayPointLogs(userID, ActionCommentCreate)
 	return count < DailyCommentLimit
+}
+
+// CheckPostPermission 检查用户发帖/评论权限及频率
+// isComment: 是否为评论请求
+func CheckPostPermission(user *models.User, isComment bool) error {
+	// 1. 基本积分门槛：小于 10 积分不能发帖
+	if !isComment && user.Points < 10 {
+		return errors.New("您的等级还太低了（需 10 竹笋），多签到或评论攒攒分再来发帖吧 ~")
+	}
+
+	// 2. 确定频率限制
+	var limit time.Duration
+	if user.Points < 50 {
+		limit = 10 * time.Minute
+	} else {
+		limit = 1 * time.Minute
+	}
+
+	// 3. 检查最近一条记录的创建时间
+	var lastCreatedAt time.Time
+	if isComment {
+		var lastComment models.Comment
+		err := db.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Select("created_at").First(&lastComment).Error
+		if err == nil {
+			lastCreatedAt = lastComment.CreatedAt
+		}
+	} else {
+		var lastPost models.Post
+		err := db.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Select("created_at").First(&lastPost).Error
+		if err == nil {
+			lastCreatedAt = lastPost.CreatedAt
+		}
+	}
+
+	// 4. 校验间隔
+	if !lastCreatedAt.IsZero() {
+		elapsed := time.Since(lastCreatedAt)
+		if elapsed < limit {
+			var msg string
+			if user.Points < 50 {
+				msg = "您操作太快了，新手（<50竹笋）每 10 分钟只能发布一条内容。"
+			} else {
+				msg = "请慢一点，每分钟只能发布一条内容。"
+			}
+			return errors.New(msg)
+		}
+	}
+
+	return nil
 }
 
 // HasCheckedInToday 检查用户今日是否已签到
