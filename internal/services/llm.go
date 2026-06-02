@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -43,10 +44,13 @@ type ChatResponse struct {
 	} `json:"choices"`
 }
 
-var llmService *LLMService
+var (
+	llmService *LLMService
+	llmOnce    sync.Once
+)
 
 func GetLLMService() *LLMService {
-	if llmService == nil {
+	llmOnce.Do(func() {
 		config := LLMConfig{
 			BaseURL:       os.Getenv("LLM_BASE_URL"),
 			Model:         os.Getenv("LLM_MODEL"),
@@ -55,7 +59,6 @@ func GetLLMService() *LLMService {
 			OllamaModel:   os.Getenv("OLLAMA_MODEL"),
 		}
 
-		// 默认配置
 		if config.BaseURL == "" {
 			config.BaseURL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 		}
@@ -74,11 +77,12 @@ func GetLLMService() *LLMService {
 			client: &http.Client{
 				Timeout: 30 * time.Second,
 			},
-			semaphore: make(chan struct{}, 5), // 限制同时并发请求数为 5
+			semaphore: make(chan struct{}, 5),
 		}
-	}
+	})
 	return llmService
 }
+
 
 // GenerateSummary 调用 LLM 生成摘要
 func (s *LLMService) GenerateSummary(title, content string) (string, error) {

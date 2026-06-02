@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/models"
@@ -62,13 +63,16 @@ func NewRSSFetcher() *RSSFetcher {
 }
 
 // 全局单例
-var rssFetcher *RSSFetcher
+var (
+	rssFetcher  *RSSFetcher
+	rssOnce     sync.Once
+)
 
 // GetRSSFetcher 获取 RSS 抓取服务单例
 func GetRSSFetcher() *RSSFetcher {
-	if rssFetcher == nil {
+	rssOnce.Do(func() {
 		rssFetcher = NewRSSFetcher()
-	}
+	})
 	return rssFetcher
 }
 
@@ -368,8 +372,30 @@ func (f *RSSFetcher) StartScheduledFetch() {
 	}()
 }
 
-// CleanupOldItems 清除发布时间超过 30 天的文章
+// CleanupOldItems 清除发布时间超过 30 天的文章，以及无人订阅的 RSS 源
 func (f *RSSFetcher) CleanupOldItems() error {
+	// 1. 清除没人订阅的 RSS 源
+	var unreferencedFeeds []models.Feed
+	db.DB.Where("id NOT IN (SELECT DISTINCT feed_id FROM user_subscriptions)").Find(&unreferencedFeeds)
+
+	deletedFeedsCount := 0
+	if len(unreferencedFeeds) > 0 {
+		var ids []uint
+		for _, feed := range unreferencedFeeds {
+			ids = append(ids, feed.ID)
+		}
+
+		// 手动级联删除关联的 FeedItems
+		db.DB.Where("feed_id IN ?", ids).Delete(&models.FeedItem{})
+
+		// 删除无用的 Feed 本身
+		resultFeeds := db.DB.Where("id IN ?", ids).Delete(&models.Feed{})
+		if resultFeeds.Error == nil {
+			deletedFeedsCount = int(resultFeeds.RowsAffected)
+		}
+	}
+
+	// 2. 清除发布时间超过 30 天的文章
 	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
 	result := db.DB.Where("published_at < ?", thirtyDaysAgo).Delete(&models.FeedItem{})
 
@@ -377,7 +403,7 @@ func (f *RSSFetcher) CleanupOldItems() error {
 		return fmt.Errorf("清除过期文章失败: %w", result.Error)
 	}
 
-	log.Printf("已清除 %d 篇超过 30 天的 RSS 文章", result.RowsAffected)
+	log.Printf("清理任务完成: 清除 %d 个无人订阅的 RSS 源, 清除 %d 篇超过 30 天的文章", deletedFeedsCount, result.RowsAffected)
 	return nil
 }
 

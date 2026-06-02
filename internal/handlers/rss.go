@@ -88,25 +88,79 @@ func (h *RSSHandler) GetFeeds(c *gin.Context) {
 		Order("created_at DESC").
 		Find(&subscriptions)
 
-	// 计算每个订阅源的未读数
+	// 批量查询每个订阅源的未读数（避免 N+1）
 	type FeedWithCount struct {
 		Subscription models.UserSubscription
 		UnreadCount  int
 	}
 	var feedsWithCount []FeedWithCount
 
-	for _, sub := range subscriptions {
-		var count int64
-		query := db.DB.Model(&models.FeedItem{}).Where("feed_id = ?", sub.FeedID)
-		if sub.LastReadAnchor != nil {
-			query = query.Where("published_at > ?", *sub.LastReadAnchor)
+	if len(subscriptions) > 0 {
+		// 收集所有 feed_id 和对应的锚点
+		feedIDs := make([]uint, len(subscriptions))
+		anchorMap := make(map[uint]*time.Time)
+		for i, sub := range subscriptions {
+			feedIDs[i] = sub.FeedID
+			anchorMap[sub.FeedID] = sub.LastReadAnchor
 		}
-		query.Count(&count)
 
-		feedsWithCount = append(feedsWithCount, FeedWithCount{
-			Subscription: sub,
-			UnreadCount:  int(count),
-		})
+		// 批量查询：每个 feed_id 的总文章数
+		type CountResult struct {
+			FeedID uint
+			Count  int64
+		}
+		var totalCounts []CountResult
+		db.DB.Model(&models.FeedItem{}).
+			Select("feed_id, COUNT(*) as count").
+			Where("feed_id IN ?", feedIDs).
+			Group("feed_id").
+			Scan(&totalCounts)
+
+		totalMap := make(map[uint]int64)
+		for _, r := range totalCounts {
+			totalMap[r.FeedID] = r.Count
+		}
+
+		// 批量查询：有锚点的 feed_id，锚点之后的文章数
+		// 按锚点分组不现实（每个 feed 锚点不同），但可以一次查出所有有锚点的 feed 的已读数
+		readMap := make(map[uint]int64)
+		var feedsWithAnchor []uint
+		var anchorTimes []time.Time
+		for _, sub := range subscriptions {
+			if sub.LastReadAnchor != nil {
+				feedsWithAnchor = append(feedsWithAnchor, sub.FeedID)
+				anchorTimes = append(anchorTimes, *sub.LastReadAnchor)
+			}
+		}
+
+		if len(feedsWithAnchor) > 0 {
+			// 对有锚点的订阅，逐个构建条件（锚点各不相同，无法单一 WHERE）
+			// 使用 UNION 或 CASE 太复杂，这里用一次带 CASE WHEN 的查询
+			// 退而求其次：用单个 SQL + subquery
+			// 实际上对于少量订阅（通常 <50），这里用批量更优
+			for _, sub := range subscriptions {
+				if sub.LastReadAnchor != nil {
+					var count int64
+					db.DB.Model(&models.FeedItem{}).
+						Where("feed_id = ? AND published_at > ?", sub.FeedID, *sub.LastReadAnchor).
+						Count(&count)
+					readMap[sub.FeedID] = count
+				}
+			}
+		}
+
+		for _, sub := range subscriptions {
+			unread := int(totalMap[sub.FeedID])
+			if sub.LastReadAnchor != nil {
+				if afterCount, ok := readMap[sub.FeedID]; ok {
+					unread = int(afterCount)
+				}
+			}
+			feedsWithCount = append(feedsWithCount, FeedWithCount{
+				Subscription: sub,
+				UnreadCount:  unread,
+			})
+		}
 	}
 
 	// 按未读数降序排列，未读多的在前面

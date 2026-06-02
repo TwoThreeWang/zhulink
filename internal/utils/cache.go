@@ -2,6 +2,7 @@ package utils
 
 import (
 	"log"
+	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -18,12 +19,14 @@ type GlobalCache struct {
 	lruCache *lru.Cache[string, CacheItem]
 }
 
-var cacheInstance *GlobalCache
+var (
+	cacheInstance *GlobalCache
+	cacheOnce     sync.Once
+)
 
 // GetCache 获取单例缓存实例
 func GetCache() *GlobalCache {
-	if cacheInstance == nil {
-		// 创建一个容量为 500 的 LRU 缓存
+	cacheOnce.Do(func() {
 		l, err := lru.New[string, CacheItem](500)
 		if err != nil {
 			log.Fatalf("Failed to create LRU cache: %v", err)
@@ -31,7 +34,7 @@ func GetCache() *GlobalCache {
 		cacheInstance = &GlobalCache{
 			lruCache: l,
 		}
-	}
+	})
 	return cacheInstance
 }
 
