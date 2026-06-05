@@ -83,45 +83,151 @@ func GetLLMService() *LLMService {
 	return llmService
 }
 
+// callLLM 通用 OpenAI 兼容 HTTP 调用（CF Gateway / 原接口均适用），最多重试 3 次
+func (s *LLMService) callLLM(baseURL, model, token, prompt string) (string, error) {
+	s.semaphore <- struct{}{}
+	defer func() { <-s.semaphore }()
 
-// GenerateSummary 调用 LLM 生成摘要
+	retryDelays := []time.Duration{3 * time.Second, 5 * time.Second, 8 * time.Second}
+	maxAttempts := 1 + len(retryDelays) // 首次 + 3次重试
+
+	reqBody := ChatRequest{
+		Model: model,
+		Messages: []ChatMessage{
+			{Role: "user", Content: prompt},
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request failed: %v", err)
+	}
+
+	apiURL := strings.TrimSuffix(baseURL, "/") + "/chat/completions"
+
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			delay := retryDelays[attempt-1]
+			log.Printf("[LLM] 第 %d 次重试，等待 %v", attempt, delay)
+			time.Sleep(delay)
+		}
+
+		req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return "", fmt.Errorf("create request failed: %v", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := s.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("api request failed: %v", err)
+			log.Printf("[LLM] 请求失败 (attempt %d/%d): %v", attempt+1, maxAttempts, err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("api returned non-200 status: %s", resp.Status)
+			log.Printf("[LLM] 非 200 状态码 (attempt %d/%d): %s", attempt+1, maxAttempts, resp.Status)
+			continue
+		}
+
+		var chatResp ChatResponse
+		if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("decode response failed: %v", err)
+			log.Printf("[LLM] 解析响应失败 (attempt %d/%d): %v", attempt+1, maxAttempts, err)
+			continue
+		}
+		resp.Body.Close()
+
+		if len(chatResp.Choices) > 0 {
+			return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
+		}
+
+		return "", nil
+	}
+
+	return "", fmt.Errorf("LLM 调用失败（已重试 %d 次）: %v", len(retryDelays), lastErr)
+}
+
+// ==================== GenerateSummary ====================
+
+// GenerateSummary 通过 Cloudflare AI Gateway 生成摘要
 func (s *LLMService) GenerateSummary(title, content string) (string, error) {
+	gatewayURL := os.Getenv("CF_GATEWAY_URL")
+	gatewayModel := os.Getenv("CF_GATEWAY_MODEL")
+	gatewayToken := os.Getenv("CF_API_TOKEN")
+
+	if gatewayURL == "" || gatewayToken == "" {
+		return s.GenerateSummaryLegacy(title, content)
+	}
+
+	prompt := buildSummaryPrompt(title, content)
+	resp, err := s.callLLM(gatewayURL, gatewayModel, gatewayToken, prompt)
+	if err != nil {
+		return "", err
+	}
+
+	if resp == "" || resp == "CONTENT_UNSUITABLE" {
+		return "CONTENT_UNSUITABLE", nil
+	}
+	return resp, nil
+}
+
+// GenerateSummaryLegacy 原始 LLM 接口（备用，切回时改名即可）
+func (s *LLMService) GenerateSummaryLegacy(title, content string) (string, error) {
 	if s.config.Token == "" {
 		return "未配置 LLM_TOKEN，请在 .env 文件中配置以使用真实 AI 功能。", nil
 	}
 
-	// 构造提示词
-	promptTemplate := `
+	prompt := buildSummaryPrompt(title, content)
+	resp, err := s.callLLM(s.config.BaseURL, s.config.Model, s.config.Token, prompt)
+	if err != nil {
+		return "", err
+	}
+
+	if resp == "" || resp == "CONTENT_UNSUITABLE" {
+		return "CONTENT_UNSUITABLE", nil
+	}
+	return resp, nil
+}
+
+func buildSummaryPrompt(title, content string) string {
+	return fmt.Sprintf(`
 # Role
 你是一名深耕技术领域的【实战派开发者】，擅长将复杂的技术文档或新闻改写为逻辑清晰、极具实操价值的技术分享。你的文风：冷静、专业、直击痛点。你擅长将枯燥的技术文档或新闻，重构成一篇**有料、有趣、带点极客范儿**的社区分享帖。
 
 # Safety First (安全第一 - 优先级最高)
 在处理内容前，必须先评估。如果原文内容包含以下任一特征，**绝对不允许生成摘要**，必须**仅**返回字符串 "CONTENT_UNSUITABLE"：
 - **纯垃圾内容**：毫无信息增量的博彩引流、灰产推广、纯 SEO 堆砌内容。
-  - **核心判定**：如果内容旨在“诱导读者点击/消费特定违规平台”，判定为 "CONTENT_UNSUITABLE"；如果内容是“中立地报道行业动态（包括敏感行业平台关停等新闻）、技术解析或事件说明”，则**不属于**违规，应正常处理。
+  - **核心判定**：如果内容旨在"诱导读者点击/消费特定违规平台"，判定为 "CONTENT_UNSUITABLE"；如果内容是"中立地报道行业动态（包括敏感行业平台关停等新闻）、技术解析或事件说明"，则**不属于**违规，应正常处理。
 - **严重违规**：色情、血腥暴力、恐怖主义、违禁品交易、明显的仇恨言论（注：中立的新闻报道不在此列）。
 - **不可读**：纯乱码或无法提取有效信息的片段。
 
 # Writing Guidelines (个人风格融合)
 
 1. **结构化思考**：
-   - **痛点开篇**：拒绝废话。顶部不需要标题，第一段必须交代“为什么要关注这个？”或“这个技术解决了什么实际问题？”。
-   - **核心逻辑**：采用“背景说明 -> 核心实现(代码/配置) -> 避坑指南”的递进式写法。
+   - **痛点开篇**：拒绝废话。顶部不需要标题，第一段必须交代"为什么要关注这个？"或"这个技术解决了什么实际问题？"。
+   - **核心逻辑**：采用"背景说明 -> 核心实现(代码/配置) -> 避坑指南"的递进式写法。
    - **逻辑跳跃与留白**：段落要短，重点要突出。
 
 2. **去 AI 味的表达习惯**：
-   - **禁止**使用 AI 常用“安全词”：不仅...而且、核心、关键、致力于、通过...实现、显著提升、深远意义、领域、亮点、首先、其次、总之、综上所述、不仅如此、本文介绍了、作者认为。
+   - **禁止**使用 AI 常用"安全词"：不仅...而且、核心、关键、致力于、通过...实现、显著提升、深远意义、领域、亮点、首先、其次、总之、综上所述、不仅如此、本文介绍了、作者认为。
    - **替换**为常用连接词：等于说、其实原理很简单、这里有个坑注意下、直接上代码等口语化表达，但不要过分低俗。
-   - **拒绝废话开头**：不要说“在当今快速发展的技术领域...”，直接切入核心爆点。
-   - **动词优先**：用“跑通流程”、“压榨性能”、“搞定配置”代替抽象的名词堆砌。
-   - **句式多变**：长短句结合。偶尔可以用“？”或“！”表达情绪。
-   - **拒绝平衡论**：AI 喜欢说“虽然...但是...”，你要有鲜明的态度。好就是好，烂就是烂。
+   - **拒绝废话开头**：不要说"在当今快速发展的技术领域..."，直接切入核心爆点。
+   - **动词优先**：用"跑通流程"、"压榨性能"、"搞定配置"代替抽象的名词堆砌。
+   - **句式多变**：长短句结合。偶尔可以用"？"或"！"表达情绪。
+   - **拒绝平衡论**：AI 喜欢说"虽然...但是..."，你要有鲜明的态度。好就是好，烂就是烂。
    - **逻辑跳跃**：人类写文章会有意无意的逻辑跳跃。不需要在每段话之间都加过渡词。
 
 3. **SEO 最佳实践（深度集成）**：
    - **关键词前置**：在第一段自然嵌入文章的核心技术关键词。
-   - **语义化段落标题**：使用 Markdown 的 ## 和 ###。段落标题要包含“如何”、“实现”、“配置”、“优化”等搜索意图明显的词。
-   - **列表与加粗**：关键步骤使用有序/无序列表；**核心参数和技术名词**必须加粗，方便扫描式阅读。
+   - **语义化段落标题**：使用 Markdown 的 ## 和 ###。段落标题要包含"如何"、"实现"、"配置"、"优化"等搜索意图明显的词。
+   - **列表与加粗**：关键步骤使用有序/无序列表；**核心参数和技术名词**必须**加粗**，方便扫描式阅读。
 
 4. **硬核干货保留**：
    - **代码至上**：原文中的核心代码块、命令行参数、配置文件片段必须**完整保留**。
@@ -129,7 +235,7 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 
 5. **插入语与互动感**：
    - 适度在括号中加入技术点评，例如：(实测这步不能省)、(虽然官方没说，但其实可以这样优化)。
-   - 不要写“摘要/正文/结论”这种死板标题。
+   - 不要写"摘要/正文/结论"这种死板标题。
 
 6. **格式**:
    - 使用标准的 Markdown。
@@ -138,7 +244,7 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 
 # Output Requirements
 1. **字数控制**：300 - 800 字，确保每一段都有信息增量，重点在于信息密度，而不是凑字数。
-2. **拒绝总结感**：严禁出现“综上所述”、“总之”等段落。
+2. **拒绝总结感**：严禁出现"综上所述"、"总之"等段落。
 3. **文末提问**：文章最后按照内容决定是否抛出一个能引导读者去尝试或讨论的问题（非必须）。
 
 # 反向案例参考（博主风格 vs 传统AI风）：
@@ -150,70 +256,14 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 ### Content: %s
 
 # Absolute Reminder
-1. 必须返回简体中文，禁止任何形式的“废话总结”。
+1. 必须返回简体中文，禁止任何形式的"废话总结"。
 2. 逻辑第一，代码第一，不要煽情，不要废话。
 3. 必须符合 Markdown 标准格式。
 4. 无法处理则返回 "CONTENT_UNSUITABLE"。
-`
-	prompt := fmt.Sprintf(promptTemplate, title, content)
-
-	// 并发限流
-	s.semaphore <- struct{}{}
-	defer func() { <-s.semaphore }()
-
-	reqBody := ChatRequest{
-		Model: s.config.Model,
-		Messages: []ChatMessage{
-			{Role: "user", Content: prompt},
-		},
-	}
-
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", fmt.Errorf("marshal request failed: %v", err)
-	}
-
-	apiURL := strings.TrimSuffix(s.config.BaseURL, "/") + "/chat/completions"
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("create request failed: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.config.Token)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		log.Printf("[LLM] API 请求失败: %v", err)
-		return "", fmt.Errorf("api request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("[LLM] API 返回非 200 状态码: %s", resp.Status)
-		return "", fmt.Errorf("api returned non-200 status: %s", resp.Status)
-	}
-
-	var chatResp ChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return "", fmt.Errorf("decode response failed: %v", err)
-	}
-
-	if len(chatResp.Choices) > 0 {
-		content := strings.TrimSpace(chatResp.Choices[0].Message.Content)
-		if content == "" {
-			// 如果返回内容为空，通常是由于 API 安全拦截，降级处理
-			return "CONTENT_UNSUITABLE", nil
-		}
-		if content == "CONTENT_UNSUITABLE" {
-			return "CONTENT_UNSUITABLE", nil
-		}
-		return content, nil
-	}
-
-	// 连 Choices 都没有，极可能也是安全拦截
-	return "CONTENT_UNSUITABLE", nil
+`, title, content)
 }
+
+// ==================== GenerateSEOMetadata ====================
 
 // SEOMetadata 包含生成的 SEO 元数据
 type SEOMetadata struct {
@@ -221,20 +271,53 @@ type SEOMetadata struct {
 	Description string // 150 字以内的页面描述
 }
 
-// GenerateSEOMetadata 调用 LLM 生成 SEO 关键词和描述
+// GenerateSEOMetadata 通过 Cloudflare AI Gateway 生成 SEO 关键词和描述
 func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, error) {
+	gatewayURL := os.Getenv("CF_GATEWAY_URL")
+	gatewayModel := os.Getenv("CF_GATEWAY_MODEL")
+	gatewayToken := os.Getenv("CF_API_TOKEN")
+
+	if gatewayURL == "" || gatewayToken == "" {
+		return s.GenerateSEOMetadataLegacy(title, content)
+	}
+
+	prompt := buildSEOPrompt(title, content)
+	resp, err := s.callLLM(gatewayURL, gatewayModel, gatewayToken, prompt)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseSEOResponse(resp)
+}
+
+// GenerateSEOMetadataLegacy 原始 LLM 接口（备用）
+func (s *LLMService) GenerateSEOMetadataLegacy(title, content string) (*SEOMetadata, error) {
 	if s.config.Token == "" {
 		return nil, fmt.Errorf("LLM_TOKEN 未配置")
 	}
 
-	// 构造提示词
-	promptTemplate := `
+	prompt := buildSEOPrompt(title, content)
+	resp, err := s.callLLM(s.config.BaseURL, s.config.Model, s.config.Token, prompt)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseSEOResponse(resp)
+}
+
+func buildSEOPrompt(title, content string) string {
+	contentForPrompt := content
+	if len([]rune(content)) > 500 {
+		contentForPrompt = string([]rune(content)[:500]) + "..."
+	}
+
+	return fmt.Sprintf(`
 # Role
 你是一个专业的 SEO 优化专家，精通搜索引擎优化和内容营销。
 
 # Tasks
 1. 评估内容属性。当内容纯粹且明显属于【纯垃圾推广广告】（如：纯博彩引流、灰产拉群、纯 SEO 堆砌、无任何有效信息增量的商业硬广等）时，请**直接且仅**返回字符串 "AD"。
-   - **核心判定**：如果内容旨在“诱导点击/消费特定违规平台为唯一目的”，且无任何信息增量，判定为 "AD"；如果内容是“中立地报道行业动态（包括敏感行业平台等新闻）、技术解析或事件说明、正常的优质站点/平台推荐”，则**不属于**广告，应正常处理。
+   - **核心判定**：如果内容旨在"诱导点击/消费特定违规平台为唯一目的"，且无任何信息增量，判定为 "AD"；如果内容是"中立地报道行业动态（包括敏感行业平台等新闻）、技术解析或事件说明、正常的优质站点/平台推荐"，则**不属于**广告，应正常处理。
    - **存疑从宽**：若内容有实质信息，包含行业新闻、平台动态、技术原理分析、客观事件描述、正常的优质站点推荐等信息价值，即使提及敏感平台，**一律不按广告处理**，正常生成关键词和描述。
 2. 如果是正常技术、新闻或社区讨论内容，基于其生成有利于 SEO 的关键词和页面描述。
 
@@ -261,65 +344,16 @@ func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, e
 # Reminder
 - 如果判定为广告：仅返回 "AD"。
 - 如果判定为正常内容：只返回 JSON，不要有任何其他文字。
-`
-	// 截取内容，避免过长
-	contentForPrompt := content
-	if len([]rune(content)) > 500 {
-		contentForPrompt = string([]rune(content)[:500]) + "..."
-	}
+`, title, contentForPrompt)
+}
 
-	prompt := fmt.Sprintf(promptTemplate, title, contentForPrompt)
+func parseSEOResponse(responseContent string) (*SEOMetadata, error) {
+	responseContent = strings.TrimSpace(responseContent)
 
-	reqBody := ChatRequest{
-		Model: s.config.Model,
-		Messages: []ChatMessage{
-			{Role: "user", Content: prompt},
-		},
-	}
-
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request failed: %v", err)
-	}
-
-	apiURL := strings.TrimSuffix(s.config.BaseURL, "/") + "/chat/completions"
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("create request failed: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.config.Token)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		log.Printf("[LLM-SEO] API 请求失败: %v", err)
-		return nil, fmt.Errorf("api request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("[LLM-SEO] API 返回非 200 状态码: %s", resp.Status)
-		return nil, fmt.Errorf("api returned non-200 status: %s", resp.Status)
-	}
-
-	var chatResp ChatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
-		return nil, fmt.Errorf("decode response failed: %v", err)
-	}
-
-	if len(chatResp.Choices) == 0 {
-		return nil, fmt.Errorf("no choices in response")
-	}
-
-	responseContent := strings.TrimSpace(chatResp.Choices[0].Message.Content)
-
-	// 首先检查是否被判定为广告
 	if strings.ToUpper(responseContent) == "AD" {
 		return &SEOMetadata{Keywords: "AD"}, nil
 	}
 
-	// 尝试提取 JSON（有时候 LLM 会在 JSON 前后添加文字）
 	startIdx := strings.Index(responseContent, "{")
 	endIdx := strings.LastIndex(responseContent, "}")
 	if startIdx == -1 || endIdx == -1 || startIdx > endIdx {
@@ -336,6 +370,8 @@ func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, e
 
 	return &seoResult, nil
 }
+
+// ==================== GetEmbedding ====================
 
 // GetEmbedding 调用 Ollama 获取文本向量
 func (s *LLMService) GetEmbedding(text string) ([]float32, error) {
