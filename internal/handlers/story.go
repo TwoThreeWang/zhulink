@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"html"
 	"html/template"
 	"math"
 	"net/http"
@@ -526,7 +527,7 @@ func (h *StoryHandler) handleAdPostPunishment(postID uint) {
 	userNotification := models.Notification{
 		UserID: post.UserID,
 		Type:   models.NotificationTypeSystem,
-		Reason: "系统检测到您发布的帖子《" + post.Title + "》包含广告信息。根据社区规则，您的账号已被自动禁言 1 天。如有误判请联系管理员。",
+		Reason: "系统检测到您发布的帖子《" + html.EscapeString(post.Title) + "》包含广告信息。根据社区规则，您的账号已被自动禁言 1 天。如有误判请联系管理员。",
 	}
 	db.DB.Create(&userNotification)
 
@@ -537,7 +538,7 @@ func (h *StoryHandler) handleAdPostPunishment(postID uint) {
 		adminNotification := models.Notification{
 			UserID: admin.ID,
 			Type:   models.NotificationTypeSystem,
-			Reason: fmt.Sprintf("AI 自动拦截了一条来自用户 @%s 的广告贴《%s》，已自动执行禁言 1 天处理。", post.User.Username, post.Title),
+			Reason: fmt.Sprintf("AI 自动拦截了一条来自用户 @%s 的广告贴《%s》，已自动执行禁言 1 天处理。", post.User.Username, html.EscapeString(post.Title)),
 		}
 		db.DB.Create(&adminNotification)
 	}
@@ -849,7 +850,7 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 						ActorID: &user.ID,
 						Type:    models.NotificationTypeReplyComment,
 						Reason: fmt.Sprintf("在文章 <a href=\"/p/%s#comment-%d\" target=\"_blank\" class=\"text-moss font-medium hover:underline tracking-tight\">《%s》</a> 中回复了您的评论",
-							post.Pid, comment.ID, post.Title),
+							post.Pid, comment.ID, html.EscapeString(post.Title)),
 					}
 					db.DB.Create(&notification)
 
@@ -873,7 +874,7 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 					ActorID: &user.ID,
 					Type:    models.NotificationTypeCommentPost,
 					Reason: fmt.Sprintf("在您的文章 <a href=\"/p/%s#comment-%d\" target=\"_blank\" class=\"text-moss font-medium hover:underline tracking-tight\">《%s》</a> 中发布了新的评论",
-						post.Pid, comment.ID, post.Title),
+						post.Pid, comment.ID, html.EscapeString(post.Title)),
 				}
 				db.DB.Create(&notification)
 			}

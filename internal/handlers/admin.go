@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"html"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
@@ -131,7 +133,7 @@ func (h *AdminHandler) PunishUser(c *gin.Context) {
 
 		// 如果有原因,添加到通知中
 		if reason != "" {
-			notificationReason += " 原因: " + reason
+			notificationReason += " 原因: " + html.EscapeString(reason)
 		}
 
 		notification := models.Notification{
@@ -167,7 +169,7 @@ func (h *AdminHandler) AdminDeletePost(c *gin.Context) {
 	notification := models.Notification{
 		UserID: post.UserID,
 		Type:   models.NotificationTypeSystem,
-		Reason: "很抱歉，您的文章《" + post.Title + "》因违规已被管理员删除。如有疑问请联系管理。",
+		Reason: "很抱歉，您的文章《" + html.EscapeString(post.Title) + "》因违规已被管理员删除。如有疑问请联系管理。",
 	}
 	db.DB.Create(&notification)
 
@@ -236,10 +238,11 @@ func (h *AdminHandler) AdminDeleteComment(c *gin.Context) {
 	services.AddPointsAsync(comment.UserID, services.PointsCommentDeleted, "评论被管理员删除")
 
 	// 2. 发送系统通知给评论作者，附上原评论内容和文章链接
+	safeOriginal := strings.ReplaceAll(html.EscapeString(originalContent), "\n", "<br>")
 	notification := models.Notification{
 		UserID: comment.UserID,
 		Type:   models.NotificationTypeSystem,
-		Reason: "很抱歉，您的评论因违规已被管理员删除。如有疑问请联系管理。<br><br>原评论内容：<br>" + originalContent + "<br><br>文章链接：<a href='" + postLink + "#comment-" + strconv.FormatUint(uint64(comment.ID), 10) + "'>" + postLink + "</a>",
+		Reason: "很抱歉，您的评论因违规已被管理员删除。如有疑问请联系管理。<br><br>原评论内容：<br>" + safeOriginal + "<br><br>文章链接：<a href='" + postLink + "#comment-" + strconv.FormatUint(uint64(comment.ID), 10) + "'>" + postLink + "</a>",
 	}
 	db.DB.Create(&notification)
 

@@ -32,7 +32,7 @@ type ChatMessage struct {
 }
 
 type ChatRequest struct {
-	Model    string        `json:"model"`
+	Model    string        `json:"model,omitempty"`
 	Messages []ChatMessage `json:"messages"`
 }
 
@@ -165,6 +165,9 @@ func (s *LLMService) GenerateSummary(title, content string) (string, error) {
 	if gatewayURL == "" || gatewayToken == "" {
 		return s.GenerateSummaryLegacy(title, content)
 	}
+	if gatewayModel == "" {
+		gatewayModel = s.config.Model
+	}
 
 	prompt := buildSummaryPrompt(title, content)
 	resp, err := s.callLLM(gatewayURL, gatewayModel, gatewayToken, prompt)
@@ -279,6 +282,9 @@ func (s *LLMService) GenerateSEOMetadata(title, content string) (*SEOMetadata, e
 
 	if gatewayURL == "" || gatewayToken == "" {
 		return s.GenerateSEOMetadataLegacy(title, content)
+	}
+	if gatewayModel == "" {
+		gatewayModel = s.config.Model
 	}
 
 	prompt := buildSEOPrompt(title, content)

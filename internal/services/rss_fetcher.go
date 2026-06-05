@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -64,8 +65,8 @@ func NewRSSFetcher() *RSSFetcher {
 
 // 全局单例
 var (
-	rssFetcher  *RSSFetcher
-	rssOnce     sync.Once
+	rssFetcher *RSSFetcher
+	rssOnce    sync.Once
 )
 
 // GetRSSFetcher 获取 RSS 抓取服务单例
@@ -355,19 +356,25 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 
 // StartScheduledFetch 启动定时拉取任务
 // 每 30 分钟自动拉取所有订阅源的新文章
-func (f *RSSFetcher) StartScheduledFetch() {
-	ticker := time.NewTicker(30 * time.Minute)
+func (f *RSSFetcher) StartScheduledFetch(ctx context.Context) {
 	go func() {
 		// 启动时立即执行一次
 		log.Println("开始首次 RSS 订阅源拉取...")
 		f.RefreshAllFeeds()
 		log.Println("首次 RSS 订阅源拉取完成")
 
-		// 然后按定时器执行
-		for range ticker.C {
-			log.Println("开始定时 RSS 订阅源拉取...")
-			f.RefreshAllFeeds()
-			log.Println("定时 RSS 订阅源拉取完成")
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("RSS 定时拉取任务已停止")
+				return
+			case <-ticker.C:
+				log.Println("开始定时 RSS 订阅源拉取...")
+				f.RefreshAllFeeds()
+				log.Println("定时 RSS 订阅源拉取完成")
+			}
 		}
 	}()
 }
@@ -409,7 +416,7 @@ func (f *RSSFetcher) CleanupOldItems() error {
 
 // StartScheduledCleanup 启动定时清除任务
 // 每天凌晨 2 点清除超过 30 天的文章
-func (f *RSSFetcher) StartScheduledCleanup() {
+func (f *RSSFetcher) StartScheduledCleanup(ctx context.Context) {
 	go func() {
 		for {
 			// 计算到下一个凌晨 2 点的时间
@@ -421,7 +428,19 @@ func (f *RSSFetcher) StartScheduledCleanup() {
 			duration := next.Sub(now)
 
 			log.Printf("下次 RSS 文章清除将在 %s 后执行 (预计时间: %s)", duration, next.Format("2006-01-02 15:04:05"))
-			time.Sleep(duration)
+			timer := time.NewTimer(duration)
+			select {
+			case <-ctx.Done():
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				log.Println("RSS 清理任务已停止")
+				return
+			case <-timer.C:
+			}
 
 			log.Println("开始清除过期 RSS 文章...")
 			if err := f.CleanupOldItems(); err != nil {

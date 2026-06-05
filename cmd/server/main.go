@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"log"
@@ -25,9 +27,13 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 func main() {
+	mainCtx, stopMain := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopMain()
+
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, finding env vars from system")
@@ -47,16 +53,16 @@ func main() {
 	handlers.InitGoogleOAuth()
 
 	// 初始化异步排名服务
-	services.GetRankingService()
+	rankingSvc := services.GetRankingService()
 
 	// 启动 RSS 定时任务
 	rssFetcher := services.GetRSSFetcher()
-	rssFetcher.StartScheduledFetch()   // 每 30 分钟拉取新文章
-	rssFetcher.StartScheduledCleanup() // 每天凌晨 2 点清除过期文章
+	rssFetcher.StartScheduledFetch(mainCtx)   // 每 30 分钟拉取新文章
+	rssFetcher.StartScheduledCleanup(mainCtx) // 每天凌晨 2 点清除过期文章
 	log.Println("RSS 定时任务已启动: 拉取间隔 30 分钟, 保留最近 30 天文章")
 
 	// 启动文章分数定时更新任务
-	services.GetRankingService().StartScheduledScoreUpdate() // 每天凌晨 3 点更新
+	rankingSvc.StartScheduledScoreUpdate(mainCtx) // 每天凌晨 3 点更新
 	log.Println("文章分数定时任务已启动: 每天凌晨 3 点更新")
 
 	// Initialize Gin
@@ -65,7 +71,15 @@ func main() {
 	// Setup Sessions
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
-		secret = "secret_key_change_me"
+		if gin.Mode() == gin.ReleaseMode {
+			log.Fatal("SESSION_SECRET must be set in production")
+		}
+		var secretBytes [32]byte
+		if _, err := rand.Read(secretBytes[:]); err != nil {
+			log.Fatalf("generate development session secret failed: %v", err)
+		}
+		secret = base64.StdEncoding.EncodeToString(secretBytes[:])
+		log.Println("SESSION_SECRET not set; using ephemeral development secret")
 	}
 	store := cookie.NewStore([]byte(secret))
 
@@ -119,11 +133,12 @@ func main() {
 		}
 	}()
 
-	// 实现平滑停机
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	// 等待终止信号（由 mainCtx 监听）
+	<-mainCtx.Done()
 	log.Println("Shutting down server...")
+
+	// 停止后台 worker
+	rankingSvc.Shutdown()
 
 	// 给予 5 秒的缓冲时间来处理现有请求
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -228,6 +243,12 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 		},
 		"safeHTML": func(s string) template.HTML {
 			return template.HTML(s)
+		},
+		"safeNotificationHTML": func(s string) template.HTML {
+			p := bluemonday.StrictPolicy()
+			p.AllowElements("br")
+			p.AllowAttrs("href", "target", "class").OnElements("a")
+			return template.HTML(p.Sanitize(s))
 		},
 		"stripHTML": func(s string) string {
 			var result []rune

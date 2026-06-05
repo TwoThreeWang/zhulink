@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ type RankingService struct {
 	queue   chan uint // 待更新的帖子 ID 队列
 	pending map[uint]bool
 	mu      sync.Mutex
+	done    chan struct{}
 }
 
 var (
@@ -27,9 +29,10 @@ func GetRankingService() *RankingService {
 		rankingService = &RankingService{
 			queue:   make(chan uint, 1000), // 缓冲队列，防止阻塞
 			pending: make(map[uint]bool),
+			done:    make(chan struct{}),
 		}
 		// 启动后台 worker
-		go rankingService.worker()
+		go rankingService.worker(rankingService.done)
 	})
 	return rankingService
 }
@@ -60,7 +63,7 @@ func (s *RankingService) ScheduleUpdate(postID uint) {
 }
 
 // worker 后台处理队列中的更新请求
-func (s *RankingService) worker() {
+func (s *RankingService) worker(done chan struct{}) {
 	// 批量处理：收集一批请求后统一处理
 	batch := make([]uint, 0, 50)
 	ticker := time.NewTicker(500 * time.Millisecond) // 每 500ms 处理一批
@@ -68,6 +71,28 @@ func (s *RankingService) worker() {
 
 	for {
 		select {
+		case <-done:
+			// Flush final batch
+			if len(batch) > 0 {
+				s.processBatch(batch)
+			}
+			// Drain remaining in queue
+			for {
+				select {
+				case postID := <-s.queue:
+					batch = append(batch, postID)
+					if len(batch) >= 50 {
+						s.processBatch(batch)
+						batch = batch[:0]
+					}
+				default:
+					if len(batch) > 0 {
+						s.processBatch(batch)
+					}
+					log.Println("排名 worker 已成功刷新缓冲并停止")
+					return
+				}
+			}
 		case postID := <-s.queue:
 			batch = append(batch, postID)
 			// 如果达到批量大小，立即处理
@@ -140,13 +165,23 @@ func (s *RankingService) updatePostScore(postID uint) {
 	}
 }
 
+// Shutdown 停止 RankingService 的后台 worker
+func (s *RankingService) Shutdown() {
+	select {
+	case <-s.done:
+		return
+	default:
+		close(s.done)
+	}
+}
+
 // UpdatePostScoreSync 同步更新帖子 Score（用于需要立即生效的场景）
 func UpdatePostScoreSync(postID uint) {
 	GetRankingService().updatePostScore(postID)
 }
 
 // StartScheduledScoreUpdate 启动定时分数更新任务（每小时执行一次）
-func (s *RankingService) StartScheduledScoreUpdate() {
+func (s *RankingService) StartScheduledScoreUpdate(ctx context.Context) {
 	go func() {
 		// 启动时先执行一次
 		log.Println("启动时执行首次文章分数更新...")
@@ -156,11 +191,16 @@ func (s *RankingService) StartScheduledScoreUpdate() {
 		// 每小时执行一次
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
-
-		for range ticker.C {
-			log.Println("开始定时更新文章分数...")
-			s.updateHotPosts()
-			log.Println("定时更新文章分数完成")
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("定时分数更新任务已停止")
+				return
+			case <-ticker.C:
+				log.Println("开始定时更新文章分数...")
+				s.updateHotPosts()
+				log.Println("定时更新文章分数完成")
+			}
 		}
 	}()
 }

@@ -44,7 +44,7 @@
                                 {{ else }}
                                 <span class="text-red-500 font-bold">系统</span>
                                 {{ end }}
-                                <span class="text-stone-600 mx-1">{{ .Reason | safeHTML }}</span>
+                                <span class="text-stone-600 mx-1">{{ .Reason | safeNotificationHTML }}</span>
                             </div>
 
                             <div class="mt-2 text-xs text-stone-300 flex items-center gap-2">

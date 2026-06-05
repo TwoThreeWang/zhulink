@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"strconv"
 	"zhulink/internal/db"
@@ -360,13 +361,15 @@ func (h *VoteHandler) Report(c *gin.Context) {
 		}
 
 		// 为每个管理员创建通知
+		safeContentDesc := html.EscapeString(contentDesc)
+		safeReason := html.EscapeString(reason)
 		for _, admin := range admins {
 			notification := models.Notification{
 				UserID:  admin.ID,
 				ActorID: &currentUser.ID,
 				Type:    models.NotificationTypeReport,
 				Reason: fmt.Sprintf("举报了<a href=\"%s\" target=\"_blank\" class=\"text-moss font-medium hover:underline tracking-tight\">%s</a>,原因: %s",
-					contentLink, contentDesc, reason),
+					contentLink, safeContentDesc, safeReason),
 			}
 			db.DB.Create(&notification)
 		}
