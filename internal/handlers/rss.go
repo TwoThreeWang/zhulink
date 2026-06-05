@@ -88,7 +88,7 @@ func (h *RSSHandler) GetFeeds(c *gin.Context) {
 		Order("created_at DESC").
 		Find(&subscriptions)
 
-	// 批量查询每个订阅源的未读数（避免 N+1）
+	// 计算每个订阅源的未读数（水位线 + 例外集）
 	type FeedWithCount struct {
 		Subscription models.UserSubscription
 		UnreadCount  int
@@ -96,69 +96,34 @@ func (h *RSSHandler) GetFeeds(c *gin.Context) {
 	var feedsWithCount []FeedWithCount
 
 	if len(subscriptions) > 0 {
-		// 收集所有 feed_id 和对应的锚点
-		feedIDs := make([]uint, len(subscriptions))
-		anchorMap := make(map[uint]*time.Time)
-		for i, sub := range subscriptions {
-			feedIDs[i] = sub.FeedID
-			anchorMap[sub.FeedID] = sub.LastReadAnchor
-		}
-
-		// 批量查询：每个 feed_id 的总文章数
-		type CountResult struct {
-			FeedID uint
-			Count  int64
-		}
-		var totalCounts []CountResult
-		db.DB.Model(&models.FeedItem{}).
-			Select("feed_id, COUNT(*) as count").
-			Where("feed_id IN ?", feedIDs).
-			Group("feed_id").
-			Scan(&totalCounts)
-
-		totalMap := make(map[uint]int64)
-		for _, r := range totalCounts {
-			totalMap[r.FeedID] = r.Count
-		}
-
-		// 批量查询：有锚点的 feed_id，锚点之后的文章数
-		// 按锚点分组不现实（每个 feed 锚点不同），但可以一次查出所有有锚点的 feed 的已读数
-		readMap := make(map[uint]int64)
-		var feedsWithAnchor []uint
-		var anchorTimes []time.Time
 		for _, sub := range subscriptions {
-			if sub.LastReadAnchor != nil {
-				feedsWithAnchor = append(feedsWithAnchor, sub.FeedID)
-				anchorTimes = append(anchorTimes, *sub.LastReadAnchor)
-			}
-		}
+			var unread int64
 
-		if len(feedsWithAnchor) > 0 {
-			// 对有锚点的订阅，逐个构建条件（锚点各不相同，无法单一 WHERE）
-			// 使用 UNION 或 CASE 太复杂，这里用一次带 CASE WHEN 的查询
-			// 退而求其次：用单个 SQL + subquery
-			// 实际上对于少量订阅（通常 <50），这里用批量更优
-			for _, sub := range subscriptions {
+			if sub.LastReadAnchor == nil && len(sub.ReadExceptions) == 0 {
+				// 从未读过：全部都是未读
+				db.DB.Model(&models.FeedItem{}).
+					Where("feed_id = ?", sub.FeedID).
+					Count(&unread)
+			} else if sub.LastReadAnchor != nil && len(sub.ReadExceptions) == 0 {
+				// 有水位线、无例外集：水位线之上全部未读
+				db.DB.Model(&models.FeedItem{}).
+					Where("feed_id = ? AND published_at > ?", sub.FeedID, *sub.LastReadAnchor).
+					Count(&unread)
+			} else {
+				// 有水位线 + 例外集：水位线之上且不在例外集中
+				query := db.DB.Model(&models.FeedItem{}).Where("feed_id = ?", sub.FeedID)
 				if sub.LastReadAnchor != nil {
-					var count int64
-					db.DB.Model(&models.FeedItem{}).
-						Where("feed_id = ? AND published_at > ?", sub.FeedID, *sub.LastReadAnchor).
-						Count(&count)
-					readMap[sub.FeedID] = count
+					query = query.Where("published_at > ?", *sub.LastReadAnchor)
 				}
+				if len(sub.ReadExceptions) > 0 {
+					query = query.Where("id NOT IN ?", sub.ReadExceptions)
+				}
+				query.Count(&unread)
 			}
-		}
 
-		for _, sub := range subscriptions {
-			unread := int(totalMap[sub.FeedID])
-			if sub.LastReadAnchor != nil {
-				if afterCount, ok := readMap[sub.FeedID]; ok {
-					unread = int(afterCount)
-				}
-			}
 			feedsWithCount = append(feedsWithCount, FeedWithCount{
 				Subscription: sub,
-				UnreadCount:  unread,
+				UnreadCount:  int(unread),
 			})
 		}
 	}
@@ -196,112 +161,156 @@ func (h *RSSHandler) GetItems(c *gin.Context) {
 
 	// 过滤参数：默认不显示全部（即仅显示未读）
 	showAll := c.Query("show_all") == "true"
-
-	// 追加加载参数
 	isAppend := c.Query("append") == "true"
-
 	pageSize := 30
 
 	// 获取用户订阅信息
 	var subscription models.UserSubscription
 	if err := db.DB.Preload("Feed").
-		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
+		Where("user_id = ? AND feed_id = ?", user.ID, uint(feedID)).
 		First(&subscription).Error; err != nil {
 		c.String(http.StatusNotFound, "未找到订阅")
 		return
 	}
 
-	// 如果是追加加载，先更新 last_read_anchor 为上一页最后一篇的时间
-	// 这样下面的查询就能基于最新的锚点
-	if isAppend {
-		lastItemIDStr := c.Query("last_item_id")
-		if lastItemID, err := strconv.Atoi(lastItemIDStr); err == nil && lastItemID > 0 {
-			// 通过 item_id 查询文章的发布时间
-			var lastItem models.FeedItem
-			if err := db.DB.Select("published_at").First(&lastItem, lastItemID).Error; err == nil {
-				// 截断到秒级，避免微秒导致的比较问题
-				publishedAt := lastItem.PublishedAt.Truncate(time.Second)
-				db.DB.Model(&models.UserSubscription{}).
-					Where("user_id = ? AND feed_id = ?", user.ID, feedID).
-					Where("last_read_anchor IS NULL OR last_read_anchor < ?", publishedAt).
-					Update("last_read_anchor", publishedAt)
-				// 更新本地变量
-				subscription.LastReadAnchor = &publishedAt
-			}
+	// 分页游标：使用 published_at
+	var lastPublishedAt *time.Time
+	if lastPublishedAtStr := c.Query("last_published_at"); lastPublishedAtStr != "" {
+		if t, err := time.Parse(time.RFC3339, lastPublishedAtStr); err == nil {
+			lastPublishedAt = &t
 		}
 	}
 
-	// 构建查询基础
-	query := db.DB.Model(&models.FeedItem{}).Where("feed_id = ?", feedID)
+	// 核心逻辑：如果加载下一页，将当前页（也就是游标之前的文章）标记为已读
+	if isAppend && lastPublishedAt != nil {
+		// 1. 获取当前页（即游标之前）的一页文章 ID
+		var currentPageItemIDs []uint
+		db.DB.Model(&models.FeedItem{}).
+			Where("feed_id = ? AND published_at >= ?", uint(feedID), *lastPublishedAt).
+			Pluck("id", &currentPageItemIDs)
 
-	// 分页逻辑：
-	// 1. 首次加载 (isAppend=false):
-	//    - 显示未读模式：从 last_read_anchor 之后开始
-	//    - 显示全部模式：从最旧的开始
-	// 2. 追加加载 (isAppend=true):
-	//    - 总是从 last_read_anchor 之后开始（已在上面更新为上一页最后一篇的时间）
-	if subscription.LastReadAnchor != nil {
-		if !showAll && !isAppend {
-			// 首次加载，仅看未读：过滤已读文章
-			query = query.Where("published_at > ?", *subscription.LastReadAnchor)
-		} else if isAppend {
-			// 追加加载（显示全部或仅看未读）：使用锚点分页
-			query = query.Where("published_at > ?", *subscription.LastReadAnchor)
+		if len(currentPageItemIDs) > 0 {
+			// 2. 加入例外集
+			subscription.AddReadExceptions(currentPageItemIDs...)
+			// 3. 压缩并存盘
+			compressExceptions(&subscription)
+			db.DB.Save(&subscription)
 		}
 	}
 
-	// 获取文章列表，按时间正序排列（旧的在上面，符合阅读流）
-	// 多查询1条用于判断是否还有更多
+	// 构建查询
+	query := db.DB.Model(&models.FeedItem{}).Where("feed_id = ?", uint(feedID))
+
+	// 分页与模式过滤
+	if !showAll {
+		// 仅看未读：水位线之上 且 不在例外集
+		if subscription.LastReadAnchor != nil {
+			query = query.Where("published_at > ?", *subscription.LastReadAnchor)
+		}
+		if len(subscription.ReadExceptions) > 0 {
+			query = query.Where("id NOT IN ?", subscription.ReadExceptions)
+		}
+	}
+
+	// 游标过滤（最新在上 DESC，翻页是往老的方向走）
+	if lastPublishedAt != nil {
+		query = query.Where("published_at < ?", *lastPublishedAt)
+	}
+
+	// 排序与加载
 	var items []models.FeedItem
-	query.Order("published_at ASC").
+	query.Order("published_at DESC").
 		Limit(pageSize + 1).
 		Find(&items)
 
-	// 判断是否还有更多
 	hasMore := len(items) > pageSize
 	if hasMore {
 		items = items[:pageSize]
 	}
 
-	// 标记已读状态
+	// 包装已读状态
 	type ItemWithReadStatus struct {
 		Item   models.FeedItem
 		IsRead bool
 	}
 	var itemsWithStatus []ItemWithReadStatus
-
 	for _, item := range items {
-		isRead := false
-		if subscription.LastReadAnchor != nil {
-			isRead = !item.PublishedAt.After(*subscription.LastReadAnchor)
-		}
 		itemsWithStatus = append(itemsWithStatus, ItemWithReadStatus{
 			Item:   item,
-			IsRead: isRead,
+			IsRead: subscription.IsItemRead(item.ID, item.PublishedAt),
 		})
 	}
 
-	// 获取当前页最后一篇的 ID，作为下一页的游标
-	var lastItemID uint
+	// 获取下一页游标
+	var nextPublishedAt string
 	if len(items) > 0 {
-		lastItemID = items[len(items)-1].ID
+		nextPublishedAt = items[len(items)-1].PublishedAt.Format(time.RFC3339)
 	}
 
-	// 根据是否追加加载选择模板
 	templateName := "rss/item_list.html"
 	if isAppend {
 		templateName = "rss/item_list_items.html"
 	}
 
 	c.HTML(http.StatusOK, templateName, gin.H{
-		"Items":        itemsWithStatus,
-		"Subscription": subscription,
-		"FeedTitle":    subscription.GetDisplayTitle(),
-		"Category":     c.Query("category"),
-		"HasMore":      hasMore,
-		"LastItemID":   lastItemID,
-		"ShowAll":      showAll,
+		"Items":           itemsWithStatus,
+		"Subscription":    subscription,
+		"FeedTitle":       subscription.GetDisplayTitle(),
+		"Category":        c.Query("category"),
+		"HasMore":         hasMore,
+		"LastPublishedAt": nextPublishedAt,
+		"ShowAll":         showAll,
 	})
+}
+
+// 辅助函数：压缩已读例外集并推进水位线
+func compressExceptions(sub *models.UserSubscription) {
+	if len(sub.ReadExceptions) == 0 {
+		return
+	}
+
+	// 1. 查询水位线之后的所有文章，按时间正序排列
+	var items []models.FeedItem
+	query := db.DB.Model(&models.FeedItem{}).Where("feed_id = ?", sub.FeedID)
+	if sub.LastReadAnchor != nil {
+		query = query.Where("published_at > ?", *sub.LastReadAnchor)
+	}
+	query.Order("published_at ASC").Find(&items)
+
+	if len(items) == 0 {
+		return
+	}
+
+	// 2. 建立索引加速查找
+	exceptionMap := make(map[uint]bool)
+	for _, id := range sub.ReadExceptions {
+		exceptionMap[id] = true
+	}
+
+	// 3. 扫描连续已读区域
+	newAnchor := sub.LastReadAnchor
+	moved := false
+
+	for _, item := range items {
+		if exceptionMap[item.ID] {
+			t := item.PublishedAt
+			newAnchor = &t
+			delete(exceptionMap, item.ID)
+			moved = true
+		} else {
+			// 遇到第一篇未读，停止推进
+			break
+		}
+	}
+
+	if moved {
+		sub.LastReadAnchor = newAnchor
+		// 更新剩余例外集
+		sub.ReadExceptions = make([]uint, 0, len(exceptionMap))
+		for id := range exceptionMap {
+			sub.ReadExceptions = append(sub.ReadExceptions, id)
+		}
+	}
 }
 
 // ReadItem HTMX 接口，读取文章内容
@@ -326,30 +335,25 @@ func (h *RSSHandler) ReadItem(c *gin.Context) {
 		crawler := services.GetCrawlerService()
 		content, err := crawler.FetchArticleContent(item.Link)
 		if err == nil && content != "" {
-			// 回填到数据库
 			item.Content = content
 			db.DB.Model(&item).Update("content", content)
 		} else {
-			// 抓取失败，使用 Description 作为内容
 			item.Content = item.Description
 		}
 	}
 
-	// 更新已读锚点 (同步执行，确保稳定)
+	// 点击单篇文章记录已读例外并压缩
 	var subscription models.UserSubscription
 	err = db.DB.Where("user_id = ? AND feed_id = ?", user.ID, item.FeedID).First(&subscription).Error
 	if err == nil {
-		// 截断到秒级，避免微秒导致的比较问题
-		publishedAt := item.PublishedAt.Truncate(time.Second)
-		// 仅当文章发布时间晚于当前已读锚点，或者还从未读过时才更新
-		if subscription.LastReadAnchor == nil || publishedAt.After(*subscription.LastReadAnchor) {
-			db.DB.Model(&subscription).Update("last_read_anchor", publishedAt)
-		}
+		subscription.AddReadExceptions(uint(itemID))
+		compressExceptions(&subscription)
+		db.DB.Save(&subscription)
 	}
 
 	c.HTML(http.StatusOK, "rss/reader_content.html", gin.H{
 		"Item":        item,
-		"ContentHTML": utils.EnhanceHTMLContent(item.Content),
+		"ContentHTML": utils.EnhanceHTMLContent(utils.SanitizeHTML(item.Content)),
 	})
 }
 
@@ -526,7 +530,7 @@ func (h *RSSHandler) ShowAddModal(c *gin.Context) {
 	})
 }
 
-// UpdateAnchor 更新已读锚点（单独的 API，用于标记全部已读等场景）
+// UpdateAnchor 标记全部已读：将水位线推到最新文章，清空例外集
 func (h *RSSHandler) UpdateAnchor(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
 	feedIDStr := c.Param("id")
@@ -545,18 +549,21 @@ func (h *RSSHandler) UpdateAnchor(c *gin.Context) {
 		return
 	}
 
-	// 截断到秒级，避免微秒导致的比较问题
 	publishedAt := latestItem.PublishedAt.Truncate(time.Second)
-	// 更新锚点为最新文章时间
+
+	// 更新水位线 + 清空例外集
 	db.DB.Model(&models.UserSubscription{}).
 		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
-		Update("last_read_anchor", publishedAt)
+		Updates(map[string]interface{}{
+			"last_read_anchor": publishedAt,
+			"read_exceptions":  "[]",
+		})
 
 	c.Header("HX-Trigger", "anchor-updated")
 	c.String(http.StatusOK, "已标记全部已读")
 }
 
-// UpdateReadAnchorBatch 批量更新已读锚点（用于hover标记已读）
+// UpdateReadAnchorBatch 前端异步批量同步已读状态
 func (h *RSSHandler) UpdateReadAnchorBatch(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
 	feedIDStr := c.Param("id")
@@ -567,31 +574,23 @@ func (h *RSSHandler) UpdateReadAnchorBatch(c *gin.Context) {
 	}
 
 	var req struct {
-		ItemID uint `json:"item_id"`
+		ItemIDs []uint `json:"item_ids"`
 	}
-	if err := c.BindJSON(&req); err != nil || req.ItemID == 0 {
+	if err := c.BindJSON(&req); err != nil || len(req.ItemIDs) == 0 {
 		c.String(http.StatusBadRequest, "无效的请求")
 		return
 	}
 
-	// 通过 item_id 查询文章的发布时间
-	var item models.FeedItem
-	if err := db.DB.Select("published_at").First(&item, req.ItemID).Error; err != nil {
-		c.String(http.StatusNotFound, "文章不存在")
+	var subscription models.UserSubscription
+	if err := db.DB.Where("user_id = ? AND feed_id = ?", user.ID, feedID).First(&subscription).Error; err != nil {
+		c.String(http.StatusNotFound, "订阅不存在")
 		return
 	}
 
-	// 截断到秒级，避免微秒导致的比较问题
-	publishedAt := item.PublishedAt.Truncate(time.Second)
-
-	// 仅当新时间更晚时才更新
-	result := db.DB.Model(&models.UserSubscription{}).
-		Where("user_id = ? AND feed_id = ?", user.ID, feedID).
-		Where("last_read_anchor IS NULL OR last_read_anchor < ?", publishedAt).
-		Update("last_read_anchor", publishedAt)
-
-	if result.Error != nil {
-		c.String(http.StatusInternalServerError, "更新失败: "+result.Error.Error())
+	subscription.AddReadExceptions(req.ItemIDs...)
+	compressExceptions(&subscription)
+	if err := db.DB.Save(&subscription).Error; err != nil {
+		c.String(http.StatusInternalServerError, "更新失败")
 		return
 	}
 

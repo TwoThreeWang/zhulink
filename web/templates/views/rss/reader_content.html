@@ -31,8 +31,12 @@
         </div>
 
         <!-- 正文 -->
-        <div class="article-content max-w-none text-lg leading-relaxed text-ink space-y-4">
+        <div class="article-content max-w-none text-lg leading-relaxed text-ink space-y-4 overflow-hidden">
             <style>
+                .article-content {
+                    overflow-wrap: break-word;
+                    word-break: break-all;
+                }
                 .article-content img {
                     max-width: 100%;
                     height: auto;
@@ -95,6 +99,14 @@
                     font-family: monospace;
                     font-size: 0.9em;
                     margin: 1.5em 0;
+                    word-break: normal;
+                    white-space: pre;
+                }
+                .article-content table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    overflow-x: auto;
+                    display: block;
                 }
 
                 .article-content code {
@@ -103,6 +115,7 @@
                     border-radius: 0.25rem;
                     font-family: monospace;
                     font-size: 0.9em;
+                    word-break: normal;
                 }
 
                 .article-content iframe {

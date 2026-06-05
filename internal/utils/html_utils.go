@@ -7,6 +7,14 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// SanitizeHTML 使用 bluemonday 消毒 HTML，移除 script/style 等危险标签
+func SanitizeHTML(htmlStr string) string {
+	if htmlStr == "" {
+		return ""
+	}
+	return policy.Sanitize(htmlStr)
+}
+
 // EnhanceHTMLContent 为 HTML 中的图片增加安全和优化属性,并转换视频链接为嵌入式播放器
 func EnhanceHTMLContent(htmlStr string) template.HTML {
 	if htmlStr == "" {

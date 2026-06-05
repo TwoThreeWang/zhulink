@@ -120,7 +120,7 @@
     {{ if .HasMore }}
     <div id="load-more-container" class="mt-6 text-center">
         <button
-            hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ .ShowAll }}&append=true&last_item_id={{ .LastItemID }}"
+            hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ .ShowAll }}&append=true&last_published_at={{ .LastPublishedAt }}"
             hx-target="#load-more-container" hx-swap="outerHTML"
             class="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer text-sm text-ink">
             加载更多
@@ -189,13 +189,11 @@
     // 初始化已读追踪器(防抖批量更新版)
     if (!window.readTracker) {
         window.readTracker = {
-            latestItemId: null,
-            latestPublishedAt: null,
+            pendingIds: new Set(),
             debounceTimer: null,
 
             markAsRead(el) {
                 const itemId = parseInt(el.dataset.itemId);
-                const publishedAt = new Date(el.dataset.publishedAt);
 
                 // 前端立即变灰
                 el.classList.add('is-read');
@@ -225,13 +223,10 @@
                     check.classList.remove('hidden');
                 }
 
-                // 更新最新已读的 item（按发布时间比较）
-                if (!this.latestPublishedAt || publishedAt > this.latestPublishedAt) {
-                    this.latestItemId = itemId;
-                    this.latestPublishedAt = publishedAt;
-                }
+                // 收集待同步 ID
+                this.pendingIds.add(itemId);
 
-                // 防抖: 停止hover 1秒后发送
+                // 防抖: 停止hover 1秒后批量发送
                 clearTimeout(this.debounceTimer);
                 this.debounceTimer = setTimeout(() => {
                     this.syncNow();
@@ -239,22 +234,21 @@
             },
 
             syncNow() {
-                if (!this.latestItemId) return;
+                if (this.pendingIds.size === 0) return;
 
                 const feedId = getCurrentFeedId();
                 if (!feedId) return;
 
-                const itemIdToSync = this.latestItemId;  // 保存到局部变量，避免异步回调时值已被重置
-                this.latestItemId = null;
-                this.latestPublishedAt = null;
+                const idsToSync = Array.from(this.pendingIds);
+                this.pendingIds.clear();
 
                 fetch(`/rss/update-read-anchor/${feedId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ item_id: itemIdToSync })
+                    body: JSON.stringify({ item_ids: idsToSync })
                 }).then(response => {
                     if (response.ok) {
-                        console.log('已读状态已同步, item_id:', itemIdToSync, 'feedId:', feedId);
+                        console.log('已读状态已同步, item_ids:', idsToSync, 'feedId:', feedId);
                     }
                 }).catch(err => {
                     console.error('同步失败:', err);
@@ -263,11 +257,11 @@
         };
 
         window.addEventListener('beforeunload', () => {
-            if (window.readTracker.latestItemId) {
+            if (window.readTracker.pendingIds.size > 0) {
                 const feedId = getCurrentFeedId();
                 if (feedId) {
                     const blob = new Blob(
-                        [JSON.stringify({ item_id: window.readTracker.latestItemId })],
+                        [JSON.stringify({ item_ids: Array.from(window.readTracker.pendingIds) })],
                         { type: 'application/json' }
                     );
                     navigator.sendBeacon(
@@ -280,7 +274,7 @@
 
         // 页面隐藏时也同步(切换标签页)
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden && window.readTracker.latestItemId) {
+            if (document.hidden && window.readTracker.pendingIds.size > 0) {
                 window.readTracker.syncNow();
             }
         });

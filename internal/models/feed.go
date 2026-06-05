@@ -24,7 +24,8 @@ type UserSubscription struct {
 	Feed           Feed       `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"feed"`
 	Title          string     `json:"title"`                          // 用户自定义标题（可覆盖 Feed.Title）
 	Category       string     `gorm:"default:'先放这儿'" json:"category"` // 分类标签
-	LastReadAnchor *time.Time `json:"last_read_anchor"`               // 已读锚点时间戳
+	LastReadAnchor *time.Time `json:"last_read_anchor"`               // 已读水位线时间戳
+	ReadExceptions []uint     `gorm:"serializer:json" json:"read_exceptions"`
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
@@ -34,6 +35,45 @@ func (s *UserSubscription) GetDisplayTitle() string {
 		return s.Title
 	}
 	return s.Feed.Title
+}
+
+func (s *UserSubscription) IsItemRead(itemID uint, publishedAt time.Time) bool {
+	if s.LastReadAnchor != nil && !publishedAt.After(*s.LastReadAnchor) {
+		return true
+	}
+	for _, id := range s.ReadExceptions {
+		if id == itemID {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *UserSubscription) AddReadExceptions(ids ...uint) {
+	if len(ids) == 0 {
+		return
+	}
+	seen := make(map[uint]bool, len(s.ReadExceptions)+len(ids))
+	for _, id := range s.ReadExceptions {
+		seen[id] = true
+	}
+	for _, id := range ids {
+		if id != 0 && !seen[id] {
+			s.ReadExceptions = append(s.ReadExceptions, id)
+			seen[id] = true
+		}
+	}
+}
+
+func (s *UserSubscription) SetReadExceptions(ids []uint) {
+	seen := make(map[uint]bool, len(ids))
+	s.ReadExceptions = s.ReadExceptions[:0]
+	for _, id := range ids {
+		if id != 0 && !seen[id] {
+			s.ReadExceptions = append(s.ReadExceptions, id)
+			seen[id] = true
+		}
+	}
 }
 
 // FeedItem RSS 文章条目

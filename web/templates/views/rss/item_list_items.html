@@ -45,7 +45,7 @@
 {{ if .HasMore }}
 <div id="load-more-container" class="mt-6 text-center">
     <button
-        hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ .ShowAll }}&append=true&last_item_id={{ .LastItemID }}"
+        hx-get="/rss/items?feed_id={{ .Subscription.FeedID }}&category={{ .Category }}&show_all={{ .ShowAll }}&append=true&last_published_at={{ .LastPublishedAt }}"
         hx-target="#load-more-container" hx-swap="outerHTML"
         class="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer text-sm text-ink">
         加载更多

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>响应式 RSS 阅读器 - 双端自适应</title>
+    <style>
+        /* 基础重置 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f5f7;
+            color: #1d1d1f;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent; /* 清除移动端点击高亮 */
+        }
+
+        /* 布局容器 */
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ==================== 左栏：多级动态导航区 ==================== */
+        .left-column {
+            width: 35%;
+            min-width: 340px;
+            max-width: 420px;
+            background-color: #ffffff;
+            border-right: 1px solid #e5e5e7;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .slider-wrapper {
+            display: flex;
+            width: 200%;
+            height: 100%;
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .panel {
+            width: 50%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: #ffffff;
+        }
+
+        .panel-header {
+            height: 60px;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #e5e5e7;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: #0066cc;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-right: 12px;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch; /* 优化移动端滚动 */
+        }
+
+        /* 一级：分类 */
+        .category-group { border-bottom: 1px solid #f5f5f7; }
+        .category-title {
+            padding: 16px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #86868b;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .category-title::after { content: '▾'; transition: transform 0.2s; }
+        .category-group.collapsed .category-title::after { transform: rotate(-90deg); }
+
+        /* 二级：网站 */
+        .site-list { max-height: 500px; overflow: hidden; transition: max-height 0.3s ease; }
+        .category-group.collapsed .site-list { max-height: 0; }
+        .site-item {
+            padding: 14px 20px 14px 36px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .site-item:hover { background-color: #f5f5f7; }
+        .site-count { font-size: 12px; color: #86868b; background-color: #e5e5e7; padding: 2px 8px; border-radius: 10px; }
+
+        /* 三级：文章列表 */
+        .article-item { padding: 16px 20px; border-bottom: 1px solid #f5f5f7; cursor: pointer; }
+        .article-item:hover { background-color: #fafafa; }
+        .article-item.active { background-color: #f0f7ff; }
+        .article-item-title { font-size: 14px; font-weight: 500; line-height: 1.4; margin-bottom: 6px; }
+        .article-item-meta { font-size: 12px; color: #86868b; }
+
+        /* 控制左栏滑动 */
+        .left-column.drill-down .slider-wrapper { transform: translateX(-50%); }
+
+        /* ==================== 右栏：详情与空白页 ==================== */
+        .right-column {
+            flex: 1;
+            background-color: #fafafa;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏（手机端专用，PC端默认隐藏） */
+        .mobile-detail-header {
+            display: none;
+            height: 60px;
+            padding: 0 16px;
+            align-items: center;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e5e5e7;
+        }
+
+        .content-body {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 状态A：空白占位 */
+        .empty-state {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .empty-icon { width: 48px; height: 48px; color: #86868b; margin-bottom: 20px; }
+        .quote-box { margin-bottom: 30px; max-width: 360px; }
+        .quote-text { font-size: 15px; color: #515154; font-style: italic; line-height: 1.6; }
+        .quote-author { font-size: 12px; color: #86868b; margin-top: 6px; display: block; }
+
+        /* 状态B：文章详情 */
+        .article-detail {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 40px 60px;
+            display: none; /* 默认隐藏 */
+        }
+
+        .article-detail.active { display: block; }
+        .article-header-text { max-width: 680px; margin: 0 auto 24px; }
+        .article-title { font-size: 26px; font-weight: 700; line-height: 1.3; margin-bottom: 12px; }
+        .article-meta { font-size: 13px; color: #86868b; }
+        .article-body { max-width: 680px; margin: 0 auto; font-size: 16px; line-height: 1.8; color: #333333; }
+        .article-body p { margin-bottom: 20px; }
+
+        /* ==================== 响应式媒体查询（手机端核心逻辑） ==================== */
+        @media (max-width: 767px) {
+            .app-container {
+                position: relative;
+                overflow: hidden;
+            }
+
+            /* 左栏在手机端占满全屏 */
+            .left-column {
+                width: 100%;
+                max-width: none;
+                min-width: 0;
+                border-right: none;
+            }
+
+            /* 右栏在手机端变成覆盖全屏的“抽屉面板” */
+            .right-column {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 100;
+                background-color: #ffffff;
+                /* 默认移出屏幕右侧 */
+                transform: translateX(100%);
+                transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            }
+
+            /* 当右栏被激活时，滑入屏幕 */
+            .right-column.mobile-active {
+                transform: translateX(0);
+            }
+
+            /* 手机端隐藏 PC 的空白占位 */
+            .empty-state {
+                display: none !important;
+            }
+
+            /* 手机端必须显示专属的顶部返回栏 */
+            .mobile-detail-header {
+                display: flex;
+            }
+
+            /* 手机端调整详情页的内边距 */
+            .article-detail {
+                padding: 24px 20px;
+            }
+
+            .article-title {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- ==================== 左栏 ==================== -->
+        <div class="left-column" id="leftColumn">
+            <div class="slider-wrapper">
+                
+                <!-- 面板1：分类与网站 -->
+                <div class="panel" id="panelNav">
+                    <div class="panel-header">
+                        <h2 class="panel-title">我的订阅源</h2>
+                    </div>
+                    <div class="panel-content">
+                        <div class="category-group">
+                            <div class="category-title" onclick="toggleCategory(this)">科技资讯</div>
+                            <div class="site-list">
+                                <div class="site-item" onclick="openSite('sspai', '少数派')">
+                                    <span>少数派 sspai</span>
+                                    <span class="site-count">2</span>
+                                </div>
+                                <div class="site-item" onclick="openSite('36kr', '36氪')">
+                                    <span>36氪</span>
+                                    <span class="site-count">1</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 面板2：文章列表 -->
+                <div class="panel" id="panelList">
+                    <div class="panel-header">
+                        <button class="back-btn" onclick="goBackToNav()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            返回
+                        </button>
+                        <h2 class="panel-title" id="currentSiteTitle">网站文章</h2>
+                    </div>
+                    <div class="panel-content" id="articleListContainer">
+                        <!-- JS 动态填充 -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ==================== 右栏（自适应细节页） ==================== -->
+        <div class="right-column" id="rightColumn">
+            
+            <!-- 手机端专用返回栏 -->
+            <div class="mobile-detail-header">
+                <button class="back-btn" onclick="closeArticleMobile()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    文章列表
+                </button>
+            </div>
+
+            <div class="content-body">
+                <!-- 状态A：空白占位（PC端生效） -->
+                <div class="empty-state" id="emptyState">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" fill="currentColor" />
+                    </svg>
+                    <div class="quote-box">
+                        <p class="quote-text">“读书破万卷，下笔如有神。”</p>
+                        <span class="quote-author">— 唐 · 杜甫</span>
+                    </div>
+                </div>
+
+                <!-- 状态B：文章内容 -->
+                <div class="article-detail" id="articleDetail">
+                    <div class="article-header-text">
+                        <h1 class="article-title" id="detailTitle">文章标题</h1>
+                        <div class="article-meta">
+                            发布自 <span id="detailSource" style="color: #1d1d1f; font-weight: 500;">来源</span> · <span id="detailTime">时间</span>
+                        </div>
+                    </div>
+                    <div class="article-body" id="detailBody">
+                        <!-- 动态正文 -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- 交互脚本 -->
+    <script>
+        // 模拟数据
+        const db = {
+            sspai: [
+                {
+                    id: 'sspai-1',
+                    title: '如何利用 RSS 构建属于你自己的高效信息工作流',
+                    time: '2小时前',
+                    body: '<p>在算法推荐时代，主动掌握信息源变得比以往任何时候都更加关键。</p><p>利用 RSS（简易信息聚合），你可以将分散在各个角落的高质量内容聚拢到一处。通过两栏式或三栏式设计的阅读器，你能有条不紊地快速略读、精读、甚至一键归档到你的个人笔记库中。</p>'
+                },
+                {
+                    id: 'sspai-2',
+                    title: '2025 桌面整理指南：极简主义者的屏幕美学',
+                    time: '3天前',
+                    body: '<p>混乱的桌面不仅会拖慢电脑运行速度，还会潜移默化地分散你的注意力。让我们从壁纸、图标分类以及隐藏不必要的常驻后台工具开始做起。</p>'
+                }
+            ],
+            '36kr': [
+                {
+                    id: '36kr-1',
+                    title: '大模型应用落地：2025 行业的新变量在哪？',
+                    time: '5小时前',
+                    body: '<p>大语言模型正在加速向垂直细分领域迈进。分析师指出，能为终端用户直接解决痛点并带来明显降本增效成果的轻量级 Agent，将成为竞争焦点。</p>'
+                }
+            ]
+        };
+
+        let activeArticles = [];
+        let currentActiveItem = null;
+
+        // 手风琴折叠
+        function toggleCategory(element) {
+            element.parentElement.classList.toggle('collapsed');
+        }
+
+        // 打开网站文章列表（移动端与PC端通用）
+        function openSite(siteKey, siteName) {
+            const leftCol = document.getElementById('leftColumn');
+            const siteTitle = document.getElementById('currentSiteTitle');
+            const container = document.getElementById('articleListContainer');
+
+            siteTitle.textContent = siteName;
+            const articles = db[siteKey] || [];
+            activeArticles = articles;
+            
+            container.innerHTML = articles.map((art, index) => `
+                <div class="article-item" id="item-${art.id}" onclick="showArticle('${siteKey}', ${index}, this)">
+                    <div class="article-item-title">${art.title}</div>
+                    <div class="article-item-meta">${art.time}</div>
+                </div>
+            `).join('');
+
+            leftCol.classList.add('drill-down');
+        }
+
+        // 从文章列表返回目录（左栏滑动）
+        function goBackToNav() {
+            document.getElementById('leftColumn').classList.remove('drill-down');
+        }
+
+        // 载入详情
+        function showArticle(siteKey, index, element) {
+            const emptyState = document.getElementById('emptyState');
+            const detailContainer = document.getElementById('articleDetail');
+            const rightCol = document.getElementById('rightColumn');
+            
+            const titleEl = document.getElementById('detailTitle');
+            const sourceEl = document.getElementById('detailSource');
+            const timeEl = document.getElementById('detailTime');
+            const bodyEl = document.getElementById('detailBody');
+
+            const article = activeArticles[index];
+            if (!article) return;
+
+            // 1. 高亮左侧列表项
+            if (currentActiveItem) currentActiveItem.classList.remove('active');
+            element.classList.add('active');
+            currentActiveItem = element;
+
+            // 2. 隐藏空白页并激活动态详情
+            emptyState.classList.add('hidden');
+            detailContainer.classList.add('active');
+
+            // 3. 数据填充
+            titleEl.textContent = article.title;
+            sourceEl.textContent = siteKey === 'sspai' ? '少数派' : '36氪';
+            timeEl.textContent = article.time;
+            bodyEl.innerHTML = article.body;
+
+            // 4. 【核心自适应】如果处于移动端宽度，让右侧面板整体滑入
+            if (window.innerWidth < 768) {
+                rightCol.classList.add('mobile-active');
+            }
+
+            detailContainer.scrollTop = 0;
+        }
+
+        // 【移动端专用】从文章详情返回文章列表
+        function closeArticleMobile() {
+            const rightCol = document.getElementById('rightColumn');
+            rightCol.classList.remove('mobile-active');
+        }
+    </script>
+</body>
+</html>
