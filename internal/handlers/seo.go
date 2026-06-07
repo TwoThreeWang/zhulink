@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -52,8 +53,6 @@ Disallow: /report/
 # Sitemap位置
 Sitemap: %s/sitemap.xml
 
-# 爬取延迟(可选,避免服务器压力)
-Crawl-delay: 1
 `, siteURL)
 
 	c.Header("Content-Type", "text/plain; charset=utf-8")
@@ -118,17 +117,38 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
 	// 6. 所有节点页面
 	var nodes []models.Node
 	db.DB.Find(&nodes)
+
+	// 一次性查询每个节点的最新文章更新时间，避免 N+1
+	type nodeLatest struct {
+		NodeID  uint
+		Lastmod time.Time
+	}
+	var nodeLatestRows []nodeLatest
+	db.DB.Model(&models.Post{}).
+		Select("node_id, MAX(updated_at) AS lastmod").
+		Group("node_id").
+		Scan(&nodeLatestRows)
+	nodeLastmodMap := make(map[uint]string, len(nodeLatestRows))
+	for _, r := range nodeLatestRows {
+		nodeLastmodMap[r.NodeID] = r.Lastmod.Format("2006-01-02")
+	}
+
 	for _, node := range nodes {
+		nodeLastmod, ok := nodeLastmodMap[node.ID]
+		if !ok {
+			nodeLastmod = now
+		}
+
 		xml += fmt.Sprintf(`  <url>
     <loc>%s/t/%s</loc>
     <lastmod>%s</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
-`, siteURL, node.Name, now)
+`, siteURL, url.PathEscape(node.Name), nodeLastmod)
 	}
 
-	// 6. 最近的文章详情页(限制500篇,避免sitemap过大)
+	// 7. 最近的文章详情页(限制500篇,避免sitemap过大)
 	var posts []models.Post
 	db.DB.Order("created_at DESC").Limit(500).Find(&posts)
 	for _, post := range posts {

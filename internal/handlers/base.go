@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"zhulink/internal/middleware"
 
@@ -26,6 +27,12 @@ func Render(c *gin.Context, code int, name string, obj gin.H) {
 
 	// Inject basic helpers if needed (or do it via template funcs)
 	obj["CurrentPath"] = c.Request.URL.Path
+
+	// Inject Site URL from environment variable
+	obj["SiteURL"] = os.Getenv("SITE_URL")
+	if obj["SiteURL"] == "" {
+		obj["SiteURL"] = "https://zhulink.vip"
+	}
 
 	c.HTML(code, name, obj)
 }

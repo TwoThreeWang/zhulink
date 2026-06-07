@@ -14,6 +14,22 @@
     <meta name="htmx-config" content='{"historyCacheSize":0}'>
     <!-- Sitemap引用 -->
     <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+    <meta property="og:locale" content="zh_CN">
+    {{ if eq .Active "top" }}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "ZhuLink 竹林",
+      "url": "{{ .SiteURL }}/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "{{ .SiteURL }}/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    {{ end }}
     <!-- RSS Feed引用 -->
     <link rel="alternate" type="application/rss+xml" title="ZhuLink RSS Feed" href="/feed.xml">
     <!-- Marked.js & Editor.js (Optional via block) -->
@@ -217,6 +233,8 @@
                 <a href="/p/about" class="hover:text-moss transition-colors">关于</a>
                 <span class="text-stone-200">|</span>
                 <a href="/p/guide" class="hover:text-moss transition-colors">指南</a>
+                <span class="text-stone-200">|</span>
+                <a href="/sitemap.xml" class="hover:text-moss transition-colors">SiteMap</a>
                 <span class="text-stone-200">|</span>
                 <a href="#top" class="hover:text-moss transition-colors">回到顶部</a>
             </div>

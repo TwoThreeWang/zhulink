@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -150,7 +151,7 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 	if siteURL == "" {
 		siteURL = "https://zhulink.vip"
 	}
-	fullURL := siteURL
+	fullURL := siteURL + "/"
 	if page > 1 {
 		fullURL = fmt.Sprintf("%s?page=%d", siteURL, page)
 	}
@@ -282,9 +283,9 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 	if siteURL == "" {
 		siteURL = "https://zhulink.vip"
 	}
-	fullURL := fmt.Sprintf("%s/t/%s", siteURL, node.Name)
+	fullURL := fmt.Sprintf("%s/t/%s", siteURL, url.PathEscape(node.Name))
 	if page > 1 {
-		fullURL = fmt.Sprintf("%s/t/%s?page=%d", siteURL, node.Name, page)
+		fullURL = fmt.Sprintf("%s/t/%s?page=%d", siteURL, url.PathEscape(node.Name), page)
 	}
 
 	description := fmt.Sprintf("ZhuLink 竹林 - %s节点的所有文章", node.Name)
