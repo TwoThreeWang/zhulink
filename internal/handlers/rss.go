@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
@@ -176,6 +177,8 @@ func (h *RSSHandler) GetItems(c *gin.Context) {
 	// 分页游标：使用 published_at
 	var lastPublishedAt *time.Time
 	if lastPublishedAtStr := c.Query("last_published_at"); lastPublishedAtStr != "" {
+		// URL 中 + 号可能被 Go net/url 解码为空格，还原回来
+		lastPublishedAtStr = strings.ReplaceAll(lastPublishedAtStr, " ", "+")
 		if t, err := time.Parse(time.RFC3339, lastPublishedAtStr); err == nil {
 			lastPublishedAt = &t
 		}
