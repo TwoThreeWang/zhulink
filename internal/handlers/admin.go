@@ -195,14 +195,18 @@ func (h *AdminHandler) RestoreAIBlockedPost(c *gin.Context) {
 		return
 	}
 
+	postUpdates := map[string]interface{}{
+		"index_status": models.PostIndexStatusIndexable,
+	}
 	if post.DeletedAt.Valid {
-		if err := db.DB.Unscoped().
-			Model(&models.Post{}).
-			Where("pid = ?", pid).
-			Update("deleted_at", nil).Error; err != nil {
-			Render(c, http.StatusInternalServerError, "error.html", gin.H{"Error": "恢复文章失败"})
-			return
-		}
+		postUpdates["deleted_at"] = nil
+	}
+	if err := db.DB.Unscoped().
+		Model(&models.Post{}).
+		Where("pid = ?", pid).
+		Updates(postUpdates).Error; err != nil {
+		Render(c, http.StatusInternalServerError, "error.html", gin.H{"Error": "恢复文章失败"})
+		return
 	}
 
 	var user models.User

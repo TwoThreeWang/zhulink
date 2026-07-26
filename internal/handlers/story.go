@@ -457,12 +457,13 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 		// 继续生成向量，不因为 SEO 失败而终止
 	}
 
-	isAd := seoMeta != nil && (seoMeta.IsAd || strings.EqualFold(seoMeta.Keywords, "AD"))
+	isAd := seoMeta != nil && (seoMeta.IsAd || strings.EqualFold(seoMeta.Keywords, "AD") || seoMeta.IndexStatus == models.PostIndexStatusBlocked)
 
 	seoUpdateFields := map[string]interface{}{}
 	if seoMeta != nil {
 		seoUpdateFields["seo_keywords"] = seoMeta.Keywords
 		seoUpdateFields["seo_description"] = seoMeta.Description
+		seoUpdateFields["index_status"] = seoMeta.IndexStatus
 	}
 
 	if len(seoUpdateFields) > 0 {
@@ -748,6 +749,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		"HasNext":       hasNext,
 		"NextPost":      nextPost,
 		"RelatedPosts":  relatedPosts,
+		"NoIndex":       post.IndexStatus == models.PostIndexStatusNoIndex || post.IndexStatus == models.PostIndexStatusBlocked,
 	}
 
 	// 写入共享缓存，有效期延长至 5 分钟

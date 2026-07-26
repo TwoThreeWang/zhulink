@@ -27,6 +27,9 @@ func Render(c *gin.Context, code int, name string, obj gin.H) {
 
 	// Inject basic helpers if needed (or do it via template funcs)
 	obj["CurrentPath"] = c.Request.URL.Path
+	if _, ok := obj["NoIndex"]; !ok {
+		obj["NoIndex"] = shouldNoIndexRequest(c)
+	}
 
 	// Inject Site URL from environment variable
 	obj["SiteURL"] = os.Getenv("SITE_URL")
@@ -35,6 +38,21 @@ func Render(c *gin.Context, code int, name string, obj gin.H) {
 	}
 
 	c.HTML(code, name, obj)
+}
+
+func shouldNoIndexRequest(c *gin.Context) bool {
+	path := c.Request.URL.Path
+	switch {
+	case path == "/search":
+		return true
+	case path == "/login", path == "/signup", path == "/activate", path == "/forgot_password", path == "/reset_password":
+		return true
+	case strings.HasPrefix(path, "/dashboard/"), path == "/dashboard", strings.HasPrefix(path, "/admin/"):
+		return true
+	}
+
+	page := c.Query("page")
+	return page != "" && page != "1"
 }
 
 // HTMX Redirect helper

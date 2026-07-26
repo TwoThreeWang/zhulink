@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"zhulink/internal/db"
@@ -14,9 +15,12 @@ import (
 	"zhulink/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type SEOHandler struct{}
+
+const sitemapPostPageSize = 45000
 
 func NewSEOHandler() *SEOHandler {
 	return &SEOHandler{}
@@ -59,62 +63,81 @@ Sitemap: %s/sitemap.xml
 	c.String(http.StatusOK, content)
 }
 
-// SitemapXML 动态生成sitemap.xml
-func (h *SEOHandler) SitemapXML(c *gin.Context) {
+// SitemapIndex 动态生成 sitemap index。
+func (h *SEOHandler) SitemapIndex(c *gin.Context) {
 	siteURL := getSiteURL()
 	now := time.Now().Format("2006-01-02")
 
-	// 开始构建XML
-	xml := `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-`
+	var postCount int64
+	indexablePostsQuery().Count(&postCount)
+	postPages := int((postCount + sitemapPostPageSize - 1) / sitemapPostPageSize)
 
-	// 1. 首页 - 最高优先级,每天更新
-	xml += fmt.Sprintf(`  <url>
+	var xml strings.Builder
+	xml.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`)
+	xml.WriteString(fmt.Sprintf(`  <sitemap>
+    <loc>%s/sitemap-static.xml</loc>
+    <lastmod>%s</lastmod>
+  </sitemap>
+`, siteURL, now))
+
+	for page := 1; page <= postPages; page++ {
+		xml.WriteString(fmt.Sprintf(`  <sitemap>
+    <loc>%s/sitemap-posts/%d.xml</loc>
+    <lastmod>%s</lastmod>
+  </sitemap>
+`, siteURL, page, now))
+	}
+
+	xml.WriteString(`</sitemapindex>`)
+
+	c.Header("Content-Type", "application/xml; charset=utf-8")
+	c.String(http.StatusOK, xml.String())
+}
+
+// SitemapStaticXML 生成公共静态页和节点页 sitemap。
+func (h *SEOHandler) SitemapStaticXML(c *gin.Context) {
+	siteURL := getSiteURL()
+	now := time.Now().Format("2006-01-02")
+
+	var xml strings.Builder
+	xml.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`)
+
+	xml.WriteString(fmt.Sprintf(`  <url>
     <loc>%s/</loc>
     <lastmod>%s</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-`, siteURL, now)
+`, siteURL, now))
 
-	// 2. 最新页
-	xml += fmt.Sprintf(`  <url>
+	xml.WriteString(fmt.Sprintf(`  <url>
     <loc>%s/new</loc>
     <lastmod>%s</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>
-`, siteURL, now)
+`, siteURL, now))
 
-	// 3. 节点列表页
-	xml += fmt.Sprintf(`  <url>
+	xml.WriteString(fmt.Sprintf(`  <url>
     <loc>%s/nodes</loc>
     <lastmod>%s</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
-`, siteURL, now)
+`, siteURL, now))
 
-	// 4. 搜索页
-	xml += fmt.Sprintf(`  <url>
-    <loc>%s/search</loc>
-    <lastmod>%s</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-`, siteURL, now)
-
-	// 5. 热门订阅页
-	xml += fmt.Sprintf(`  <url>
+	xml.WriteString(fmt.Sprintf(`  <url>
     <loc>%s/rss/popular</loc>
     <lastmod>%s</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
-`, siteURL, now)
+`, siteURL, now))
 
-	// 6. 所有节点页面
 	var nodes []models.Node
 	db.DB.Find(&nodes)
 
@@ -124,7 +147,7 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
 		Lastmod time.Time
 	}
 	var nodeLatestRows []nodeLatest
-	db.DB.Model(&models.Post{}).
+	indexablePostsQuery().
 		Select("node_id, MAX(updated_at) AS lastmod").
 		Group("node_id").
 		Scan(&nodeLatestRows)
@@ -136,24 +159,53 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
 	for _, node := range nodes {
 		nodeLastmod, ok := nodeLastmodMap[node.ID]
 		if !ok {
-			nodeLastmod = now
+			continue
 		}
 
-		xml += fmt.Sprintf(`  <url>
+		xml.WriteString(fmt.Sprintf(`  <url>
     <loc>%s/t/%s</loc>
     <lastmod>%s</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
-`, siteURL, url.PathEscape(node.Name), nodeLastmod)
+`, siteURL, url.PathEscape(node.Name), nodeLastmod))
 	}
 
-	// 7. 最近的文章详情页(限制500篇,避免sitemap过大)
+	xml.WriteString(`</urlset>`)
+
+	c.Header("Content-Type", "application/xml; charset=utf-8")
+	c.String(http.StatusOK, xml.String())
+}
+
+// SitemapPostsXML 生成可索引帖子 sitemap 分片。
+func (h *SEOHandler) SitemapPostsXML(c *gin.Context) {
+	siteURL := getSiteURL()
+	pageStr := strings.TrimSuffix(c.Param("page"), ".xml")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		c.String(http.StatusNotFound, "Not Found")
+		return
+	}
+
 	var posts []models.Post
-	db.DB.Order("created_at DESC").Limit(500).Find(&posts)
+	indexablePostsQuery().
+		Order("created_at DESC").
+		Offset((page - 1) * sitemapPostPageSize).
+		Limit(sitemapPostPageSize).
+		Find(&posts)
+
+	if len(posts) == 0 && page > 1 {
+		c.String(http.StatusNotFound, "Not Found")
+		return
+	}
+
+	var xml strings.Builder
+	xml.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`)
+
 	for _, post := range posts {
 		lastmod := post.UpdatedAt.Format("2006-01-02")
-		// 根据文章新旧程度调整优先级
 		daysSinceCreated := time.Since(post.CreatedAt).Hours() / 24
 		priority := 0.6
 		changefreq := "weekly"
@@ -166,20 +218,24 @@ func (h *SEOHandler) SitemapXML(c *gin.Context) {
 			changefreq = "weekly"
 		}
 
-		xml += fmt.Sprintf(`  <url>
+		xml.WriteString(fmt.Sprintf(`  <url>
     <loc>%s/p/%s</loc>
     <lastmod>%s</lastmod>
     <changefreq>%s</changefreq>
     <priority>%.1f</priority>
   </url>
-`, siteURL, post.Pid, lastmod, changefreq, priority)
+`, siteURL, post.Pid, lastmod, changefreq, priority))
 	}
 
-	// 结束XML
-	xml += `</urlset>`
+	xml.WriteString(`</urlset>`)
 
 	c.Header("Content-Type", "application/xml; charset=utf-8")
-	c.String(http.StatusOK, xml)
+	c.String(http.StatusOK, xml.String())
+}
+
+func indexablePostsQuery() *gorm.DB {
+	return db.DB.Model(&models.Post{}).
+		Where("index_status = ? OR index_status = '' OR index_status IS NULL", models.PostIndexStatusIndexable)
 }
 
 // RSSFeed 生成RSS 2.0 feed

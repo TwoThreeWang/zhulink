@@ -270,9 +270,10 @@ func buildSummaryPrompt(title, content string) string {
 
 // SEOMetadata 包含生成的 SEO 元数据
 type SEOMetadata struct {
-	Keywords    string `json:"keywords"`    // 逗号分隔的关键词列表
-	Description string `json:"description"` // 150 字以内的页面描述
-	IsAd        bool   `json:"is_ad"`       // 是否为广告内容
+	Keywords    string `json:"keywords"`     // 逗号分隔的关键词列表
+	Description string `json:"description"`  // 150 字以内的页面描述
+	IsAd        bool   `json:"is_ad"`        // 是否为广告内容
+	IndexStatus string `json:"index_status"` // indexable, noindex, blocked
 }
 
 // GenerateSEOMetadata 通过 Cloudflare AI Gateway 生成 SEO 关键词和描述
@@ -326,12 +327,17 @@ func buildSEOPrompt(title, content string) string {
 1. 评估内容属性。当内容纯粹且明显属于【纯垃圾推广广告】（如：纯博彩引流、灰产拉群、纯 SEO 堆砌、无任何有效信息增量的商业硬广等）时，将 is_ad 标记为 true。
    - **核心判定**：如果内容旨在"诱导点击/消费特定违规平台为唯一目的"，且无任何信息增量，判定为 "AD"；如果内容是"中立地报道行业动态（包括敏感行业平台等新闻）、技术解析或事件说明、正常的优质站点/平台推荐"，则**不属于**广告，应正常处理。
    - **存疑从宽**：若内容有实质信息，包含行业新闻、平台动态、技术原理分析、客观事件描述、正常的优质站点推荐等信息价值，即使提及敏感平台，**一律不按广告处理**，正常生成关键词和描述。
-2. 无论是否为广告，都要基于标题和正文生成可入库的 SEO 关键词和页面描述。
+2. 评估该帖子是否适合进入搜索引擎索引，返回 index_status：
+   - "indexable"：原创度或人工推荐价值较高，有清晰信息增量，适合被搜索引擎索引。
+   - "noindex"：页面可在站内展示，但不适合搜索引擎索引，例如普通 RSS 摘要搬运、短内容、重复优惠信息、低原创聚合、普通账号/套餐/薅羊毛教程、时效性很短的信息、仅转述外站且缺少个人判断。
+   - "blocked"：应自动拦截的违规内容，例如纯垃圾广告、灰产引流、博彩色情、恶意欺诈、严重 NSFW、诱导绕过平台规则或明显违法违规内容。
+3. 无论 index_status 是什么，都要基于标题和正文生成可入库的 SEO 关键词和页面描述。
 
 # Output Requirements
 - 请严格按照以下 JSON 格式返回，不要包含任何其他文字：
-{"keywords":"关键词1,关键词2,关键词3,...","description":"页面描述","is_ad":false}
-- 如果判定为广告，将 is_ad 设置为 true，keywords 和 description 仍然必须正常生成。
+{"keywords":"关键词1,关键词2,关键词3,...","description":"页面描述","is_ad":false,"index_status":"indexable"}
+- 如果判定为广告或需要拦截，将 is_ad 设置为 true，index_status 设置为 "blocked"，keywords 和 description 仍然必须正常生成。
+- 如果内容正常但低原创/低搜索价值，将 is_ad 设置为 false，index_status 设置为 "noindex"。
 
 ## Keywords 要求:
 1. 生成 5-8 个与文章高度相关的中文关键词
@@ -351,6 +357,7 @@ func buildSEOPrompt(title, content string) string {
 # Reminder
 - 只返回 JSON，不要有任何其他文字。
 - is_ad 必须是布尔值 true 或 false，不能是字符串。
+- index_status 必须是 "indexable"、"noindex"、"blocked" 三者之一。
 `, title, contentForPrompt)
 }
 
@@ -358,7 +365,7 @@ func parseSEOResponse(responseContent string) (*SEOMetadata, error) {
 	responseContent = strings.TrimSpace(responseContent)
 
 	if strings.ToUpper(responseContent) == "AD" {
-		return &SEOMetadata{Keywords: "AD", IsAd: true}, nil
+		return &SEOMetadata{Keywords: "AD", IsAd: true, IndexStatus: "blocked"}, nil
 	}
 
 	startIdx := strings.Index(responseContent, "{")
@@ -373,6 +380,23 @@ func parseSEOResponse(responseContent string) (*SEOMetadata, error) {
 	if err := json.Unmarshal([]byte(jsonStr), &seoResult); err != nil {
 		log.Printf("[LLM-SEO] JSON 解析失败: %v, 原始内容: %s", err, jsonStr)
 		return nil, fmt.Errorf("parse SEO metadata failed: %v", err)
+	}
+
+	seoResult.IndexStatus = strings.ToLower(strings.TrimSpace(seoResult.IndexStatus))
+	switch seoResult.IndexStatus {
+	case "indexable", "noindex", "blocked":
+	case "":
+		if seoResult.IsAd {
+			seoResult.IndexStatus = "blocked"
+		} else {
+			seoResult.IndexStatus = "indexable"
+		}
+	default:
+		log.Printf("[LLM-SEO] 非法 index_status: %s", seoResult.IndexStatus)
+		seoResult.IndexStatus = "noindex"
+	}
+	if seoResult.IsAd {
+		seoResult.IndexStatus = "blocked"
 	}
 
 	return &seoResult, nil

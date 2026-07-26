@@ -116,14 +116,15 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 
 	// 发布逻辑
 	post := models.Post{
-		Pid:        utils.RandStringBytesMaskImpr(8),
-		UserID:     user.ID,
-		NodeID:     uint(nodeID),
-		Title:      title,
-		URL:        item.Link,
-		Content:    content,
-		Score:      1, // 初始分，后续可触发自动点赞
-		SourceType: "rss",
+		Pid:         utils.RandStringBytesMaskImpr(8),
+		UserID:      user.ID,
+		NodeID:      uint(nodeID),
+		Title:       title,
+		URL:         item.Link,
+		Content:     content,
+		Score:       1, // 初始分，后续可触发自动点赞
+		SourceType:  "rss",
+		IndexStatus: models.PostIndexStatusNoIndex,
 	}
 
 	if err := db.DB.Create(&post).Error; err != nil {
@@ -134,6 +135,8 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 		})
 		return
 	}
+
+	go NewStoryHandler().asyncGeneratePostMeta(post.ID, title, content)
 
 	// 异步加分
 	go func() {
