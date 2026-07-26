@@ -489,14 +489,8 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 		description = seoMeta.Description
 	}
 
-	// 截取正文前 200 字用于向量生成
-	contentRunes := []rune(postContent)
-	shortContent := postContent
-	if len(contentRunes) > 200 {
-		shortContent = string(contentRunes[:200])
-	}
-
-	vectorText := fmt.Sprintf("标题：%s\n关键词：%s\n摘要：%s\n正文：%s", postTitle, keywords, description, shortContent)
+	cleanContentExcerpt := cleanContentExcerptForEmbedding(postContent, 600)
+	vectorText := fmt.Sprintf("标题：%s\n主题：%s\n摘要：%s\n正文片段：%s", postTitle, keywords, description, cleanContentExcerpt)
 	embedding, err := llm.GetEmbedding(vectorText)
 	vectorUpdateFields := map[string]interface{}{}
 	if err != nil {
@@ -526,6 +520,42 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 		}
 		fmt.Printf("[Async] 已更新帖子 %d 的向量数据\n", postID)
 	}
+}
+
+var (
+	embeddingCodeBlockRe  = regexp.MustCompile("(?s)```.*?```")
+	embeddingInlineCodeRe = regexp.MustCompile("`([^`]*)`")
+	embeddingImageRe      = regexp.MustCompile(`!\[[^\]]*\]\([^)]+\)`)
+	embeddingLinkRe       = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
+	embeddingURLRe        = regexp.MustCompile(`https?://\S+|www\.\S+`)
+	embeddingHTMLTagRe    = regexp.MustCompile(`<[^>]+>`)
+	embeddingLineMarkerRe = regexp.MustCompile(`(?m)^\s{0,3}(#{1,6}|[-*+]\s+|\d+\.\s+|>\s*)`)
+	embeddingMarkdownRe   = regexp.MustCompile(`[*_~]+`)
+	embeddingWhitespaceRe = regexp.MustCompile(`\s+`)
+)
+
+func cleanContentExcerptForEmbedding(content string, maxRunes int) string {
+	text := embeddingCodeBlockRe.ReplaceAllString(content, " ")
+	text = embeddingImageRe.ReplaceAllString(text, " ")
+	text = embeddingLinkRe.ReplaceAllString(text, "$1")
+	text = embeddingInlineCodeRe.ReplaceAllString(text, "$1")
+	text = embeddingURLRe.ReplaceAllString(text, " ")
+	text = embeddingHTMLTagRe.ReplaceAllString(text, " ")
+	text = html.UnescapeString(text)
+	text = embeddingLineMarkerRe.ReplaceAllString(text, "")
+	text = embeddingMarkdownRe.ReplaceAllString(text, "")
+	text = embeddingWhitespaceRe.ReplaceAllString(text, " ")
+	text = strings.TrimSpace(text)
+
+	if maxRunes <= 0 {
+		return text
+	}
+
+	runes := []rune(text)
+	if len(runes) > maxRunes {
+		return strings.TrimSpace(string(runes[:maxRunes]))
+	}
+	return text
 }
 
 // handleAdPostPunishment 处理 AI 识别出的广告贴惩罚
