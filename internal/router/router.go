@@ -130,13 +130,14 @@ func RegisterRoutes(r *gin.Engine) {
 	admin := r.Group("/admin")
 	admin.Use(middleware.AuthRequired())
 	{
-		admin.POST("/post/:pid/top", adminHandler.ToggleTop)           // 置顶
-		admin.POST("/post/:pid/move", adminHandler.MoveNode)           // 移动节点
-		admin.POST("/user/:id/punish", adminHandler.PunishUser)        // 惩罚用户
-		admin.DELETE("/post/:pid", adminHandler.AdminDeletePost)       // 管理员删除文章
-		admin.DELETE("/comment/:cid", adminHandler.AdminDeleteComment) // 管理员删除评论
-		admin.GET("/reports", adminHandler.ListReports)                // 举报列表
-		admin.DELETE("/reports/:id", adminHandler.HandleReport)        // 处理举报
-		admin.GET("/users", adminHandler.ListUsers)                    // 用户管理
+		admin.POST("/post/:pid/top", adminHandler.ToggleTop)                        // 置顶
+		admin.POST("/post/:pid/move", adminHandler.MoveNode)                        // 移动节点
+		admin.GET("/post/:pid/restore-ai-block", adminHandler.RestoreAIBlockedPost) // 恢复 AI 误判软删除帖子
+		admin.POST("/user/:id/punish", adminHandler.PunishUser)                     // 惩罚用户
+		admin.DELETE("/post/:pid", adminHandler.AdminDeletePost)                    // 管理员删除文章
+		admin.DELETE("/comment/:cid", adminHandler.AdminDeleteComment)              // 管理员删除评论
+		admin.GET("/reports", adminHandler.ListReports)                             // 举报列表
+		admin.DELETE("/reports/:id", adminHandler.HandleReport)                     // 处理举报
+		admin.GET("/users", adminHandler.ListUsers)                                 // 用户管理
 	}
 }

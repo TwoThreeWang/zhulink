@@ -270,8 +270,9 @@ func buildSummaryPrompt(title, content string) string {
 
 // SEOMetadata 包含生成的 SEO 元数据
 type SEOMetadata struct {
-	Keywords    string // 逗号分隔的关键词列表
-	Description string // 150 字以内的页面描述
+	Keywords    string `json:"keywords"`    // 逗号分隔的关键词列表
+	Description string `json:"description"` // 150 字以内的页面描述
+	IsAd        bool   `json:"is_ad"`       // 是否为广告内容
 }
 
 // GenerateSEOMetadata 通过 Cloudflare AI Gateway 生成 SEO 关键词和描述
@@ -322,15 +323,15 @@ func buildSEOPrompt(title, content string) string {
 你是一个专业的 SEO 优化专家，精通搜索引擎优化和内容营销。
 
 # Tasks
-1. 评估内容属性。当内容纯粹且明显属于【纯垃圾推广广告】（如：纯博彩引流、灰产拉群、纯 SEO 堆砌、无任何有效信息增量的商业硬广等）时，请**直接且仅**返回字符串 "AD"。
+1. 评估内容属性。当内容纯粹且明显属于【纯垃圾推广广告】（如：纯博彩引流、灰产拉群、纯 SEO 堆砌、无任何有效信息增量的商业硬广等）时，将 is_ad 标记为 true。
    - **核心判定**：如果内容旨在"诱导点击/消费特定违规平台为唯一目的"，且无任何信息增量，判定为 "AD"；如果内容是"中立地报道行业动态（包括敏感行业平台等新闻）、技术解析或事件说明、正常的优质站点/平台推荐"，则**不属于**广告，应正常处理。
    - **存疑从宽**：若内容有实质信息，包含行业新闻、平台动态、技术原理分析、客观事件描述、正常的优质站点推荐等信息价值，即使提及敏感平台，**一律不按广告处理**，正常生成关键词和描述。
-2. 如果是正常技术、新闻或社区讨论内容，基于其生成有利于 SEO 的关键词和页面描述。
+2. 无论是否为广告，都要基于标题和正文生成可入库的 SEO 关键词和页面描述。
 
 # Output Requirements
-- 如果判定为广告：仅返回 "AD"。
-- 如果判定为正常内容：请严格按照以下 JSON 格式返回，不要包含任何其他文字：
-{"keywords":"关键词1,关键词2,关键词3,...","description":"页面描述"}
+- 请严格按照以下 JSON 格式返回，不要包含任何其他文字：
+{"keywords":"关键词1,关键词2,关键词3,...","description":"页面描述","is_ad":false}
+- 如果判定为广告，将 is_ad 设置为 true，keywords 和 description 仍然必须正常生成。
 
 ## Keywords 要求:
 1. 生成 5-8 个与文章高度相关的中文关键词
@@ -348,8 +349,8 @@ func buildSEOPrompt(title, content string) string {
 ### Content: %s
 
 # Reminder
-- 如果判定为广告：仅返回 "AD"。
-- 如果判定为正常内容：只返回 JSON，不要有任何其他文字。
+- 只返回 JSON，不要有任何其他文字。
+- is_ad 必须是布尔值 true 或 false，不能是字符串。
 `, title, contentForPrompt)
 }
 
@@ -357,7 +358,7 @@ func parseSEOResponse(responseContent string) (*SEOMetadata, error) {
 	responseContent = strings.TrimSpace(responseContent)
 
 	if strings.ToUpper(responseContent) == "AD" {
-		return &SEOMetadata{Keywords: "AD"}, nil
+		return &SEOMetadata{Keywords: "AD", IsAd: true}, nil
 	}
 
 	startIdx := strings.Index(responseContent, "{")

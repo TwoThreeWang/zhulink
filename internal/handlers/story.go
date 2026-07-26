@@ -457,16 +457,27 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 		// 继续生成向量，不因为 SEO 失败而终止
 	}
 
-	// 检查是否被判定为广告
-	if seoMeta != nil && seoMeta.Keywords == "AD" {
-		h.handleAdPostPunishment(postID)
-		return
+	isAd := seoMeta != nil && (seoMeta.IsAd || strings.EqualFold(seoMeta.Keywords, "AD"))
+
+	seoUpdateFields := map[string]interface{}{}
+	if seoMeta != nil {
+		seoUpdateFields["seo_keywords"] = seoMeta.Keywords
+		seoUpdateFields["seo_description"] = seoMeta.Description
 	}
 
-	updateFields := map[string]interface{}{}
-	if seoMeta != nil {
-		updateFields["seo_keywords"] = seoMeta.Keywords
-		updateFields["seo_description"] = seoMeta.Description
+	if len(seoUpdateFields) > 0 {
+		if err := db.DB.Model(&models.Post{}).Where("id = ?", postID).Updates(seoUpdateFields).Error; err != nil {
+			fmt.Printf("[Async] 更新帖子 %d SEO 数据失败: %v\n", postID, err)
+		} else {
+			var post models.Post
+			if err := db.DB.Select("pid").First(&post, postID).Error; err == nil {
+				utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
+			}
+		}
+	}
+
+	if isAd {
+		h.handleAdPostPunishment(postID)
 	}
 
 	// 生成向量文本并获取向量
@@ -486,25 +497,33 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 
 	vectorText := fmt.Sprintf("标题：%s\n关键词：%s\n摘要：%s\n正文：%s", postTitle, keywords, description, shortContent)
 	embedding, err := llm.GetEmbedding(vectorText)
+	vectorUpdateFields := map[string]interface{}{}
 	if err != nil {
 		fmt.Printf("[Vector] 生成向量失败 (postID=%d): %v\n", postID, err)
 	} else {
-		updateFields["vector_text"] = vectorText
+		vectorUpdateFields["vector_text"] = vectorText
 		vec := pgvector.NewVector(embedding)
-		updateFields["embedding"] = &vec
+		vectorUpdateFields["embedding"] = &vec
 	}
 
-	if len(updateFields) > 0 {
+	if len(vectorUpdateFields) > 0 {
 		var post models.Post
-		if err := db.DB.Model(&models.Post{}).Where("id = ?", postID).Updates(updateFields).Error; err != nil {
-			fmt.Printf("[Async] 更新帖子 %d 异步数据失败: %v\n", postID, err)
+		query := db.DB.Model(&models.Post{})
+		postQuery := db.DB.Select("pid")
+		if isAd {
+			query = db.DB.Unscoped().Model(&models.Post{})
+			postQuery = db.DB.Unscoped().Select("pid")
+		}
+
+		if err := query.Where("id = ?", postID).Updates(vectorUpdateFields).Error; err != nil {
+			fmt.Printf("[Async] 更新帖子 %d 向量数据失败: %v\n", postID, err)
 			return
 		}
 		// 获取最新的 Pid 以便清除缓存
-		if err := db.DB.Select("pid").First(&post, postID).Error; err == nil {
+		if err := postQuery.First(&post, postID).Error; err == nil {
 			utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
 		}
-		fmt.Printf("[Async] 已更新帖子 %d 的 SEO 和向量数据\n", postID)
+		fmt.Printf("[Async] 已更新帖子 %d 的向量数据\n", postID)
 	}
 }
 
@@ -539,12 +558,12 @@ func (h *StoryHandler) handleAdPostPunishment(postID uint) {
 		adminNotification := models.Notification{
 			UserID: admin.ID,
 			Type:   models.NotificationTypeSystem,
-			Reason: fmt.Sprintf("AI 自动拦截了一条来自用户 @%s 的广告贴《%s》，已自动执行禁言 1 天处理。", post.User.Username, html.EscapeString(post.Title)),
+			Reason: fmt.Sprintf("AI 自动拦截了一条来自用户 @%s 的广告贴《%s》，已自动执行禁言 1 天处理。<br><a href=\"/admin/post/%s/restore-ai-block\" class=\"text-moss font-medium hover:underline tracking-tight\">误判恢复帖子和用户</a>", html.EscapeString(post.User.Username), html.EscapeString(post.Title), post.Pid),
 		}
 		db.DB.Create(&adminNotification)
 	}
 
-	// 4. 删除帖子
+	// 4. 软删除帖子
 	db.DB.Delete(&post)
 
 	// 5. 失效缓存

@@ -10,6 +10,7 @@ import (
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
 	"zhulink/internal/services"
+	"zhulink/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -178,6 +179,52 @@ func (h *AdminHandler) AdminDeletePost(c *gin.Context) {
 
 	c.Header("HX-Redirect", "/")
 	c.Status(http.StatusOK)
+}
+
+// RestoreAIBlockedPost 恢复 AI 误判软删除的帖子，并解除自动禁言。
+func (h *AdminHandler) RestoreAIBlockedPost(c *gin.Context) {
+	if h.checkAdmin(c) == nil {
+		c.Status(http.StatusForbidden)
+		return
+	}
+
+	pid := c.Param("pid")
+	var post models.Post
+	if err := db.DB.Unscoped().Preload("User").Where("pid = ?", pid).First(&post).Error; err != nil {
+		Render(c, http.StatusNotFound, "error.html", gin.H{"Error": "文章不存在或无法恢复"})
+		return
+	}
+
+	if post.DeletedAt.Valid {
+		if err := db.DB.Unscoped().
+			Model(&models.Post{}).
+			Where("pid = ?", pid).
+			Update("deleted_at", nil).Error; err != nil {
+			Render(c, http.StatusInternalServerError, "error.html", gin.H{"Error": "恢复文章失败"})
+			return
+		}
+	}
+
+	var user models.User
+	if err := db.DB.First(&user, post.UserID).Error; err == nil && user.Status == 1 {
+		db.DB.Model(&models.User{}).Where("id = ?", post.UserID).Updates(map[string]interface{}{
+			"status":         0,
+			"punish_expires": nil,
+		})
+	}
+
+	notification := models.Notification{
+		UserID: post.UserID,
+		Type:   models.NotificationTypeSystem,
+		Reason: "您的文章《" + html.EscapeString(post.Title) + "》经管理员复核后已恢复，账号禁言状态也已解除。<br><a href=\"/p/" + post.Pid + "\" class=\"text-moss font-medium hover:underline tracking-tight\">查看文章</a>",
+	}
+	db.DB.Create(&notification)
+
+	utils.GetCache().Delete("story:top:page:1")
+	utils.GetCache().Delete("story:new:page:1")
+	utils.GetCache().Delete("story:detail:shared:" + post.Pid)
+
+	c.Redirect(http.StatusFound, "/p/"+post.Pid)
 }
 
 // ListReports 举报列表
