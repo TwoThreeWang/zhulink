@@ -10,7 +10,7 @@
     <meta name="robots" content="noindex,follow">
     {{ end }}
     <link rel="icon" type="image/svg+xml" href="/static/img/logo.svg">
-    <link href="/static/css/style.css?v=5" rel="stylesheet">
+    <link href="/static/css/style.css?v=1.0" rel="stylesheet">
     <!-- HTMX -->
     <script defer src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js"></script>
     <!-- 禁用 HTMX 历史缓存，避免内存累积 -->
@@ -76,31 +76,31 @@
 
                 <!-- 核心流入口: 纯文字，选中状态用加粗+底部绿线 -->
                 <nav class="flex items-center space-x-5 text-[15px]">
-                    <a href="/" class="relative py-0.5 transition-colors {{ if eq .Active " top" }}text-ink
+                    <a href="/" class="relative py-0.5 transition-colors {{ if eq .Active "top" }}text-ink
                         font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
                         热门
                         {{ if eq .Active "top" }}<span
                             class="absolute bottom-0 left-0 right-0 h-0.5 bg-moss rounded-full"></span>{{ end }}
                     </a>
-                    <a href="/new" class="relative py-0.5 transition-colors {{ if eq .Active " new" }}text-ink
+                    <a href="/new" class="relative py-0.5 transition-colors {{ if eq .Active "new" }}text-ink
                         font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
                         最新
                         {{ if eq .Active "new" }}<span
                             class="absolute bottom-0 left-0 right-0 h-0.5 bg-moss rounded-full"></span>{{ end }}
                     </a>
-                    <a href="/nodes" class="relative py-0.5 transition-colors {{ if eq .Active " nodes" }}text-ink
+                    <a href="/nodes" class="relative py-0.5 transition-colors {{ if eq .Active "nodes" }}text-ink
                         font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
                         节点
                         {{ if eq .Active "nodes" }}<span
                             class="absolute bottom-0 left-0 right-0 h-0.5 bg-moss rounded-full"></span>{{ end }}
                     </a>
-                    <a href="/rss" class="relative py-0.5 transition-colors {{ if eq .Active " rss" }}text-ink
+                    <a href="/rss" class="relative py-0.5 transition-colors {{ if eq .Active "rss" }}text-ink
                         font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
                         苗圃
                         {{ if eq .Active "rss" }}<span
                             class="absolute bottom-0 left-0 right-0 h-0.5 bg-moss rounded-full"></span>{{ end }}
                     </a>
-                    <a href="/search" class="relative py-0.5 transition-colors {{ if eq .Active " search" }}text-ink
+                    <a href="/search" class="relative py-0.5 transition-colors {{ if eq .Active "search" }}text-ink
                         font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
                         搜索
                         {{ if eq .Active "search" }}<span
@@ -164,64 +164,55 @@
 
     <!-- ==================== 手机端顶栏 (Mobile Header) ==================== -->
     <!-- 设计关键词：效率、行动、紧凑 -->
-    <header class="md:hidden fixed w-full top-0 z-50 bg-paper/90 backdrop-blur-md border-b border-stone-100">
-        <div class="px-4 py-1.5 flex items-center justify-between max-w-6xl mx-auto">
-            <!-- 左侧: Logo + 网站名称 + 导航 -->
-            <div class="flex items-center space-x-3">
-                <!-- Logo + 名称 -->
-                <a href="/" class="flex items-center space-x-1">
-                    <img src="/static/img/logo.svg" alt="ZhuLink" class="h-4 w-auto">
-                    <span class="font-semibold text-xs text-ink">ZhuLink</span>
+    <header class="md:hidden fixed w-full top-0 z-50 bg-paper/95 backdrop-blur-md border-b border-stone-100">
+        <div class="px-4 py-2 max-w-6xl mx-auto">
+            <div class="flex items-center justify-between">
+                <a href="/" class="flex items-center space-x-1.5 min-w-0">
+                    <img src="/static/img/logo.svg" alt="ZhuLink" class="h-5 w-auto">
+                    <span class="font-semibold text-sm text-ink tracking-wide">ZhuLink</span>
                 </a>
 
-                <!-- 核心导航 -->
-                <nav class="flex items-center space-x-2 text-xs">
-                    <a href="/" class="transition-colors {{ if eq .Active " top" }}text-ink font-medium{{ else
-                        }}text-ink-light{{ end }}">热门</a>
-                    <span class="text-stone-200">|</span>
-                    <a href="/new" class="transition-colors {{ if eq .Active " new" }}text-ink font-medium{{ else
-                        }}text-ink-light{{ end }}">最新</a>
-                    <span class="text-stone-200">|</span>
-                    <a href="/nodes" class="transition-colors {{ if eq .Active " nodes" }}text-ink font-medium{{ else
-                        }}text-ink-light{{ end }}">节点</a>
-                    <span class="text-stone-200">|</span>
-                    <a href="/rss" class="transition-colors {{ if eq .Active " rss" }}text-ink font-medium{{ else
-                        }}text-ink-light{{ end }}">苗圃</a>
-                    <span class="text-stone-200">|</span>
-                    <a href="/search" class="transition-colors {{ if eq .Active " search" }}text-ink font-medium{{ else
-                        }}text-ink-light{{ end }}">搜索</a>
-                </nav>
-            </div>
+                <div class="flex items-center space-x-2">
+                    <a href="/submit"
+                        class="flex items-center justify-center w-9 h-9 bg-moss text-white rounded-full hover:bg-moss-dark active:scale-95 transition-all"
+                        aria-label="发布新内容">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                    </a>
 
-            <!-- 右侧: 发布 + 用户 -->
-            <div class="flex items-center space-x-2">
-                <!-- 发布按钮: 醒目的品牌色 -->
-                <a href="/submit"
-                    class="flex items-center justify-center w-6 h-6 bg-moss text-white rounded-full hover:bg-moss-dark transition-colors">
-                    <!-- + 图标 -->
-                    <i data-lucide="plus" class="w-3 h-3"></i>
-                </a>
-
-                {{ if .CurrentUser }}
-                <!-- 已登录: emoji 头像,带未读消息小圆点 -->
-                <a href="/dashboard"
-                    class="relative flex items-center justify-center text-xl hover:opacity-80 transition-opacity">
-                    {{ .CurrentUser.Avatar }}
-                    {{ if gt .UnreadCount 0 }}
-                    <span
-                        class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                    {{ if .CurrentUser }}
+                    <a href="/dashboard"
+                        class="relative flex items-center justify-center w-9 h-9 text-xl rounded-full bg-white border border-stone-100 hover:bg-stone-50 transition-colors"
+                        aria-label="个人后台">
+                        {{ .CurrentUser.Avatar }}
+                        {{ if gt .UnreadCount 0 }}
+                        <span
+                            class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                        {{ end }}
+                    </a>
+                    {{ else }}
+                    <a href="/login"
+                        class="inline-flex items-center justify-center h-9 px-3 text-sm text-ink-light hover:text-ink transition-colors">登录</a>
                     {{ end }}
-                </a>
-                {{ else }}
-                <!-- 未登录: 登录 -->
-                <a href="/login" class="text-xs text-ink-light hover:text-ink transition-colors">登录</a>
-                {{ end }}
+                </div>
             </div>
+
+            <nav class="mt-2 flex items-center gap-1 overflow-x-auto scrollbar-hide text-sm">
+                <a href="/"
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "top" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">热门</a>
+                <a href="/new"
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "new" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">最新</a>
+                <a href="/nodes"
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "nodes" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">节点</a>
+                <a href="/rss"
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "rss" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">苗圃</a>
+                <a href="/search"
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "search" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">搜索</a>
+            </nav>
         </div>
     </header>
 
     <!-- 固定 Header 占位 -->
-    <div class="h-9 md:h-10"></div>
+    <div class="h-20 md:h-10"></div>
 
     <!-- Main Content -->
     <main class="flex-grow container mx-auto px-4 md:px-6 py-6 md:py-10 max-w-6xl border-x border-stone-100">
@@ -265,7 +256,7 @@
             x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 translate-y-2"
-            class="fixed bottom-8 right-8 flex items-center space-x-3 px-5 py-3 rounded-lg shadow-lg max-w-md pointer-events-auto"
+            class="fixed top-6 left-1/2 -translate-x-1/2 flex items-center space-x-3 px-5 py-3 rounded-lg shadow-lg max-w-[calc(100vw-2rem)] pointer-events-auto"
             :class="{
                 'bg-green-50 border border-green-200 text-green-700': type === 'success',
                 'bg-red-50 border border-red-200 text-red-700': type === 'error'

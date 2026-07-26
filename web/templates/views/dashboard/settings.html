@@ -180,7 +180,10 @@
                         <input type="password" name="old_password" id="old_password"
                             class="w-full px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm transition-colors group-hover:border-stone-300">
                         {{ if .User.GoogleID }}
-                        <p class="mt-1 text-xs text-stone-400">💡 通过 Google 登录注册的用户,修改密码时原密码可以留空</p>
+                        <p class="mt-1 flex items-center gap-1 text-xs text-stone-400">
+                            <i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>
+                            <span>通过 Google 登录注册的用户,修改密码时原密码可以留空</span>
+                        </p>
                         {{ end }}
                     </div>
 

@@ -53,7 +53,10 @@
 </div>
 {{ else }}
 <div class="mt-6 text-center text-ink-light">
-    <p class="py-4 text-sm">📖 {{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</p>
+    <p class="inline-flex items-center justify-center gap-1.5 py-4 text-sm">
+        <i data-lucide="book-open" class="w-4 h-4"></i>
+        <span>{{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</span>
+    </p>
 </div>
 {{ end }}
 

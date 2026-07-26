@@ -139,7 +139,8 @@
             <div class="flex items-center space-x-3">
                 <button hx-get="/rss/transplant/{{ .Item.ID }}" hx-target="body" hx-swap="beforeend"
                     class="flex items-center space-x-1.5 px-4 py-2 bg-white border border-stone-200 text-ink hover:border-moss hover:text-moss rounded-lg transition-colors text-sm font-bold shadow-sm">
-                    <span>🎋 推荐到社区</span>
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                    <span>推荐到社区</span>
                 </button>
 
                 <a href="{{ .Item.Link }}" target="_blank" rel="noopener noreferrer"

@@ -29,7 +29,7 @@
                         {{ if .Subscription.Feed.IconURL }}
                         <img src="{{ .Subscription.Feed.IconURL }}" alt="" class="w-full h-full object-cover">
                         {{ else }}
-                        <span class="text-xl">📰</span>
+                        <i data-lucide="newspaper" class="w-5 h-5 text-stone-400"></i>
                         {{ end }}
                     </div>
 
@@ -85,7 +85,7 @@
     {{ else }}
     <!-- 空状态 -->
     <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-        <div class="text-5xl mb-4">📭</div>
+        <i data-lucide="inbox" class="w-10 h-10 text-stone-300 mb-4"></i>
         <h3 class="text-lg font-medium text-ink mb-2">暂无订阅</h3>
         <p class="text-sm">点击右上角「添加订阅」开始收集内容</p>
     </div>

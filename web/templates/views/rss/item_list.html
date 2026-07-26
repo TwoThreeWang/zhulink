@@ -128,14 +128,17 @@
     </div>
     {{ else }}
     <div class="mt-6 text-center text-ink-light">
-        <p class="py-4 text-sm">📖 {{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</p>
+        <p class="inline-flex items-center justify-center gap-1.5 py-4 text-sm">
+            <i data-lucide="book-open" class="w-4 h-4"></i>
+            <span>{{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</span>
+        </p>
     </div>
     {{ end }}
 </div>
 {{ else }}
 <!-- 空状态 -->
 <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-    <div class="text-5xl mb-4">📄</div>
+    <i data-lucide="file-text" class="w-10 h-10 text-stone-300 mb-4"></i>
     <h3 class="text-lg font-medium text-ink mb-2">{{ if .ShowAll }}暂无文章{{ else }}太棒了！暂无未读文章{{ end }}</h3>
     <p class="text-sm">{{ if .ShowAll }}该订阅源还没有抓取到文章{{ else }}切换到“显示全部”可以查看历史记录{{ end }}</p>
     {{ if .ShowAll }}

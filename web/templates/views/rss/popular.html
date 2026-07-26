@@ -38,7 +38,10 @@
     <div class="max-w-4xl mx-auto">
         <!-- 面包屑导航 -->
         <nav class="flex items-center space-x-2 text-sm text-ink-light mb-4">
-            <a href="/rss" class="hover:text-moss transition-colors">🌱 苗圃</a>
+            <a href="/rss" class="inline-flex items-center gap-1 hover:text-moss transition-colors">
+                <i data-lucide="sprout" class="w-4 h-4"></i>
+                <span>苗圃</span>
+            </a>
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
             <span class="text-ink">热门订阅</span>
         </nav>
@@ -73,7 +76,7 @@
                         {{ if .IconURL }}
                         <img src="{{ .IconURL }}" alt="" class="w-full h-full object-cover">
                         {{ else }}
-                        <span class="text-2xl">📰</span>
+                        <i data-lucide="newspaper" class="w-6 h-6 text-stone-400"></i>
                         {{ end }}
                     </div>
 
@@ -131,7 +134,7 @@
                 上一页
             </a>
             {{ else }}
-            <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-ink-lighter cursor-not-allowed">
+            <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-stone-300 cursor-not-allowed">
                 <i data-lucide="chevron-left" class="w-4 h-4 inline-block"></i>
                 上一页
             </span>
@@ -150,7 +153,7 @@
                 <i data-lucide="chevron-right" class="w-4 h-4 inline-block"></i>
             </a>
             {{ else }}
-            <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-ink-lighter cursor-not-allowed">
+            <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-stone-300 cursor-not-allowed">
                 下一页
                 <i data-lucide="chevron-right" class="w-4 h-4 inline-block"></i>
             </span>
@@ -160,7 +163,7 @@
         {{ else }}
         <!-- 空状态 -->
         <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-            <div class="text-6xl mb-4">📭</div>
+            <i data-lucide="inbox" class="w-12 h-12 text-stone-300 mb-4"></i>
             <h2 class="text-xl font-medium text-ink mb-2">暂无热门订阅</h2>
             <p class="text-sm">还没有用户添加 RSS 订阅</p>
         </div>

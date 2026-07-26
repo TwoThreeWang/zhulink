@@ -9,7 +9,10 @@
         <aside class="hidden md:block md:col-span-3">
             <div class="sticky top-16">
                 <div class="flex items-center justify-between mb-4">
-                    <h1 class="text-lg font-bold text-ink">🌱 苗圃</h1>
+                    <h1 class="flex items-center gap-2 text-lg font-bold text-ink">
+                        <i data-lucide="sprout" class="w-5 h-5 text-moss"></i>
+                        <span>苗圃</span>
+                    </h1>
                     <div class="text-xs text-ink-light bg-stone-100 px-2 py-1 rounded-md">
                         {{ .CurrentRSSCount }}{{ if ne .MaxRSSCount -1 }}/{{ .MaxRSSCount }}{{ end }}
                     </div>
@@ -47,7 +50,7 @@
                 {{ else }}
                 <!-- 空状态 -->
                 <div class="text-center py-8 text-ink-light">
-                    <div class="text-3xl mb-2">📭</div>
+                    <i data-lucide="inbox" class="w-8 h-8 text-stone-300 mx-auto mb-2"></i>
                     <p class="text-sm">暂无订阅分类</p>
                     <p class="text-xs mt-1">点击上方按钮添加</p>
                 </div>
@@ -55,7 +58,10 @@
 
                 <!-- 底部提示 -->
                 <div class="mt-8 p-4 bg-stone-50 rounded-lg text-sm text-ink-light">
-                    <p class="mb-2">💡 使用技巧</p>
+                    <p class="mb-2 flex items-center gap-1.5">
+                        <i data-lucide="lightbulb" class="w-4 h-4"></i>
+                        <span>使用技巧</span>
+                    </p>
                     <ul class="list-disc list-inside space-y-1 text-xs">
                         <li>点击分类查看订阅源</li>
                         <li>点击订阅源查看文章</li>
@@ -72,7 +78,10 @@
                 <!-- 标题 + 添加按钮 -->
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center justify-between mb-1">
-                        <h1 class="text-lg font-bold text-ink">🌱 苗圃</h1>
+                        <h1 class="flex items-center gap-2 text-lg font-bold text-ink">
+                            <i data-lucide="sprout" class="w-5 h-5 text-moss"></i>
+                            <span>苗圃</span>
+                        </h1>
                         <div class="text-xs text-ink-light bg-stone-100 px-2 py-1 rounded-md">
                             {{ .CurrentRSSCount }}{{ if ne .MaxRSSCount -1 }}/{{ .MaxRSSCount }}{{ end }}
                         </div>
@@ -113,7 +122,7 @@
                 {{ end }}>
                 <!-- 初始状态 -->
                 <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-                    <div class="text-6xl mb-4">📡</div>
+                    <i data-lucide="rss" class="w-12 h-12 text-stone-300 mb-4"></i>
                     <h2 class="text-xl font-medium text-ink mb-2">开始阅读</h2>
                     <p class="text-sm hidden md:block">从左侧选择一个分类，或添加新的订阅源</p>
                     <p class="text-sm md:hidden">点击上方分类开始阅读</p>
@@ -325,16 +334,6 @@
 </div>
 
 <style>
-    /* 隐藏滚动条 */
-    .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-    }
-
-    .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-    }
-
     /* Loading Indicator Logic */
     #add-loading {
         display: none;
