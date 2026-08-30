@@ -25,7 +25,8 @@ nano .env.production
 
 **必须修改的配置项**:
 - `DB_PASSWORD`: 数据库密码 (强密码)
-- `SESSION_SECRET`: Session 密钥 (至少 32 位随机字符串)
+- `SESSION_AUTH_KEY`: Session 签名密钥 (`openssl rand -base64 64`)
+- `SESSION_ENCRYPTION_KEY`: Session 加密密钥 (`openssl rand -base64 32`)
 - `SITE_URL`: 你的网站 URL
 
 **可选配置项**:
@@ -160,7 +161,7 @@ docker-compose up -d
 
 ### 1. 安全配置
 
-- ✅ 使用强随机密码 (`DB_PASSWORD`, `SESSION_SECRET`)
+- ✅ 使用强随机密码和密钥 (`DB_PASSWORD`, `SESSION_AUTH_KEY`, `SESSION_ENCRYPTION_KEY`)
 - ✅ 不要将 `.env.production` 提交到 Git
 - ✅ 定期更新 Docker 镜像
 - ✅ 配置防火墙,仅开放必要端口
@@ -326,7 +327,8 @@ docker image prune -f
 | `DB_PASSWORD` | **是** | - | 数据库密码 |
 | `DB_PORT` | 否 | `5432` | 数据库端口 |
 | `APP_PORT` | 否 | `32919` | 应用端口 |
-| `SESSION_SECRET` | **是** | - | Session 密钥 |
+| `SESSION_AUTH_KEY` | **是** | - | Base64 编码的 64 字节 Session 签名密钥 |
+| `SESSION_ENCRYPTION_KEY` | **是** | - | Base64 编码的 32 字节 Session 加密密钥 |
 | `SITE_URL` | 否 | `http://localhost:32919` | 网站 URL |
 | `LLM_BASE_URL` | 否 | - | LLM API 地址 |
 | `LLM_MODEL` | 否 | - | LLM 模型名称 |

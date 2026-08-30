@@ -159,8 +159,10 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	}
 
 	// 登录
-	session.Set("user_id", user.ID)
-	session.Save()
+	if err := startUserSession(c, user.ID); err != nil {
+		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "登录状态保存失败，请重试"})
+		return
+	}
 
 	c.Redirect(http.StatusFound, "/")
 }

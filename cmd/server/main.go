@@ -69,28 +69,12 @@ func main() {
 	r := gin.Default()
 
 	// Setup Sessions
-	secret := os.Getenv("SESSION_SECRET")
-	if secret == "" {
-		if gin.Mode() == gin.ReleaseMode {
-			log.Fatal("SESSION_SECRET must be set in production")
-		}
-		var secretBytes [32]byte
-		if _, err := rand.Read(secretBytes[:]); err != nil {
-			log.Fatalf("generate development session secret failed: %v", err)
-		}
-		secret = base64.StdEncoding.EncodeToString(secretBytes[:])
-		log.Println("SESSION_SECRET not set; using ephemeral development secret")
-	}
-	store := cookie.NewStore([]byte(secret))
+	authKey := loadSessionKey("SESSION_AUTH_KEY", 64)
+	encryptionKey := loadSessionKey("SESSION_ENCRYPTION_KEY", 32)
+	store := cookie.NewStore(authKey, encryptionKey)
 
 	// 配置cookie选项以支持iOS等移动设备
-	store.Options(sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7,                          // 7天
-		HttpOnly: true,                               // 防止XSS攻击
-		Secure:   os.Getenv("GIN_MODE") == "release", // 生产环境使用HTTPS
-		SameSite: http.SameSiteLaxMode,               // Lax模式兼容性最好
-	})
+	store.Options(middleware.SessionCookieOptions(middleware.SessionIdleMaxAge))
 
 	r.Use(sessions.Sessions("zhulink_session", store))
 
@@ -148,6 +132,28 @@ func main() {
 	}
 
 	log.Println("Server exiting")
+}
+
+func loadSessionKey(name string, size int) []byte {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		if gin.Mode() == gin.ReleaseMode {
+			log.Fatalf("%s must be set in production", name)
+		}
+
+		key := make([]byte, size)
+		if _, err := rand.Read(key); err != nil {
+			log.Fatalf("generate development %s failed: %v", name, err)
+		}
+		log.Printf("%s not set; using an ephemeral development key", name)
+		return key
+	}
+
+	key, err := base64.StdEncoding.DecodeString(value)
+	if err != nil || len(key) != size {
+		log.Fatalf("%s must be standard Base64 encoding exactly %d bytes", name, size)
+	}
+	return key
 }
 
 func loadTemplates(templatesDir string) multitemplate.Renderer {

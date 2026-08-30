@@ -122,7 +122,10 @@ DATABASE_URL="host=localhost user=postgres password=yourpassword dbname=zhulink 
 # 服务器配置
 PORT=32919
 GIN_MODE=release  # debug, release, or test
-SESSION_SECRET="your-secret-key-change-me"
+# openssl rand -base64 64
+SESSION_AUTH_KEY="your-base64-encoded-64-byte-auth-key"
+# openssl rand -base64 32
+SESSION_ENCRYPTION_KEY="your-base64-encoded-32-byte-encryption-key"
 
 # 站点配置
 SITE_URL="https://zhulink.vip"
@@ -461,7 +464,7 @@ docker-compose up -d
 
 #### 生产环境配置
 1. 设置 `GIN_MODE=release`
-2. 使用强随机 `SESSION_SECRET`
+2. 使用 `openssl rand -base64 64` 和 `openssl rand -base64 32` 生成 Session 签名、加密密钥
 3. 配置 HTTPS (推荐使用 Nginx 反向代理)
 4. 配置数据库连接池
 5. 设置合适的超时时间

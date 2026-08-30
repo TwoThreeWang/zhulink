@@ -3,7 +3,9 @@ package handlers
 import (
 	"net/http"
 	"strings"
+	"time"
 	"zhulink/internal/db"
+	"zhulink/internal/middleware"
 	"zhulink/internal/models"
 	"zhulink/internal/utils"
 
@@ -16,6 +18,20 @@ import (
 type AuthHandler struct {
 	mailService    *services.MailService
 	captchaService *services.CaptchaService
+}
+
+const sessionAbsoluteLifetime = 180 * 24 * time.Hour
+
+func startUserSession(c *gin.Context, userID uint) error {
+	now := time.Now()
+	session := sessions.Default(c)
+	session.Clear()
+	session.Set(middleware.SessionUserIDKey, userID)
+	session.Set(middleware.SessionIssuedKey, now.Unix())
+	session.Set(middleware.SessionRenewedKey, now.Unix())
+	session.Set(middleware.SessionExpiresKey, now.Add(sessionAbsoluteLifetime).Unix())
+	session.Options(middleware.SessionCookieOptions(middleware.SessionIdleMaxAge))
+	return session.Save()
 }
 
 func NewAuthHandler() *AuthHandler {
@@ -144,9 +160,10 @@ func (h *AuthHandler) Activate(c *gin.Context) {
 	db.DB.Save(&user)
 
 	// 激活成功后自动登录
-	session := sessions.Default(c)
-	session.Set("user_id", user.ID)
-	session.Save()
+	if err := startUserSession(c, user.ID); err != nil {
+		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "登录状态保存失败，请重试"})
+		return
+	}
 
 	c.Redirect(http.StatusFound, "/")
 }
@@ -183,17 +200,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	session := sessions.Default(c)
-	session.Set("user_id", user.ID)
-	session.Save()
+	if err := startUserSession(c, user.ID); err != nil {
+		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "登录状态保存失败，请重试"})
+		return
+	}
 
 	c.Redirect(http.StatusFound, "/")
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
 	session := sessions.Default(c)
-	session.Clear()
-	session.Save()
+	if err := middleware.ClearSession(session); err != nil {
+		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "退出登录失败，请重试"})
+		return
+	}
 	c.Redirect(http.StatusFound, "/")
 }
 
