@@ -5,14 +5,14 @@
         <!-- 左侧：关闭按钮 -->
         <button onclick="hideReader()"
             class="flex items-center space-x-1.5 text-ink-light hover:text-ink transition-colors cursor-pointer">
-            <i data-lucide="x" class="w-5 h-5"></i>
+            <svg class="icon w-5 h-5" aria-hidden="true"><use href="#i-x"/></svg>
             <span class="text-sm">关闭</span>
         </button>
 
         <!-- 右侧：打开原文 -->
         <a href="{{ .Item.Link }}" target="_blank" rel="noopener noreferrer"
             class="flex items-center space-x-1.5 px-3 py-1.5 text-sm text-moss hover:bg-moss hover:text-white rounded-lg transition-colors">
-            <i data-lucide="external-link" class="w-4 h-4"></i>
+            <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-external-link"/></svg>
             <span>打开原文</span>
         </a>
     </div>
@@ -25,7 +25,7 @@
         <!-- 元信息 -->
         <div class="flex items-center space-x-4 text-sm text-ink-light mb-6 pb-6 border-b border-stone-100">
             <span class="flex items-center space-x-1">
-                <i data-lucide="calendar" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-calendar"/></svg>
                 <span>{{ .Item.PublishedAt.Format "2006-01-02 15:04" }}</span>
             </span>
         </div>
@@ -139,13 +139,13 @@
             <div class="flex items-center space-x-3">
                 <button hx-get="/rss/transplant/{{ .Item.ID }}" hx-target="body" hx-swap="beforeend"
                     class="flex items-center space-x-1.5 px-4 py-2 bg-white border border-stone-200 text-ink hover:border-moss hover:text-moss rounded-lg transition-colors text-sm font-bold shadow-sm">
-                    <i data-lucide="send" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-send"/></svg>
                     <span>推荐到社区</span>
                 </button>
 
                 <a href="{{ .Item.Link }}" target="_blank" rel="noopener noreferrer"
                     class="flex items-center space-x-1.5 px-4 py-2 bg-moss text-white rounded-lg hover:bg-moss-dark transition-colors text-sm">
-                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-external-link"/></svg>
                     <span>查看原文</span>
                 </a>
             </div>

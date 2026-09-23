@@ -86,11 +86,11 @@ func (h *BookmarkHandler) Toggle(c *gin.Context) {
 	// 返回更新后的HTML片段 - 匹配前端 #bookmark-content-{id} 的内容结构
 	if isBookmarked {
 		c.String(http.StatusOK, fmt.Sprintf(`
-			<i data-lucide="bookmark" class="w-4 h-4 text-amber-500 fill-amber-500"></i>
+			<svg class="icon w-4 h-4 text-amber-500 fill-amber-500" aria-hidden="true"><use href="#i-bookmark"/></svg>
 			<span>收藏 %d</span>`, count))
 	} else {
 		c.String(http.StatusOK, fmt.Sprintf(`
-			<i data-lucide="bookmark" class="w-4 h-4 text-stone-400 group-hover:text-amber-500 transition-colors"></i>
+			<svg class="icon w-4 h-4 text-stone-400 group-hover:text-amber-500 transition-colors" aria-hidden="true"><use href="#i-bookmark"/></svg>
 			<span>收藏 %d</span>`, count))
 	}
 }

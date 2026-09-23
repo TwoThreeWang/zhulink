@@ -9,6 +9,19 @@
   }
 }
 
+@layer components {
+  /* 图标：引用 base.html 内联的 sprite（<svg class="icon"><use href="#i-名称"/></svg>），默认样式同 lucide */
+  .icon {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;

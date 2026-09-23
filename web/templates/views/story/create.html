@@ -16,7 +16,7 @@
 <div class="grid grid-cols-12 gap-6 md:gap-12">
 
     <!-- 主内容区: col-span-8 -->
-    <main class="col-span-12 lg:col-span-8">
+    <div class="col-span-12 lg:col-span-8">
 
         <!-- 页面标题 -->
         <header class="mb-8">
@@ -26,7 +26,7 @@
 
         {{ if .Error }}
         <div class="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6 text-sm flex items-start">
-            <i data-lucide="alert-circle" class="w-5 h-5 mr-3 flex-shrink-0 mt-0.5"></i>
+            <svg class="icon w-5 h-5 mr-3 flex-shrink-0 mt-0.5" aria-hidden="true"><use href="#i-alert-circle"/></svg>
             <span>{{ .Error }}</span>
         </div>
         {{ end }}
@@ -73,20 +73,20 @@
             <!-- 提交按钮 -->
             <div class="flex items-center justify-between pt-4 border-t border-stone-100">
                 <a href="/" class="text-sm text-stone-500 hover:text-ink transition-colors inline-flex items-center">
-                    <i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i>
+                    <svg class="icon w-4 h-4 mr-1" aria-hidden="true"><use href="#i-arrow-left"/></svg>
                     返回首页
                 </a>
 
                 <button type="submit"
                     class="inline-flex items-center justify-center min-w-[120px] px-6 py-2.5 bg-moss hover:bg-moss-dark text-white font-medium rounded-md shadow-sm transition-all hover:shadow focus:ring-2 focus:ring-offset-2 focus:ring-moss">
-                    <i data-lucide="send" class="w-4 h-4 mr-2 flex-shrink-0"></i>
+                    <svg class="icon w-4 h-4 mr-2 flex-shrink-0" aria-hidden="true"><use href="#i-send"/></svg>
                     <span>发布</span>
                 </button>
             </div>
 
         </form>
 
-    </main>
+    </div>
 
     <!-- 侧边栏: col-span-4, sticky -->
     <aside class="hidden lg:block lg:col-span-4">
@@ -95,24 +95,24 @@
             <!-- 发帖指南 -->
             <div class="bg-stone-50 rounded-lg p-5 border border-stone-100">
                 <h3 class="font-bold text-ink mb-3 text-sm flex items-center">
-                    <i data-lucide="info" class="w-4 h-4 mr-2 text-moss"></i>
+                    <svg class="icon w-4 h-4 mr-2 text-moss" aria-hidden="true"><use href="#i-info"/></svg>
                     发帖指南
                 </h3>
                 <ul class="text-xs text-stone-600 space-y-2 leading-relaxed">
                     <li class="flex items-start">
-                        <i data-lucide="check" class="w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0"></i>
+                        <svg class="icon w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0" aria-hidden="true"><use href="#i-check"/></svg>
                         <span>标题要简洁明了，突出核心内容</span>
                     </li>
                     <li class="flex items-start">
-                        <i data-lucide="check" class="w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0"></i>
+                        <svg class="icon w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0" aria-hidden="true"><use href="#i-check"/></svg>
                         <span>选择合适的节点以便分类</span>
                     </li>
                     <li class="flex items-start">
-                        <i data-lucide="check" class="w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0"></i>
+                        <svg class="icon w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0" aria-hidden="true"><use href="#i-check"/></svg>
                         <span>分享链接时附上简短的评论</span>
                     </li>
                     <li class="flex items-start">
-                        <i data-lucide="check" class="w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0"></i>
+                        <svg class="icon w-3 h-3 mr-2 mt-0.5 text-moss flex-shrink-0" aria-hidden="true"><use href="#i-check"/></svg>
                         <span>内容支持 Markdown 格式</span>
                     </li>
                 </ul>
@@ -121,7 +121,7 @@
             <!-- Markdown 提示 -->
             <div class="bg-white rounded-lg p-5 border border-stone-100">
                 <h3 class="font-bold text-ink mb-3 text-sm flex items-center">
-                    <i data-lucide="file-text" class="w-4 h-4 mr-2 text-stone-400"></i>
+                    <svg class="icon w-4 h-4 mr-2 text-stone-400" aria-hidden="true"><use href="#i-file-text"/></svg>
                     Markdown 速查
                 </h3>
                 <div class="text-xs text-stone-600 space-y-1.5 font-mono">

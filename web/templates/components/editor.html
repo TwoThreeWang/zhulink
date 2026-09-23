@@ -31,60 +31,60 @@ Parameters:
             <div class="flex items-center space-x-0.5 text-stone-500 overflow-x-auto" x-show="!isPreview">
                 <button type="button" @click="prefixLines('## ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="标题 (H2)">
-                    <i data-lucide="heading-2" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-heading-2"/></svg>
                 </button>
                 <button type="button" @click="insertText('**', '**')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="加粗 (Ctrl+B)">
-                    <i data-lucide="bold" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-bold"/></svg>
                 </button>
                 <button type="button" @click="insertText('*', '*')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="斜体 (Ctrl+I)">
-                    <i data-lucide="italic" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-italic"/></svg>
                 </button>
                 <button type="button" @click="insertText('~~', '~~')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="删除线">
-                    <i data-lucide="strikethrough" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-strikethrough"/></svg>
                 </button>
                 <span class="w-px h-4 bg-stone-200 mx-1"></span>
                 <button type="button" @click="prefixLines('> ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="引用">
-                    <i data-lucide="quote" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-quote"/></svg>
                 </button>
                 <button type="button" @click="insertText('`', '`')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="行内代码">
-                    <i data-lucide="code" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-code"/></svg>
                 </button>
                 <button type="button" @click="insertCodeBlock()"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="代码块">
-                    <i data-lucide="file-code" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-file-code"/></svg>
                 </button>
                 <span class="w-px h-4 bg-stone-200 mx-1"></span>
                 <button type="button" @click="prefixLines('- ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="无序列表">
-                    <i data-lucide="list" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-list"/></svg>
                 </button>
                 <button type="button" @click="prefixLines('1. ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="有序列表">
-                    <i data-lucide="list-ordered" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-list-ordered"/></svg>
                 </button>
                 <button type="button" @click="insertLink()"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="链接 (Ctrl+K)">
-                    <i data-lucide="link" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-link"/></svg>
                 </button>
                 <button type="button" @click="insertText('![](', ')')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="图片链接">
-                    <i data-lucide="image" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-image"/></svg>
                 </button>
                 <button type="button" @click="triggerImageUpload()" :disabled="isUploading"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors relative"
                     :class="isUploading ? 'opacity-50 cursor-wait' : ''" title="上传图片 (Ctrl+V 粘贴)">
-                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-upload"/></svg>
                     <span x-show="isUploading"
                         class="absolute -top-1 -right-1 w-2 h-2 bg-moss rounded-full animate-pulse"></span>
                 </button>
                 <button type="button" @click="insertRule()"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="分割线">
-                    <i data-lucide="minus" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-minus"/></svg>
                 </button>
             </div>
         </div>
@@ -97,14 +97,14 @@ Parameters:
             <button type="button" @click="toggleSplitView()" x-show="isFullScreen"
                 class="p-2 rounded hover:bg-stone-200 text-stone-500 hover:text-ink transition-colors"
                 :class="isSplitView ? 'bg-stone-200 text-ink' : ''" :title="isSplitView ? '关闭对照' : '对照模式'">
-                <i data-lucide="columns-2" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-columns-2"/></svg>
             </button>
 
             <button type="button" @click="toggleFullScreen()"
                 class="p-2 rounded hover:bg-stone-200 text-stone-500 hover:text-ink transition-colors"
                 :title="isFullScreen ? '退出全屏' : '全屏编辑'">
-                <i x-show="!isFullScreen" data-lucide="maximize-2" class="w-4 h-4"></i>
-                <i x-show="isFullScreen" x-cloak data-lucide="minimize-2" class="w-4 h-4"></i>
+                <svg x-show="!isFullScreen" class="icon w-4 h-4" aria-hidden="true"><use href="#i-maximize-2"/></svg>
+                <svg x-show="isFullScreen" x-cloak class="icon w-4 h-4" aria-hidden="true"><use href="#i-minimize-2"/></svg>
             </button>
         </div>
     </div>

@@ -36,7 +36,7 @@
     <!-- 已读标记 -->
     <div
         class="read-check absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity {{ if not .IsRead }}hidden{{ end }}">
-        <i data-lucide="check" class="w-4 h-4 text-stone-300"></i>
+        <svg class="icon w-4 h-4 text-stone-300" aria-hidden="true"><use href="#i-check"/></svg>
     </div>
 </article>
 {{ end }}
@@ -54,7 +54,7 @@
 {{ else }}
 <div class="mt-6 text-center text-ink-light">
     <p class="inline-flex items-center justify-center gap-1.5 py-4 text-sm">
-        <i data-lucide="book-open" class="w-4 h-4"></i>
+        <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-book-open"/></svg>
         <span>{{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</span>
     </p>
 </div>

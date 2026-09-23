@@ -89,7 +89,7 @@
 <div class="grid grid-cols-12 gap-6 md:gap-12">
 
     <!-- 主内容区: col-span-8 -->
-    <main class="col-span-12 lg:col-span-8">
+    <div class="col-span-12 lg:col-span-8">
 
         <!-- Article Section -->
         <article class="mb-8 md:mb-12">
@@ -102,15 +102,15 @@
                 {{ if .Post.URL }}
                 <a href="{{ .Post.URL }}" target="_blank" rel="noopener nofollow"
                     class="block text-sm font-normal text-stone-400 -mt-2 mb-3 truncate hover:text-moss transition-colors">
-                    {{ .Post.URL }} <i data-lucide="external-link"
-                        class="w-4 h-4 inline-block -mt-1 ml-0.5 text-stone-300"></i>
+                    {{ .Post.URL }} <svg
+                        class="icon w-4 h-4 inline-block -mt-1 ml-0.5 text-stone-300" aria-hidden="true"><use href="#i-external-link"/></svg>
                 </a>
                 {{ end }}
 
                 <!-- Meta -->
                 <div class="flex flex-wrap items-center text-sm text-stone-500 gap-y-2">
                     <span class="inline-flex items-center">
-                        <i data-lucide="user" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        <svg class="icon w-3.5 h-3.5 mr-1.5 opacity-70" aria-hidden="true"><use href="#i-user"/></svg>
                         <a href="/u/{{ .Post.User.ID }}" class="font-medium hover:text-moss transition-colors">
                             {{ if eq .Post.SourceType "rss" }}由 {{ .Post.User.Username }} 推荐{{ else }}{{
                             .Post.User.Username }}{{ end }}
@@ -127,21 +127,21 @@
 
                     <a href="/t/{{ .Post.Node.Name }}"
                         class="inline-flex items-center hover:text-moss transition-colors">
-                        <i data-lucide="folder" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        <svg class="icon w-3.5 h-3.5 mr-1.5 opacity-70" aria-hidden="true"><use href="#i-folder"/></svg>
                         {{ .Post.Node.Name }}
                     </a>
 
                     <span class="text-stone-300 mx-2">·</span>
 
                     <span class="inline-flex items-center">
-                        <i data-lucide="eye" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        <svg class="icon w-3.5 h-3.5 mr-1.5 opacity-70" aria-hidden="true"><use href="#i-eye"/></svg>
                         {{ .Post.Views }}
                     </span>
 
                     <span class="text-stone-300 mx-2">·</span>
 
                     <a href="#comments" class="inline-flex items-center hover:text-moss transition-colors">
-                        <i data-lucide="message-square" class="w-3.5 h-3.5 mr-1.5 opacity-70"></i>
+                        <svg class="icon w-3.5 h-3.5 mr-1.5 opacity-70" aria-hidden="true"><use href="#i-message-square"/></svg>
                         {{ len .Comments }}
                     </a>
 
@@ -182,11 +182,11 @@
                     title="收藏">
                     <span id="bookmark-content-{{.Post.ID}}" class="inline-flex items-center gap-1.5">
                         {{ if .IsBookmarked }}
-                        <i data-lucide="bookmark" class="w-4 h-4 text-amber-500 fill-amber-500"></i>
+                        <svg class="icon w-4 h-4 text-amber-500 fill-amber-500" aria-hidden="true"><use href="#i-bookmark"/></svg>
                         <span>收藏 {{ .BookmarkCount }}</span>
                         {{ else }}
-                        <i data-lucide="bookmark"
-                            class="w-4 h-4 text-stone-400 group-hover:text-amber-500 transition-colors"></i>
+                        <svg
+                            class="icon w-4 h-4 text-stone-400 group-hover:text-amber-500 transition-colors" aria-hidden="true"><use href="#i-bookmark"/></svg>
                         <span>收藏 {{ .BookmarkCount }}</span>
                         {{ end }}
                     </span>
@@ -195,7 +195,7 @@
                 <button hx-post="/vote/post/{{.Post.ID}}" hx-swap="innerHTML" hx-target="#score-post-{{.Post.ID}}"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-stone-200 bg-white text-stone-600 hover:border-moss/30 hover:text-moss hover:bg-moss/5 transition-colors"
                     title="点赞">
-                    <i data-lucide="triangle" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-triangle"/></svg>
                     <span>赞</span>
                     <span id="score-post-{{.Post.ID}}" class="font-semibold">{{ .UpvoteCount }}</span>
                 </button>
@@ -203,7 +203,7 @@
                 <button hx-post="/vote/post/{{.Post.ID}}/down" hx-swap="innerHTML" hx-target="#downvote-{{.Post.ID}}"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-stone-200 bg-white text-stone-500 hover:border-stone-300 hover:text-ink hover:bg-stone-50 transition-colors"
                     title="点踩">
-                    <i data-lucide="triangle" class="w-4 h-4 rotate-180"></i>
+                    <svg class="icon w-4 h-4 rotate-180" aria-hidden="true"><use href="#i-triangle"/></svg>
                     <span>踩</span>
                     <span id="downvote-{{.Post.ID}}" class="font-semibold">{{ .DownvoteCount }}</span>
                 </button>
@@ -213,7 +213,7 @@
                     <button @click="shareOpen = !shareOpen"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-stone-200 bg-white text-stone-600 hover:border-moss/30 hover:text-moss hover:bg-moss/5 transition-colors"
                         title="分享">
-                        <i data-lucide="share-2" class="w-4 h-4"></i>
+                        <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-share-2"/></svg>
                         <span>分享</span>
                     </button>
                     <div x-show="shareOpen" x-cloak x-transition:enter="transition ease-out duration-150"
@@ -243,7 +243,7 @@
                         </a>
                         <button @click="copyArticleLink(); shareOpen = false"
                             class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-stone-600 hover:bg-stone-50 hover:text-moss transition-colors">
-                            <i data-lucide="link" class="w-4 h-4"></i>
+                            <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-link"/></svg>
                             <span>复制链接</span>
                         </button>
                     </div>
@@ -253,7 +253,7 @@
                 <button onclick="reportItem('post', {{.Post.ID}})"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-transparent text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                     title="举报">
-                    <i data-lucide="flag" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-flag"/></svg>
                     <span>举报</span>
                 </button>
                 {{ end }}
@@ -376,7 +376,7 @@
                         <a href="/p/{{ .PrevPost.Pid }}"
                             class="group flex flex-col p-4 rounded-lg border border-stone-200 hover:border-moss/50 hover:bg-moss/5 transition-all h-full">
                             <span class="text-xs text-stone-400 mb-1 flex items-center gap-1">
-                                <i data-lucide="chevron-left" class="w-3 h-3"></i>
+                                <svg class="icon w-3 h-3" aria-hidden="true"><use href="#i-chevron-left"/></svg>
                                 上一篇
                             </span>
                             <span
@@ -392,7 +392,7 @@
                             class="group flex flex-col p-4 rounded-lg border border-stone-200 hover:border-moss/50 hover:bg-moss/5 transition-all h-full text-right">
                             <span class="text-xs text-stone-400 mb-1 flex items-center justify-end gap-1">
                                 下一篇
-                                <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                                <svg class="icon w-3 h-3" aria-hidden="true"><use href="#i-chevron-right"/></svg>
                             </span>
                             <span
                                 class="text-sm font-medium text-stone-700 group-hover:text-moss transition-colors line-clamp-2">{{
@@ -532,7 +532,7 @@
             }
         </script>
 
-    </main>
+    </div>
 
     <!-- 侧边栏: col-span-4, sticky -->
     <aside class="hidden lg:block lg:col-span-4">

@@ -39,10 +39,10 @@
         <!-- 面包屑导航 -->
         <nav class="flex items-center space-x-2 text-sm text-ink-light mb-4">
             <a href="/rss" class="inline-flex items-center gap-1 hover:text-moss transition-colors">
-                <i data-lucide="sprout" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-sprout"/></svg>
                 <span>苗圃</span>
             </a>
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-right"/></svg>
             <span class="text-ink">热门订阅</span>
         </nav>
 
@@ -50,7 +50,7 @@
         <div class="flex items-center justify-between mb-6 pb-4 border-b border-stone-100">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 bg-moss/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="flame" class="w-5 h-5 text-moss"></i>
+                    <svg class="icon w-5 h-5 text-moss" aria-hidden="true"><use href="#i-flame"/></svg>
                 </div>
                 <div>
                     <h1 class="text-xl font-bold text-ink">热门订阅</h1>
@@ -76,7 +76,7 @@
                         {{ if .IconURL }}
                         <img src="{{ .IconURL }}" alt="" class="w-full h-full object-cover">
                         {{ else }}
-                        <i data-lucide="newspaper" class="w-6 h-6 text-stone-400"></i>
+                        <svg class="icon w-6 h-6 text-stone-400" aria-hidden="true"><use href="#i-newspaper"/></svg>
                         {{ end }}
                     </div>
 
@@ -89,7 +89,7 @@
                         <!-- 订阅人数和订阅按钮 -->
                         <div class="flex items-center justify-between mt-2">
                             <div class="flex items-center text-sm text-ink-light">
-                                <i data-lucide="users" class="w-4 h-4 mr-1"></i>
+                                <svg class="icon w-4 h-4 mr-1" aria-hidden="true"><use href="#i-users"/></svg>
                                 <span>{{ .SubscriberCount }} 人订阅</span>
                             </div>
                             {{ if $.CurrentUser }}
@@ -130,12 +130,12 @@
             {{ if gt .CurrentPage 1 }}
             <a href="/rss/popular?page={{ add .CurrentPage -1 }}"
                 class="px-4 py-2 text-sm border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors">
-                <i data-lucide="chevron-left" class="w-4 h-4 inline-block"></i>
+                <svg class="icon w-4 h-4 inline-block" aria-hidden="true"><use href="#i-chevron-left"/></svg>
                 上一页
             </a>
             {{ else }}
             <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-stone-300 cursor-not-allowed">
-                <i data-lucide="chevron-left" class="w-4 h-4 inline-block"></i>
+                <svg class="icon w-4 h-4 inline-block" aria-hidden="true"><use href="#i-chevron-left"/></svg>
                 上一页
             </span>
             {{ end }}
@@ -150,12 +150,12 @@
             <a href="/rss/popular?page={{ add .CurrentPage 1 }}"
                 class="px-4 py-2 text-sm border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors">
                 下一页
-                <i data-lucide="chevron-right" class="w-4 h-4 inline-block"></i>
+                <svg class="icon w-4 h-4 inline-block" aria-hidden="true"><use href="#i-chevron-right"/></svg>
             </a>
             {{ else }}
             <span class="px-4 py-2 text-sm border border-stone-100 rounded-lg text-stone-300 cursor-not-allowed">
                 下一页
-                <i data-lucide="chevron-right" class="w-4 h-4 inline-block"></i>
+                <svg class="icon w-4 h-4 inline-block" aria-hidden="true"><use href="#i-chevron-right"/></svg>
             </span>
             {{ end }}
         </div>
@@ -163,7 +163,7 @@
         {{ else }}
         <!-- 空状态 -->
         <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-            <i data-lucide="inbox" class="w-12 h-12 text-stone-300 mb-4"></i>
+            <svg class="icon w-12 h-12 text-stone-300 mb-4" aria-hidden="true"><use href="#i-inbox"/></svg>
             <h2 class="text-xl font-medium text-ink mb-2">暂无热门订阅</h2>
             <p class="text-sm">还没有用户添加 RSS 订阅</p>
         </div>

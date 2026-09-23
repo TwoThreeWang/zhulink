@@ -37,5 +37,7 @@ type Post struct {
 	DeletedAt      gorm.DeletedAt   `gorm:"index" json:"-"`
 
 	// 非数据库字段，用于查询时填充
-	CommentCount int `gorm:"-" json:"comment_count"`
+	CommentCount int  `gorm:"-" json:"comment_count"`
+	UpvoteCount  int  `gorm:"-" json:"upvote_count"`
+	IsNew        bool `gorm:"-" json:"-"` // 发布 48 小时内，列表里没人点赞时显示"新"
 }

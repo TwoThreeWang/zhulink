@@ -35,39 +35,37 @@ func NewStoryHandler() *StoryHandler {
 	}
 }
 
-// fillCommentCounts 批量填充帖子的评论数量
-func fillCommentCounts(posts []models.Post) {
+// fillPostCounts 批量填充列表展示用的评论数和点赞数
+func fillPostCounts(posts []models.Post) {
 	if len(posts) == 0 {
 		return
 	}
 
-	// 收集所有帖子ID
 	postIDs := make([]uint, len(posts))
 	for i, p := range posts {
 		postIDs[i] = p.ID
 	}
 
-	// 批量查询评论数量
-	type CountResult struct {
-		PostID uint
-		Count  int
+	// 按帖子分组计数，返回 post_id -> count
+	countBy := func(query *gorm.DB) map[uint]int {
+		var results []struct {
+			PostID uint
+			Count  int
+		}
+		query.Select("post_id, COUNT(*) as count").Where("post_id IN ?", postIDs).Group("post_id").Scan(&results)
+		counts := make(map[uint]int, len(results))
+		for _, r := range results {
+			counts[r.PostID] = r.Count
+		}
+		return counts
 	}
-	var results []CountResult
-	db.DB.Model(&models.Comment{}).
-		Select("post_id, COUNT(*) as count").
-		Where("post_id IN ?", postIDs).
-		Group("post_id").
-		Scan(&results)
+	comments := countBy(db.DB.Model(&models.Comment{}))
+	upvotes := countBy(db.DB.Model(&models.Vote{}).Where("value = 1"))
 
-	// 建立映射
-	countMap := make(map[uint]int)
-	for _, r := range results {
-		countMap[r.PostID] = r.Count
-	}
-
-	// 填充到帖子
 	for i := range posts {
-		posts[i].CommentCount = countMap[posts[i].ID]
+		posts[i].CommentCount = comments[posts[i].ID]
+		posts[i].UpvoteCount = upvotes[posts[i].ID]
+		posts[i].IsNew = time.Since(posts[i].CreatedAt) < 48*time.Hour
 	}
 }
 
@@ -133,7 +131,7 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 		Offset(offset).
 		Find(&posts)
 
-	fillCommentCounts(posts)
+	fillPostCounts(posts)
 
 	// 获取节点列表（用于侧边栏导航）
 	var nodes []models.Node
@@ -193,7 +191,7 @@ func (h *StoryHandler) ListNew(c *gin.Context) {
 		Offset(offset).
 		Find(&posts)
 
-	fillCommentCounts(posts)
+	fillPostCounts(posts)
 
 	// 获取节点列表（用于侧边栏导航）
 	var nodes []models.Node
@@ -262,7 +260,7 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 		Offset(offset).
 		Find(&posts)
 
-	fillCommentCounts(posts)
+	fillPostCounts(posts)
 
 	// 获取节点列表（用于侧边栏导航）
 	var nodes []models.Node
@@ -312,7 +310,7 @@ func (h *StoryHandler) Search(c *gin.Context) {
 			Find(&posts)
 	}
 
-	fillCommentCounts(posts)
+	fillPostCounts(posts)
 
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")

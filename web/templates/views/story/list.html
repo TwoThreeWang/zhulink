@@ -58,14 +58,17 @@
 <div class="grid grid-cols-12 gap-4 md:gap-12">
 
     <!-- 主内容区: col-span-8 -->
-    <main class="col-span-12 lg:col-span-8">
+    <div class="col-span-12 lg:col-span-8">
 
-        <!-- 节点信息展示 (仅在节点页面显示) -->
+        <!-- 节点页显示节点标题；热门/最新页的 h1 只给搜索引擎和读屏，不改变视觉 -->
+        {{ if not .Node }}
+        <h1 class="sr-only">{{ if eq .Active "top" }}ZhuLink 竹林：去算法的高质量资讯社区{{ else }}{{ .Title }} - ZhuLink 竹林{{ end }}</h1>
+        {{ end }}
         {{ if .Node }}
         <header class="mb-6 pb-6 border-b border-stone-200">
             <div class="flex items-start gap-3">
                 <div class="flex-shrink-0 w-12 h-12 bg-moss/10 rounded-lg flex items-center justify-center">
-                    <i data-lucide="hash" class="w-6 h-6 text-moss"></i>
+                    <svg class="icon w-6 h-6 text-moss" aria-hidden="true"><use href="#i-hash"/></svg>
                 </div>
                 <div class="flex-grow min-w-0">
                     <h1 class="font-sans font-bold text-2xl md:text-3xl text-ink mb-2">
@@ -88,10 +91,10 @@
         <!-- 帖子列表 -->
         <ul class="divide-y divide-stone-200/60">
             {{ range $index, $post := .Posts }}
-            <li class="py-3 flex items-start gap-1 md:gap-2">
+            <li class="py-3 flex items-start gap-2 md:gap-3">
 
-                <!-- 热度指示器 -->
-                {{ template "heat" dict "Score" .Score }}
+                <!-- 点赞数（共识信号） -->
+                {{ template "upvotes" . }}
 
                 <!-- Content -->
                 <div class="flex-grow min-w-0 overflow-hidden">
@@ -99,8 +102,8 @@
                     <div class="leading-snug line-clamp-2">
                         {{ if .IsTop }}
                         <span
-                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-bold uppercase tracking-wider mr-1 border border-amber-100/50 vertical-align-middle">
-                            <i data-lucide="pin" class="w-3 h-3 fill-current"></i>
+                            class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-bold uppercase tracking-wider mr-1 border border-amber-100/50 vertical-align-middle">
+                            <svg class="icon w-3 h-3 fill-current" aria-hidden="true"><use href="#i-pin"/></svg>
                             置顶
                         </span>
                         {{ end }}
@@ -108,7 +111,7 @@
                         <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
                             class="font-sans font-medium text-base text-ink hover:text-moss transition-colors visited-link">
                             {{ .Title }}
-                            <i data-lucide="external-link" class="w-3.5 h-3.5 text-stone-400 inline-block ml-1"></i>
+                            <svg class="icon w-3.5 h-3.5 text-stone-400 inline-block ml-1" aria-hidden="true"><use href="#i-external-link"/></svg>
                         </a>
                         {{ else }}
                         <a href="/p/{{ .Pid }}"
@@ -122,20 +125,20 @@
                     <p class="text-xs text-stone-500 mt-1 flex flex-wrap items-center gap-x-2">
                         <a href="/u/{{ .User.ID }}"
                             class="hover:text-moss transition-colors inline-flex items-center gap-1 flex-shrink-0">
-                            <i data-lucide="user" class="w-3 h-3"></i>
+                            <svg class="icon w-3 h-3" aria-hidden="true"><use href="#i-user"/></svg>
                             <span class="truncate max-w-[100px]">{{ .User.Username }}</span>
                         </a>
                         <span class="text-stone-300">·</span>
                         <span class="whitespace-nowrap">{{ timeAgo .CreatedAt }}</span>
                         <span class="text-stone-300">·</span>
                         <span class="inline-flex items-center gap-1 flex-shrink-0">
-                            <i data-lucide="eye" class="w-3 h-3"></i>
+                            <svg class="icon w-3 h-3" aria-hidden="true"><use href="#i-eye"/></svg>
                             {{ .Views }}
                         </span>
                         <span class="text-stone-300">·</span>
                         <a href="/p/{{ .Pid }}"
                             class="hover:text-moss transition-colors inline-flex items-center gap-1 flex-shrink-0">
-                            <i data-lucide="message-square" class="w-3 h-3"></i>
+                            <svg class="icon w-3 h-3" aria-hidden="true"><use href="#i-message-square"/></svg>
                             {{ .CommentCount }}
                         </a>
                     </p>
@@ -144,7 +147,7 @@
                 <!-- Node Badge -->
                 <div class="flex-shrink-0">
                     <a href="/t/{{ .Node.Name }}"
-                        class="inline-block px-2 py-1 text-xs font-medium text-moss bg-moss/10 rounded hover:bg-moss/20 transition-colors whitespace-nowrap">
+                        class="inline-block px-2 py-1 text-xs font-medium text-green-800 bg-moss/10 rounded hover:bg-moss/20 transition-colors whitespace-nowrap">
                         {{ .Node.Name }}
                     </a>
                 </div>
@@ -160,13 +163,13 @@
             {{ if gt .CurrentPage 1 }}
             <a href="?page={{ sub .CurrentPage 1 }}"
                 class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">
-                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-left"/></svg>
                 <span>上一页</span>
             </a>
             {{ else }}
             <span
                 class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-stone-300 bg-stone-50/50 rounded-md cursor-not-allowed">
-                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-left"/></svg>
                 <span>上一页</span>
             </span>
             {{ end }}
@@ -227,18 +230,18 @@
             <a href="?page={{ add .CurrentPage 1 }}"
                 class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">
                 <span>下一页</span>
-                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-right"/></svg>
             </a>
             {{ else }}
             <span
                 class="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-stone-300 bg-stone-50/50 rounded-md cursor-not-allowed">
                 <span>下一页</span>
-                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-right"/></svg>
             </span>
             {{ end }}
         </nav>
         {{ end }}
-    </main>
+    </div>
 
     <!-- 侧边栏: col-span-4, sticky -->
     <aside class="hidden lg:block lg:col-span-4">
@@ -270,7 +273,7 @@
                     <a href="/t/{{ .Name }}"
                         class="block py-2 hover:bg-white/50 -mx-1 px-1 rounded transition-colors group">
                         <div class="flex items-center gap-1.5">
-                            <i data-lucide="hash" class="w-3.5 h-3.5 text-moss flex-shrink-0"></i>
+                            <svg class="icon w-3.5 h-3.5 text-moss flex-shrink-0" aria-hidden="true"><use href="#i-hash"/></svg>
                             <span class="text-sm text-ink group-hover:text-moss">{{ .Name }}</span>
                         </div>
                         {{ if .Description }}

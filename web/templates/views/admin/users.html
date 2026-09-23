@@ -9,7 +9,7 @@
         </aside>
 
         <!-- 主内容区 -->
-        <main class="flex-grow min-w-0">
+        <div class="flex-grow min-w-0">
             <div class="flex items-center justify-between mb-6 pl-1">
                 <h1 class="text-xl font-bold text-ink">用户管理</h1>
                 <span class="text-sm text-stone-400">共 {{ .Total }} 位用户</span>
@@ -78,12 +78,12 @@
                 {{ if .HasPrev }}
                 <a href="/admin/users?page={{ sub .Page 1 }}"
                     class="flex items-center gap-1 px-4 py-2 text-sm text-stone-600 hover:text-moss hover:bg-moss/10 rounded-lg transition-colors">
-                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-left"/></svg>
                     上一页
                 </a>
                 {{ else }}
                 <span class="flex items-center gap-1 px-4 py-2 text-sm text-stone-300 cursor-not-allowed">
-                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-left"/></svg>
                     上一页
                 </span>
                 {{ end }}
@@ -96,12 +96,12 @@
                 <a href="/admin/users?page={{ add .Page 1 }}"
                     class="flex items-center gap-1 px-4 py-2 text-sm text-stone-600 hover:text-moss hover:bg-moss/10 rounded-lg transition-colors">
                     下一页
-                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-right"/></svg>
                 </a>
                 {{ else }}
                 <span class="flex items-center gap-1 px-4 py-2 text-sm text-stone-300 cursor-not-allowed">
                     下一页
-                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-right"/></svg>
                 </span>
                 {{ end }}
             </div>
@@ -111,12 +111,12 @@
             <div class="py-12 text-center bg-stone-50/50 rounded-2xl border border-dashed border-stone-200">
                 <div
                     class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-sm mb-3 text-stone-300">
-                    <i data-lucide="users" class="w-6 h-6"></i>
+                    <svg class="icon w-6 h-6" aria-hidden="true"><use href="#i-users"/></svg>
                 </div>
                 <p class="text-stone-400 text-sm font-medium">暂无用户</p>
             </div>
             {{ end }}
-        </main>
+        </div>
     </div>
 </div>
 {{ end }}

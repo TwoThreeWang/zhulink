@@ -1,4 +1,4 @@
-.PHONY: dev build css css-build css-watch run-server setup clean
+.PHONY: dev build css css-build css-watch run-server setup clean icons
 
 # 开发模式 (热重载 + CSS 监听)
 dev:
@@ -19,6 +19,10 @@ css-watch:
 # CSS 构建模式 (生产环境,压缩)
 css-build:
 	npx tailwindcss -i ./web/assets/input.css -o ./web/static/css/style.css --minify
+
+# 重新生成图标 sprite（模板里新增 #i-xxx 图标后运行）
+icons:
+	node scripts/gen-icons.mjs
 
 # 兼容旧命令
 css: css-watch

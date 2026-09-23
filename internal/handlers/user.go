@@ -66,7 +66,7 @@ func (h *UserHandler) Profile(c *gin.Context) {
 			Order("created_at DESC").
 			Limit(50).
 			Find(&posts)
-		fillCommentCounts(posts)
+		fillPostCounts(posts)
 	} else if tab == "comments" {
 		// 查询用户的评论
 		db.DB.Preload("Post").
@@ -95,7 +95,7 @@ func (h *UserHandler) Profile(c *gin.Context) {
 		for _, b := range bookmarks {
 			bookmarkedPosts = append(bookmarkedPosts, b.Post)
 		}
-		fillCommentCounts(bookmarkedPosts)
+		fillPostCounts(bookmarkedPosts)
 	}
 
 	Render(c, http.StatusOK, "user/public.html", gin.H{

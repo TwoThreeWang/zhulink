@@ -15,7 +15,7 @@
                 <!-- 返回按钮 -->
                 <button hx-get="/rss/feeds?category={{ .Category }}" hx-target="#rss-main-container" hx-swap="innerHTML"
                     class="flex items-center text-ink-light hover:text-ink transition-colors cursor-pointer">
-                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-arrow-left"/></svg>
                 </button>
 
                 <!-- 分隔 -->
@@ -28,7 +28,7 @@
                 </button>
 
                 <!-- 箭头 -->
-                <i data-lucide="chevron-right" class="w-4 h-4 text-stone-300 flex-shrink-0"></i>
+                <svg class="icon w-4 h-4 text-stone-300 flex-shrink-0" aria-hidden="true"><use href="#i-chevron-right"/></svg>
 
                 <!-- 订阅源名称 -->
                 <span class="font-medium text-ink truncate">{{ .FeedTitle }}</span>
@@ -42,7 +42,7 @@
                     hx-target="#rss-item-list" hx-swap="outerHTML"
                     class="flex items-center space-x-1 px-2.5 py-1.5 text-sm rounded-lg transition-colors cursor-pointer {{ if .ShowAll }}bg-stone-100 text-ink{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}"
                     title="{{ if .ShowAll }}仅看未读{{ else }}显示全部{{ end }}">
-                    <i data-lucide="{{ if .ShowAll }}eye-off{{ else }}eye{{ end }}" class="w-4 h-4"></i>
+                    {{ if .ShowAll }}<svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-eye-off"/></svg>{{ else }}<svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-eye"/></svg>{{ end }}
                 </button>
 
                 <!-- 标记全部已读 -->
@@ -50,14 +50,14 @@
                     hx-on::after-request="if(event.detail.successful) { htmx.ajax('GET', '/rss/feeds?category={{ .Category }}', {target:'#rss-main-container', swap:'innerHTML'}) }"
                     class="flex items-center px-2.5 py-1.5 text-sm text-ink-light hover:text-ink hover:bg-stone-50 rounded-lg transition-colors cursor-pointer"
                     title="标记全部已读">
-                    <i data-lucide="check-check" class="w-4 h-4"></i>
+                    <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-check-check"/></svg>
                 </button>
 
                 <!-- 刷新 -->
                 <button hx-post="/rss/refresh/{{ .Subscription.FeedID }}" hx-swap="none"
                     class="group flex items-center px-2.5 py-1.5 text-sm text-ink-light hover:text-ink hover:bg-stone-50 rounded-lg transition-colors cursor-pointer"
                     title="刷新">
-                    <i data-lucide="refresh-cw" class="w-4 h-4 group-[.htmx-request]:animate-spin"></i>
+                    <svg class="icon w-4 h-4 group-[.htmx-request]:animate-spin" aria-hidden="true"><use href="#i-refresh-cw"/></svg>
                 </button>
 
 
@@ -110,7 +110,7 @@
             <!-- 已读标记 -->
             <div
                 class="read-check absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity {{ if not .IsRead }}hidden{{ end }}">
-                <i data-lucide="check" class="w-4 h-4 text-stone-300"></i>
+                <svg class="icon w-4 h-4 text-stone-300" aria-hidden="true"><use href="#i-check"/></svg>
             </div>
         </article>
         {{ end }}
@@ -129,7 +129,7 @@
     {{ else }}
     <div class="mt-6 text-center text-ink-light">
         <p class="inline-flex items-center justify-center gap-1.5 py-4 text-sm">
-            <i data-lucide="book-open" class="w-4 h-4"></i>
+            <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-book-open"/></svg>
             <span>{{ if .ShowAll }}已加载全部文章{{ else }}已加载全部未读文章{{ end }}</span>
         </p>
     </div>
@@ -138,7 +138,7 @@
 {{ else }}
 <!-- 空状态 -->
 <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-    <i data-lucide="file-text" class="w-10 h-10 text-stone-300 mb-4"></i>
+    <svg class="icon w-10 h-10 text-stone-300 mb-4" aria-hidden="true"><use href="#i-file-text"/></svg>
     <h3 class="text-lg font-medium text-ink mb-2">{{ if .ShowAll }}暂无文章{{ else }}太棒了！暂无未读文章{{ end }}</h3>
     <p class="text-sm">{{ if .ShowAll }}该订阅源还没有抓取到文章{{ else }}切换到“显示全部”可以查看历史记录{{ end }}</p>
     {{ if .ShowAll }}

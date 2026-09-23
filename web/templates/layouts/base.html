@@ -39,8 +39,6 @@
     {{ block "scripts" . }}{{ end }}
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js"></script>
-    <!-- Lucide Icons -->
-    <script defer src="https://cdn.jsdelivr.net/npm/lucide@1.47.0/dist/umd/lucide.min.js"></script>
     <style>
         [x-cloak] {
             display: none !important;
@@ -61,6 +59,7 @@
 <!-- 设计理念: 白纸墨字, 点翠成林 -->
 
 <body class="bg-paper text-ink font-sans antialiased min-h-screen flex flex-col selection:bg-moss selection:text-white">
+    {{ template "icon_sprite" }}
 
     <!-- ==================== PC 端顶栏 (Desktop Header) ==================== -->
     <!-- 设计关键词：沉浸、浏览、身份 -->
@@ -128,8 +127,8 @@
                             {{ end }}
                         </span>
                         <span class="text-ink-light">{{ .CurrentUser.Username }}</span>
-                        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform"
-                            :class="{ 'rotate-180': open }"></i>
+                        <svg class="icon w-4 h-4 transition-transform"
+                            :class="{ 'rotate-180': open }" aria-hidden="true"><use href="#i-chevron-down"/></svg>
                     </button>
                     <!-- 下拉菜单 -->
                     <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-150"
@@ -176,7 +175,7 @@
                     <a href="/submit"
                         class="flex items-center justify-center w-9 h-9 bg-moss text-white rounded-full hover:bg-moss-dark active:scale-95 transition-all"
                         aria-label="发布新内容">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-plus"/></svg>
                     </a>
 
                     {{ if .CurrentUser }}
@@ -198,15 +197,15 @@
 
             <nav class="mt-2 flex items-center gap-1 overflow-x-auto scrollbar-hide text-sm">
                 <a href="/"
-                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "top" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">热门</a>
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "top" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">热门</a>
                 <a href="/new"
-                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "new" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">最新</a>
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "new" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">最新</a>
                 <a href="/nodes"
-                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "nodes" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">节点</a>
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "nodes" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">节点</a>
                 <a href="/rss"
-                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "rss" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">苗圃</a>
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "rss" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">苗圃</a>
                 <a href="/search"
-                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "search" }}bg-moss/10 text-moss font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">搜索</a>
+                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "search" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">搜索</a>
             </nav>
         </div>
     </header>
@@ -264,8 +263,8 @@
 
             <!-- 图标 (预渲染所有可能的图标，避免动态扫描) -->
             <div class="flex-shrink-0">
-                <i data-lucide="check-circle" x-show="type === 'success'" class="w-5 h-5"></i>
-                <i data-lucide="alert-circle" x-show="type === 'error'" class="w-5 h-5"></i>
+                <svg x-show="type === 'success'" class="icon w-5 h-5" aria-hidden="true"><use href="#i-check-circle"/></svg>
+                <svg x-show="type === 'error'" class="icon w-5 h-5" aria-hidden="true"><use href="#i-alert-circle"/></svg>
             </div>
 
             <!-- 消息文本 -->
@@ -273,17 +272,16 @@
 
             <!-- 关闭按钮 -->
             <button @click="show = false" class="ml-2 hover:opacity-70 transition-opacity cursor-pointer">
-                <i data-lucide="x" class="w-4 h-4"></i>
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-x"/></svg>
             </button>
         </div>
     </div>
 
     <!-- 返回顶部按钮 -->
-    <button onclick="window.scrollTo({top:0,behavior:'smooth'})"
+    <button onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="回到顶部"
         class="fixed bottom-8 right-8 w-12 h-12 bg-moss text-white rounded-full shadow-lg hover:bg-moss-dark transition-all opacity-0 pointer-events-none z-50"
-        onscroll="this.style.opacity=window.scrollY>300?'1':'0';this.style.pointerEvents=window.scrollY>300?'auto':'none'"
         id="backToTop">
-        <i data-lucide="arrow-up" class="w-5 h-5 mx-auto"></i>
+        <svg class="icon w-5 h-5 mx-auto" aria-hidden="true"><use href="#i-arrow-up"/></svg>
     </button>
 
     <script>
@@ -299,40 +297,7 @@
         });
     </script>
 
-    <!-- 初始化 Lucide Icons -->
     <script>
-        // 等待 DOM 和 defer 脚本加载完成后再初始化图标
-        document.addEventListener('DOMContentLoaded', function () {
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-        });
-
-        // 防抖渲染 Lucide 图标（限制作用范围）
-        window.__lucideTimeout = null;
-        function renderLucideIconsIn(container) {
-            if (window.__lucideTimeout) clearTimeout(window.__lucideTimeout);
-            window.__lucideTimeout = setTimeout(() => {
-                if (container && container.querySelectorAll) {
-                    const icons = container.querySelectorAll('i[data-lucide]:not([data-lucide-rendered])');
-                    if (icons.length > 0) {
-                        icons.forEach(icon => {
-                            icon.setAttribute('data-lucide-rendered', 'true');
-                        });
-                        // 只渲染传入的特定节点，避免扫描全页面
-                        lucide.createIcons({
-                            nodes: Array.from(icons)
-                        });
-                    }
-                }
-            }, 50);
-        }
-
-        // HTMX 内容替换后只渲染新内容区域的图标
-        document.body.addEventListener('htmx:afterSwap', function (evt) {
-            renderLucideIconsIn(evt.detail.target);
-        });
-
         // 处理非 2xx 响应中的 HX-Trigger（HTMX 默认不处理错误响应的 Trigger）
         document.body.addEventListener('htmx:responseError', function (evt) {
             const xhr = evt.detail.xhr;

@@ -3,7 +3,7 @@
     <!-- 顶部导航 -->
     <div class="flex items-center justify-between mb-6 pb-4 border-b border-stone-100">
         <div class="flex items-center space-x-2">
-            <i data-lucide="folder" class="w-5 h-5 text-moss"></i>
+            <svg class="icon w-5 h-5 text-moss" aria-hidden="true"><use href="#i-folder"/></svg>
             <h2 class="text-lg font-bold text-ink">{{ .Category }}</h2>
         </div>
         <span class="text-sm text-ink-light">{{ len .Feeds }} 个订阅</span>
@@ -29,7 +29,7 @@
                         {{ if .Subscription.Feed.IconURL }}
                         <img src="{{ .Subscription.Feed.IconURL }}" alt="" class="w-full h-full object-cover">
                         {{ else }}
-                        <i data-lucide="newspaper" class="w-5 h-5 text-stone-400"></i>
+                        <svg class="icon w-5 h-5 text-stone-400" aria-hidden="true"><use href="#i-newspaper"/></svg>
                         {{ end }}
                     </div>
 
@@ -67,7 +67,7 @@
                     @click.stop="editingId = {{ .Subscription.ID }}; editTitle = '{{ .Subscription.Title }}'; editCategory = '{{ .Subscription.Category }}'"
                     class="p-2 text-ink-light hover:text-moss hover:bg-stone-100 rounded transition-colors cursor-pointer"
                     title="编辑">
-                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                    <svg class="icon w-3.5 h-3.5" aria-hidden="true"><use href="#i-pencil"/></svg>
                 </button>
                 <!-- 删除按钮 -->
                 <button hx-delete="/rss/unsubscribe/{{ .Subscription.ID }}"
@@ -76,7 +76,7 @@
                     @click.stop
                     class="p-2 text-ink-light hover:text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
                     title="取消订阅">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    <svg class="icon w-3.5 h-3.5" aria-hidden="true"><use href="#i-trash-2"/></svg>
                 </button>
             </div>
         </div>
@@ -85,7 +85,7 @@
     {{ else }}
     <!-- 空状态 -->
     <div class="flex flex-col items-center justify-center py-20 text-center text-ink-light">
-        <i data-lucide="inbox" class="w-10 h-10 text-stone-300 mb-4"></i>
+        <svg class="icon w-10 h-10 text-stone-300 mb-4" aria-hidden="true"><use href="#i-inbox"/></svg>
         <h3 class="text-lg font-medium text-ink mb-2">暂无订阅</h3>
         <p class="text-sm">点击右上角「添加订阅」开始收集内容</p>
     </div>
@@ -105,7 +105,7 @@
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-lg font-bold text-ink">编辑订阅</h3>
                 <button @click="editingId = null" class="text-ink-light hover:text-ink cursor-pointer">
-                    <i data-lucide="x" class="w-5 h-5"></i>
+                    <svg class="icon w-5 h-5" aria-hidden="true"><use href="#i-x"/></svg>
                 </button>
             </div>
 
@@ -159,4 +159,3 @@
     </div>
 </div>
 
-<!-- lucide 图标由 base.html 的 htmx:afterSwap 统一处理 -->
