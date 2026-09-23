@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"html/template"
@@ -199,6 +200,16 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 				dict[key] = values[i+1]
 			}
 			return dict, nil
+		},
+		// asset 返回带内容哈希的静态文件地址：静态文件缓存一年且 immutable，
+		// 文件内容一变 URL 就变，浏览器和 CDN 才会取新版本
+		"asset": func(path string) string {
+			data, err := os.ReadFile("./web/static/" + path)
+			if err != nil {
+				return "/static/" + path
+			}
+			sum := sha256.Sum256(data)
+			return fmt.Sprintf("/static/%s?v=%x", path, sum[:5])
 		},
 		"add": func(a, b int) int {
 			return a + b
