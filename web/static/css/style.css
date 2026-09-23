@@ -2994,10 +2994,6 @@ body {
     display: block;
   }
 
-  .md\:flex {
-    display: flex;
-  }
-
   .md\:table-cell {
     display: table-cell;
   }

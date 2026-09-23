@@ -3,7 +3,7 @@
 Markdown Editor Component (DOM-Bridge Pattern)
 Parameters:
   - .Name: Form input name (e.g. "content")
-  - .Value: Initial content (handled by Go template, synced to Alpine via DOM)
+  - .Value: Initial content (rendered by Go template; the textarea itself is the source of truth)
   - .Placeholder: Textarea placeholder
 -->
 
@@ -14,9 +14,9 @@ Parameters:
     <!-- Toolbar -->
     <div class="flex items-center justify-between bg-stone-50 border-b border-stone-200">
         <!-- Left: Mode Switch + Format Tools -->
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-4 min-w-0">
             <!-- Mode Switch -->
-            <div class="flex text-sm font-medium">
+            <div class="flex flex-shrink-0 whitespace-nowrap text-sm font-medium">
                 <button type="button" @click="isPreview = false" class="px-3 py-1.5 rounded-l-md transition-colors"
                     :class="!isPreview ? 'bg-white text-ink' : 'bg-stone-100 text-stone-500 hover:text-stone-700'">
                     编辑
@@ -27,9 +27,9 @@ Parameters:
                 </button>
             </div>
 
-            <!-- Format Tools -->
-            <div class="hidden md:flex items-center space-x-0.5 text-stone-500" x-show="!isPreview">
-                <button type="button" @click="insertText('## ', '')"
+            <!-- Format Tools：窄屏横向滚动，保证手机上也能用（含图片上传） -->
+            <div class="flex items-center space-x-0.5 text-stone-500 overflow-x-auto" x-show="!isPreview">
+                <button type="button" @click="prefixLines('## ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="标题 (H2)">
                     <i data-lucide="heading-2" class="w-4 h-4"></i>
                 </button>
@@ -46,7 +46,7 @@ Parameters:
                     <i data-lucide="strikethrough" class="w-4 h-4"></i>
                 </button>
                 <span class="w-px h-4 bg-stone-200 mx-1"></span>
-                <button type="button" @click="insertText('> ', '')"
+                <button type="button" @click="prefixLines('> ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="引用">
                     <i data-lucide="quote" class="w-4 h-4"></i>
                 </button>
@@ -54,20 +54,20 @@ Parameters:
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="行内代码">
                     <i data-lucide="code" class="w-4 h-4"></i>
                 </button>
-                <button type="button" @click="insertText('\n```\n', '\n```')"
+                <button type="button" @click="insertCodeBlock()"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="代码块">
                     <i data-lucide="file-code" class="w-4 h-4"></i>
                 </button>
                 <span class="w-px h-4 bg-stone-200 mx-1"></span>
-                <button type="button" @click="insertText('- ', '')"
+                <button type="button" @click="prefixLines('- ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="无序列表">
                     <i data-lucide="list" class="w-4 h-4"></i>
                 </button>
-                <button type="button" @click="insertText('1. ', '')"
+                <button type="button" @click="prefixLines('1. ')"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="有序列表">
                     <i data-lucide="list-ordered" class="w-4 h-4"></i>
                 </button>
-                <button type="button" @click="insertText('[', '](url)')"
+                <button type="button" @click="insertLink()"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="链接 (Ctrl+K)">
                     <i data-lucide="link" class="w-4 h-4"></i>
                 </button>
@@ -82,7 +82,7 @@ Parameters:
                     <span x-show="isUploading"
                         class="absolute -top-1 -right-1 w-2 h-2 bg-moss rounded-full animate-pulse"></span>
                 </button>
-                <button type="button" @click="insertText('\n---\n', '')"
+                <button type="button" @click="insertRule()"
                     class="p-1.5 rounded hover:bg-stone-200 hover:text-ink transition-colors" title="分割线">
                     <i data-lucide="minus" class="w-4 h-4"></i>
                 </button>
@@ -90,8 +90,8 @@ Parameters:
         </div>
 
         <!-- Right: Fullscreen Button -->
-        <div class="flex items-center space-x-2">
-            <span class="hidden lg:inline text-xs text-stone-400">支持 Markdown</span>
+        <div class="flex flex-shrink-0 items-center space-x-2">
+            <span class="hidden lg:inline whitespace-nowrap text-xs text-stone-400">支持 Markdown</span>
 
             <!-- Contrast Mode Button (Only in Full Screen) -->
             <button type="button" @click="toggleSplitView()" x-show="isFullScreen"
@@ -116,12 +116,13 @@ Parameters:
         ]">
         <!-- Editor Textarea -->
         <!-- x-ref="input" is CRITICAL for DOM-Bridge Pattern -->
-        <textarea x-ref="input" name="{{ .Name }}" x-model="content" x-show="!isPreview || isSplitView"
+        <textarea x-ref="input" name="{{ .Name }}" x-show="!isPreview || isSplitView"
             @keydown.ctrl.b.prevent="insertText('**', '**')" @keydown.meta.b.prevent="insertText('**', '**')"
             @keydown.ctrl.i.prevent="insertText('*', '*')" @keydown.meta.i.prevent="insertText('*', '*')"
-            @keydown.ctrl.k.prevent="insertText('[', '](url)')" @keydown.meta.k.prevent="insertText('[', '](url)')"
-            @keydown.escape="if(isFullScreen) toggleFullScreen()" @input="autoResize($event.target)"
-            @paste="handlePaste($event)"
+            @keydown.ctrl.k.prevent="insertLink()" @keydown.meta.k.prevent="insertLink()"
+            @keydown.escape="if(isFullScreen) toggleFullScreen()" @input="onInput()"
+            @paste="handlePaste($event)" @scroll="syncScroll('input')" @keydown="scrollSource = 'input'"
+            @mouseenter="scrollSource = 'input'" @touchstart.passive="scrollSource = 'input'"
             class="w-full p-4 md:p-6 bg-white border-0 focus:ring-0 outline-none resize-none font-mono text-sm leading-relaxed text-ink placeholder-stone-400"
             :class="[
                 isFullScreen ? 'h-full' : 'min-h-[200px]',
@@ -130,9 +131,10 @@ Parameters:
             placeholder="{{ if .Placeholder }}{{ .Placeholder }}{{ else }}在此输入内容...{{ end }}">{{ if .Value }}{{ .Value }}{{ end }}</textarea>
 
         <!-- Preview Area -->
-        <div x-show="isPreview || isSplitView" x-cloak
+        <div x-show="isPreview || isSplitView" x-cloak x-ref="preview" @scroll="syncScroll('preview')"
+            @mouseenter="scrollSource = 'preview'" @touchstart.passive="scrollSource = 'preview'"
             class="prose max-w-none p-4 md:p-6 h-full overflow-y-auto bg-stone-50/50 min-h-[200px]"
-            :class="isSplitView ? 'bg-white block' : ''" x-html="renderMarkdown(content)">
+            :class="isSplitView ? 'bg-white block' : ''" x-html="previewHTML">
         </div>
     </div>
 

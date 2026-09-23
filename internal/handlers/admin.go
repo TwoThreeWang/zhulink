@@ -224,8 +224,6 @@ func (h *AdminHandler) RestoreAIBlockedPost(c *gin.Context) {
 	}
 	db.DB.Create(&notification)
 
-	utils.GetCache().Delete("story:top:page:1")
-	utils.GetCache().Delete("story:new:page:1")
 	utils.GetCache().Delete("story:detail:shared:" + post.Pid)
 
 	c.Redirect(http.StatusFound, "/p/"+post.Pid)

@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"html"
 	"html/template"
+	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -14,6 +16,9 @@ func SanitizeHTML(htmlStr string) string {
 	}
 	return policy.Sanitize(htmlStr)
 }
+
+// videoIDPattern 视频 ID 只允许这些字符，防止拼进 iframe src 时注入属性
+var videoIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 // EnhanceHTMLContent 为 HTML 中的图片增加安全和优化属性,并转换视频链接为嵌入式播放器
 func EnhanceHTMLContent(htmlStr string) template.HTML {
@@ -58,24 +63,30 @@ func EnhanceHTMLContent(htmlStr string) template.HTML {
 				if len(parts) > 1 {
 					bvid := strings.Split(parts[1], "?")[0]
 					bvid = strings.TrimSuffix(bvid, "/")
-					embedHTML = `<div class="video-container"><iframe src="https://player.bilibili.com/player.html?bvid=` + bvid + `&high_quality=1&autoplay=0" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+					if videoIDPattern.MatchString(bvid) {
+						embedHTML = `<div class="video-container"><iframe src="https://player.bilibili.com/player.html?bvid=` + bvid + `&high_quality=1&autoplay=0" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+					}
 				}
 			} else if strings.Contains(text, "b23.tv/") {
 				// Bilibili 短链接,保留原链接提示用户
-				embedHTML = `<p class="text-stone-500 text-sm">⚠️ 请使用完整的 Bilibili 视频链接 (bilibili.com/video/BV...)</p><p><a href="` + text + `" target="_blank" rel="noopener noreferrer">` + text + `</a></p>`
+				embedHTML = `<p class="text-stone-500 text-sm">⚠️ 请使用完整的 Bilibili 视频链接 (bilibili.com/video/BV...)</p><p><a href="` + html.EscapeString(text) + `" target="_blank" rel="noopener noreferrer">` + html.EscapeString(text) + `</a></p>`
 			} else if strings.Contains(text, "youtube.com/watch?v=") {
 				// YouTube 视频
 				parts := strings.Split(text, "v=")
 				if len(parts) > 1 {
 					videoID := strings.Split(parts[1], "&")[0]
-					embedHTML = `<div class="video-container"><iframe src="https://www.youtube.com/embed/` + videoID + `" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+					if videoIDPattern.MatchString(videoID) {
+						embedHTML = `<div class="video-container"><iframe src="https://www.youtube.com/embed/` + videoID + `" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+					}
 				}
 			} else if strings.Contains(text, "youtu.be/") {
 				// YouTube 短链接
 				parts := strings.Split(text, "youtu.be/")
 				if len(parts) > 1 {
 					videoID := strings.Split(parts[1], "?")[0]
-					embedHTML = `<div class="video-container"><iframe src="https://www.youtube.com/embed/` + videoID + `" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+					if videoIDPattern.MatchString(videoID) {
+						embedHTML = `<div class="video-container"><iframe src="https://www.youtube.com/embed/` + videoID + `" frameborder="0" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>`
+					}
 				}
 			}
 

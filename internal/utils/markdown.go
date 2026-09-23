@@ -33,17 +33,16 @@ func init() {
 	// Add noopener and follow security best practices, but don't force no-referrer to keep referrer data for targets
 	// We will handle rel attributes manually in EnhanceHTMLContent
 	policy.RequireNoReferrerOnLinks(false)
-	// Allow iframe for video embedding
+	// Allow iframe for video embedding in RSS content.
+	// 不放行 style/class：否则可用 position:fixed 或站内 Tailwind 类盖住整页做钓鱼
 	policy.AllowElements("iframe")
-	policy.AllowAttrs("src", "frameborder", "allowfullscreen", "allow", "width", "height", "style", "class").OnElements("iframe")
-	// Allow div with class and style for video containers
-	policy.AllowAttrs("class", "style").OnElements("div")
+	policy.AllowAttrs("src", "frameborder", "allowfullscreen", "allow", "width", "height").OnElements("iframe")
 }
 
 func RenderMarkdown(source string) template.HTML {
 	var buf bytes.Buffer
 	if err := mdParser.Convert([]byte(source), &buf); err != nil {
-		return template.HTML(source) // Fallback
+		return template.HTML(template.HTMLEscapeString(source)) // Fallback
 	}
 
 	// Sanitize HTML
