@@ -225,19 +225,13 @@ make dev
 # 首次部署
 cp .env.example .env
 nano .env  # 配置数据库等信息
-./deploy.sh
+sh deploy.sh
 
 # 后续更新
-./deploy.sh  # 自动拉取最新代码、构建、部署
+sh deploy.sh  # 拉取最新代码、重建镜像、等待健康检查通过、清理悬空镜像
 ```
 
-**脚本功能**:
-- ✅ 自动拉取最新代码
-- ✅ 备份当前运行版本
-- ✅ 构建 Docker 镜像
-- ✅ 健康检查
-- ✅ 失败自动回滚
-- ✅ 清理旧镜像
+出问题需要回退时，切回上一个可用的提交再部署：`git checkout <提交> && docker compose up -d --build --wait`。
 
 **详细部署文档**: 查看 [DOCKER_DEPLOY.md](./DOCKER_DEPLOY.md)
 
