@@ -1,6 +1,7 @@
 {{ template "base.html" . }}
 
 {{ define "scripts" }}
+{{ template "ad_script" }}
 <!-- SEO Meta标签 -->
 {{ if .Description }}
 <meta name="description" content="{{ .Description }}">
@@ -153,6 +154,10 @@
                 </div>
 
             </li>
+            <!-- 广告：信息流第 6、18 条之后 -->
+            {{ if or (eq $index 5) (eq $index 17) }}
+            <li class="py-3 ad-li ad-wrap">{{ template "ad_unit" 280 }}</li>
+            {{ end }}
             {{ end }}
         </ul>
 
@@ -261,6 +266,9 @@
                 </p>
             </div>
 
+            <!-- 广告：侧栏，放在节点导航上方，保证 sticky 时在视口内 -->
+            {{ template "ad_unit" 250 }}
+
             <!-- Component C: 节点导航 -->
             {{ if .Nodes }}
             <div class="bg-stone-50 rounded-lg p-4">
@@ -298,6 +306,11 @@
         content-visibility: auto;
         contain-intrinsic-size: 0 72px;
         /* 预估高度 */
+    }
+
+    /* 广告项不能跳过渲染，否则 AdSense 量到宽度为 0 无法出广告 */
+    .divide-y>li.ad-li {
+        content-visibility: visible;
     }
 </style>
 {{ end }}

@@ -1,0 +1,42 @@
+{{ define "ad_script" }}
+<!-- Google AdSense：只在需要广告的页面加载（自动广告的锚定/插页也只会出现在这些页面） -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4678475430515042"
+    crossorigin="anonymous" onerror="document.documentElement.classList.add('ads-off')"></script>
+<script>
+    // 被大陆网络卡住时 onerror 可能很久才触发：8 秒内脚本没跑起来就收起所有广告位
+    setTimeout(function () {
+        if (!(window.adsbygoogle && window.adsbygoogle.loaded)) document.documentElement.classList.add('ads-off');
+    }, 8000);
+</script>
+<style>
+    /* 加载中：淡色占位框；填充成功后透明，只剩广告本身（手机端全宽广告会超出框，留着边框会错位） */
+    .ad-unit {
+        background: #fafaf9;
+        border: 1px solid #e7e5e4;
+        border-radius: 6px;
+        transition: background-color .3s, border-color .3s;
+    }
+    .ad-unit:has(ins[data-ad-status="filled"]) {
+        background: transparent;
+        border-color: transparent;
+    }
+
+    /* 脚本被拦截/超时，或 AdSense 没有广告可填 (unfilled) 时，整块广告位连同外层间距一起隐藏 */
+    .ads-off .ad-unit, .ads-off .ad-wrap,
+    .ad-unit:has(ins[data-ad-status="unfilled"]),
+    .ad-wrap:has(ins[data-ad-status="unfilled"]) {
+        display: none !important;
+    }
+</style>
+{{ end }}
+
+{{/* 用法: {{ template "ad_unit" 280 }}，参数是预留的最小高度(px)，防止广告加载后页面跳动 (CLS) */}}
+{{ define "ad_unit" }}
+<div class="ad-unit" style="min-height:{{ . }}px">
+    <div class="text-[10px] text-stone-400 px-2 py-1 tracking-wider">广告</div>
+    <!-- shortcut: 所有位置共用同一个自适应 slot，想按位置看收入时在 AdSense 新建单元并给每处单独 slot -->
+    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4678475430515042"
+        data-ad-slot="5275519214" data-ad-format="auto" data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+</div>
+{{ end }}

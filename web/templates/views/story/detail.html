@@ -1,6 +1,7 @@
 {{ template "base.html" . }}
 
 {{ define "scripts" }}
+{{ template "ad_script" }}
 <!-- Marked.js -->
 <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
 <script src="{{ asset "js/editor.js" }}"></script>
@@ -366,6 +367,11 @@
             </script>
             {{ end }}
 
+            <!-- 广告：正文结束后（纯外链无正文的帖子不放，避免广告多于内容） -->
+            {{ if .PostContent }}
+            <div class="mt-10 ad-wrap">{{ template "ad_unit" 280 }}</div>
+            {{ end }}
+
             <!-- 上一篇/下一篇导航 -->
             {{ if or .HasPrev .HasNext }}
             <nav class="mt-10 pt-6 border-t border-stone-200">
@@ -443,6 +449,11 @@
             {{ end }}
 
         </article>
+
+        <!-- 广告：延伸阅读之后、评论之前 -->
+        {{ if .PostContent }}
+        <div class="mb-10 ad-wrap">{{ template "ad_unit" 280 }}</div>
+        {{ end }}
 
         <!-- Divider -->
         <hr class="border-stone-200/60 mb-10">
@@ -552,18 +563,8 @@
                 </p>
             </div>
 
-            <!-- google -->
-            <div class="hidden lg:block">
-                <script async
-                    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4678475430515042"
-                    crossorigin="anonymous"></script>
-                <!-- 自适应 -->
-                <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4678475430515042"
-                    data-ad-slot="5275519214" data-ad-format="auto" data-full-width-responsive="true"></ins>
-                <script>
-                    (adsbygoogle = window.adsbygoogle || []).push({});
-                </script>
-            </div>
+            <!-- 广告：侧栏 -->
+            {{ template "ad_unit" 250 }}
 
         </div>
     </aside>
