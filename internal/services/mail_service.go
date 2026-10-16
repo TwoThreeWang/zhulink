@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"mime"
 	"net/smtp"
 	"os"
 	"path/filepath"
@@ -46,6 +47,9 @@ func (s *MailService) sendAsync(to []string, subject string, body string) {
 	if !s.Enabled {
 		return
 	}
+
+	// 标题里拼了用户名和文章标题：去掉换行防止注入邮件头，再按 RFC 2047 编码中文和 emoji
+	subject = mime.QEncoding.Encode("utf-8", strings.NewReplacer("\r", "", "\n", "").Replace(subject))
 
 	go func() {
 		auth := smtp.PlainAuth("", s.Username, s.Password, s.Host)

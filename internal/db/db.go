@@ -64,6 +64,8 @@ func Init() {
 	}
 	log.Println("Database migration completed")
 
+	migrateUniqueConstraints()
+
 	// Seed initial nodes
 	seedNodes()
 }
@@ -91,4 +93,22 @@ func seedNodes() {
 		}
 	}
 	log.Println("Initial nodes created successfully")
+}
+
+// migrateUniqueConstraints 补上 AutoMigrate 处理不了的唯一约束
+func migrateUniqueConstraints() {
+	stmts := []string{
+		// 每人对同一帖子/评论只能投一票：先删掉并发请求留下的重复票（保留最早一张），再建部分唯一索引
+		`DELETE FROM votes a USING votes b WHERE a.id > b.id AND a.user_id = b.user_id AND a.post_id = b.post_id`,
+		`DELETE FROM votes a USING votes b WHERE a.id > b.id AND a.user_id = b.user_id AND a.comment_id = b.comment_id`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_vote_user_post ON votes (user_id, post_id) WHERE post_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_vote_user_comment ON votes (user_id, comment_id) WHERE comment_id IS NOT NULL`,
+		// RSS 条目改为"同一订阅源内 GUID 唯一"，删掉旧的全局唯一索引
+		`DROP INDEX IF EXISTS idx_feed_items_guid`,
+	}
+	for _, stmt := range stmts {
+		if err := DB.Exec(stmt).Error; err != nil {
+			log.Fatalf("Failed to migrate unique constraints (%s): %v", stmt, err)
+		}
+	}
 }

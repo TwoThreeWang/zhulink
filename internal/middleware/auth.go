@@ -86,6 +86,20 @@ func renewalMaxAge(now time.Time, renewedAt, absoluteExpiresAt int64) (int, bool
 	return maxAge, maxAge > 0
 }
 
+// ClearExpiredPunishment 禁言/封禁到期后恢复正常状态（punish_expires 为空表示永久）
+func ClearExpiredPunishment(user *models.User) {
+	if user.Status == 0 || user.PunishExpires == nil || time.Now().Before(*user.PunishExpires) {
+		return
+	}
+	if err := db.DB.Model(&models.User{}).Where("id = ?", user.ID).
+		Updates(map[string]interface{}{"status": 0, "punish_expires": nil}).Error; err != nil {
+		log.Printf("clear expired punishment for user %d failed: %v", user.ID, err)
+		return
+	}
+	user.Status = 0
+	user.PunishExpires = nil
+}
+
 // LoadUser retrieves user from session and sets to context
 func LoadUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -122,6 +136,7 @@ func LoadUser() gin.HandlerFunc {
 			return
 		}
 
+		ClearExpiredPunishment(&user)
 		if user.Status == 2 || !user.IsActivated {
 			if err := ClearSession(session); err != nil {
 				log.Printf("clear disabled-user session failed: %v", err)

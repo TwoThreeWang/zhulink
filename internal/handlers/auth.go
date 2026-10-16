@@ -50,10 +50,14 @@ func (h *AuthHandler) ShowRegister(c *gin.Context) {
 }
 
 // createUser 创建新用户的通用函数
+// password 为空表示没有密码（Google 注册），库里存空串：bcrypt 校验空串永远失败，无法用密码登录
 func (h *AuthHandler) createUser(username, email, password string) (*models.User, error) {
-	hash, err := utils.HashPassword(password)
-	if err != nil {
-		return nil, err
+	hash := ""
+	if password != "" {
+		var err error
+		if hash, err = utils.HashPassword(password); err != nil {
+			return nil, err
+		}
 	}
 
 	user := models.User{
@@ -187,8 +191,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// 检查用户是否被封禁
-	// 检查用户是否被封禁
+	// 检查用户是否被封禁（到期的惩罚先解除）
+	middleware.ClearExpiredPunishment(&user)
 	if user.Status == 2 {
 		Render(c, http.StatusForbidden, "auth/login.html", gin.H{"Error": "您的账号已被封禁,无法登录。"})
 		return

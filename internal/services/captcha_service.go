@@ -3,25 +3,21 @@ package services
 import (
 	"fmt"
 	"math/rand"
-	"time"
 )
 
-type CaptchaService struct {
-	rnd *rand.Rand
-}
+// CaptchaService 用包级 rand 函数：它们并发安全，共享的 *rand.Rand 不是
+type CaptchaService struct{}
 
 func NewCaptchaService() *CaptchaService {
-	return &CaptchaService{
-		rnd: rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
+	return &CaptchaService{}
 }
 
 // GenerateMathProblem returns a display string (e.g. "3 + 5") and the integer answer.
 // Usage: Store answer in session, display question to user.
 func (s *CaptchaService) GenerateMathProblem() (string, int) {
-	a := s.rnd.Intn(10) // 0-9
-	b := s.rnd.Intn(10) // 0-9
-	op := s.rnd.Intn(2) // 0: +, 1: -
+	a := rand.Intn(10) // 0-9
+	b := rand.Intn(10) // 0-9
+	op := rand.Intn(2) // 0: +, 1: -
 
 	if op == 0 {
 		return fmt.Sprintf("%d + %d", a, b), a + b

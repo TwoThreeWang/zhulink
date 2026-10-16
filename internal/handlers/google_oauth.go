@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 	"zhulink/internal/db"
+	"zhulink/internal/middleware"
 	"zhulink/internal/models"
+	"zhulink/internal/utils"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -37,6 +40,28 @@ func InitGoogleOAuth() {
 			"https://www.googleapis.com/auth/userinfo.profile",
 		},
 		Endpoint: google.Endpoint,
+	}
+
+	go clearGoogleIDPasswords()
+}
+
+// clearGoogleIDPasswords 旧版 Google 注册把 GoogleID 当密码，GoogleID 可被公开工具查到，
+// 启动时把这类账号的密码清空（之后只能用 Google 登录或在设置里设新密码）
+func clearGoogleIDPasswords() {
+	var users []models.User
+	if err := db.DB.Select("id, google_id, password").Where("google_id <> '' AND password <> ''").Find(&users).Error; err != nil {
+		log.Printf("清理 GoogleID 密码失败: %v", err)
+		return
+	}
+	cleared := 0
+	for _, u := range users {
+		if utils.CheckPasswordHash(u.GoogleID, u.Password) {
+			db.DB.Model(&models.User{}).Where("id = ?", u.ID).UpdateColumn("password", "")
+			cleared++
+		}
+	}
+	if cleared > 0 {
+		log.Printf("已清空 %d 个以 GoogleID 为密码的账号密码", cleared)
 	}
 }
 
@@ -130,28 +155,33 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 			username = strings.Split(userInfo.Email, "@")[0]
 		}
 
-		// 使用 GoogleID 作为初始密码,方便用户后续在设置中修改密码
-		newUser, err := h.createUser(username, userInfo.Email, userInfo.ID)
+		// 不设密码：GoogleID 可被公开工具查到，不能当密码；用户可在设置里自行设置密码
+		newUser, err := h.createUser(username, userInfo.Email, "")
 		if err != nil {
 			Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "创建用户失败"})
 			return
 		}
 
-		// 绑定 Google 账号
+		// 绑定 Google 账号；Google 已验证过邮箱，直接视为已激活
 		newUser.GoogleID = userInfo.ID
 		newUser.GoogleEmail = userInfo.Email
+		newUser.IsActivated = true
 		db.DB.Save(newUser)
 
 		user = *newUser
 	} else {
-		// 老用户,如果还没绑定 GoogleID,则绑定
-		if user.GoogleID == "" {
-			user.GoogleID = userInfo.ID
-			user.GoogleEmail = userInfo.Email
+		// 老用户,如果还没绑定 GoogleID,则绑定；Google 已验证过邮箱，未激活的顺便激活
+		if user.GoogleID == "" || !user.IsActivated {
+			if user.GoogleID == "" {
+				user.GoogleID = userInfo.ID
+				user.GoogleEmail = userInfo.Email
+			}
+			user.IsActivated = true
 			db.DB.Save(&user)
 		}
 
-		// 检查用户是否被封禁
+		// 检查用户是否被封禁（到期的惩罚先解除）
+		middleware.ClearExpiredPunishment(&user)
 		if user.Status == 2 {
 			Render(c, http.StatusForbidden, "auth/login.html", gin.H{"Error": "您的账号已被封禁,无法登录。"})
 			return
@@ -298,6 +328,12 @@ func (h *AuthHandler) UnbindGoogle(c *gin.Context) {
 	var user models.User
 	if err := db.DB.First(&user, userID).Error; err != nil {
 		c.Redirect(http.StatusFound, "/dashboard/settings?error=user_not_found")
+		return
+	}
+
+	// 没有密码的账号（Google 注册）解绑后将无法登录，必须先设置密码
+	if user.Password == "" {
+		c.Redirect(http.StatusFound, "/dashboard/settings?error=set_password_first")
 		return
 	}
 

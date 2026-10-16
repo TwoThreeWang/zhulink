@@ -25,6 +25,8 @@ func NewCrawlerService() *CrawlerService {
 	return &CrawlerService{
 		client: &http.Client{
 			Timeout: 30 * time.Second,
+			// 文章链接来自用户订阅的 RSS 源，禁止访问内网
+			Transport: &http.Transport{DialContext: safeDialer.DialContext},
 		},
 		sanitizer: bluemonday.UGCPolicy(),
 	}
@@ -82,7 +84,7 @@ func (s *CrawlerService) fetchDirect(articleURL string) (string, error) {
 		return "", fmt.Errorf("HTTP 状态码: %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(limitBody(resp.Body))
 	if err != nil {
 		return "", fmt.Errorf("读取响应失败: %w", err)
 	}
@@ -109,7 +111,7 @@ func (s *CrawlerService) fetchViaProxy(articleURL string) (string, error) {
 		return "", fmt.Errorf("代理返回状态码: %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(limitBody(resp.Body))
 	if err != nil {
 		return "", fmt.Errorf("读取代理响应失败: %w", err)
 	}
@@ -129,13 +131,4 @@ func (s *CrawlerService) fetchViaProxy(articleURL string) (string, error) {
 	}
 
 	return s.sanitizer.Sanitize(result.Data.Content), nil
-}
-
-// FetchWithFallback 尝试抓取内容，失败时返回空字符串而不是错误
-func (s *CrawlerService) FetchWithFallback(url string) string {
-	content, err := s.FetchArticleContent(url)
-	if err != nil {
-		return ""
-	}
-	return content
 }

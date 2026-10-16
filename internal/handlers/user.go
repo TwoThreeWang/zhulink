@@ -257,6 +257,8 @@ func (h *UserHandler) ShowSettings(c *gin.Context) {
 			errorMsg = "绑定失败"
 		case "unbind_failed":
 			errorMsg = "解除绑定失败"
+		case "set_password_first":
+			errorMsg = "您的账号还没有密码，请先设置密码再解除 Google 绑定"
 		default:
 			errorMsg = "操作失败"
 		}
@@ -290,6 +292,9 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 	oldPassword := c.PostForm("old_password")
 	newPassword := c.PostForm("new_password")
 
+	// 改邮箱、改密码都要验证原密码；没有密码的账号（Google 注册）可留空
+	passwordValid := user.Password == "" || utils.CheckPasswordHash(oldPassword, user.Password)
+
 	// 更新基本信息
 	updates := make(map[string]interface{})
 
@@ -298,6 +303,15 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	if email != "" && email != user.Email {
+		// 否则拿到会话的人可以改掉邮箱，再走"忘记密码"永久夺走账号
+		if !passwordValid {
+			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
+				"Error":        "修改邮箱需要填写正确的原密码",
+				"User":         user,
+				"CommonEmojis": utils.GetCommonEmojis(),
+			})
+			return
+		}
 		// 检查邮箱是否已被使用
 		var existingUser models.User
 		if err := db.DB.Where("email = ? AND id != ?", email, user.ID).First(&existingUser).Error; err == nil {
@@ -330,23 +344,9 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 			return
 		}
 
-		// 验证原密码
-		passwordValid := false
-		if oldPassword != "" {
-			// 用户提供了原密码,直接验证
-			passwordValid = utils.CheckPasswordHash(oldPassword, user.Password)
-		} else if user.GoogleID != "" {
-			// 用户没有提供原密码,但有 GoogleID,尝试使用 GoogleID 验证
-			passwordValid = utils.CheckPasswordHash(user.GoogleID, user.Password)
-		}
-
 		if !passwordValid {
-			errorMsg := "原密码错误"
-			if user.GoogleID != "" && oldPassword == "" {
-				errorMsg = "原密码错误。如果您是通过 Google 登录注册的,原密码可以留空"
-			}
 			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
-				"Error":        errorMsg,
+				"Error":        "原密码错误",
 				"User":         user,
 				"CommonEmojis": utils.GetCommonEmojis(),
 			})

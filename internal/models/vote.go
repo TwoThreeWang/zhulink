@@ -13,6 +13,4 @@ type Vote struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Custom hook or unique index enforcement can be done via GORM tags or DB approach.
-// To ensure one vote per item per user:
-// gorm:"uniqueIndex:idx_post_vote;uniqueIndex:idx_comment_vote" is tricky with nulls in some DBs, but PG handles (user_id, post_id) unique where post_id is not null.
+// 每人对同一帖子/评论只能投一票：唯一索引 idx_vote_user_post / idx_vote_user_comment 在 db.migrateUniqueConstraints 中创建

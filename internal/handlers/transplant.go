@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
@@ -136,7 +137,7 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 		return
 	}
 
-	go NewStoryHandler().asyncGeneratePostMeta(post.ID, title, content)
+	go NewStoryHandler().asyncGeneratePostMeta(post.ID, title, content, true)
 
 	// 异步加分
 	go func() {
@@ -165,7 +166,10 @@ func (h *TransplantHandler) autoUpvote(userID uint, postID uint) {
 			PostID: &postID,
 			Value:  1,
 		}
-		db.DB.Create(&vote)
+		// 并发重复请求会撞唯一索引失败，此时不能再加分
+		if db.DB.Create(&vote).Error != nil {
+			return
+		}
 
 		// 更新分数
 		var post models.Post
@@ -197,12 +201,13 @@ func cleanHTMLAndTruncate(html string, maxLength int) string {
 	text = strings.TrimSpace(text)
 	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
 
-	// 截断
-	if len(text) > maxLength {
-		// 尝试在句子边界截断
-		text = text[:maxLength]
-		if lastPeriod := strings.LastIndexAny(text, "。.!！?？"); lastPeriod > maxLength/2 {
-			text = text[:lastPeriod+1]
+	// 截断：按字符（rune）截，按字节截会把汉字切成半个变成乱码
+	if runes := []rune(text); len(runes) > maxLength {
+		text = string(runes[:maxLength])
+		// 尝试在句子边界截断；"。"等是多字节字符，要保留完整的标点
+		if lastPeriod := strings.LastIndexAny(text, "。.!！?？"); lastPeriod > len(text)/2 {
+			_, size := utf8.DecodeRuneInString(text[lastPeriod:])
+			text = text[:lastPeriod+size]
 		} else {
 			text = text + "..."
 		}

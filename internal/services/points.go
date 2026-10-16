@@ -8,6 +8,7 @@ import (
 	"zhulink/internal/models"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // 积分动作常量
@@ -171,16 +172,26 @@ func HasCheckedInToday(userID uint) bool {
 
 // CheckIn 每日签到，返回获得的积分和是否为首次签到
 func CheckIn(userID uint) (points int, bonus int, alreadyCheckedIn bool, err error) {
-	// 检查是否已签到
-	if HasCheckedInToday(userID) {
-		return 0, 0, true, nil
-	}
-
 	// 基础积分
 	points = PointsCheckIn
 
 	// 使用事务处理签到逻辑
 	err = db.DB.Transaction(func(tx *gorm.DB) error {
+		// 锁住用户行再检查今天是否已签到：并发的签到请求在这里排队，避免重复签到
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").First(&models.User{}, userID).Error; err != nil {
+			return err
+		}
+		startOfDay, endOfDay := getTodayRange()
+		var checkedIn int64
+		if err := tx.Model(&models.PointLog{}).
+			Where("user_id = ? AND action = ? AND created_at >= ? AND created_at < ?", userID, ActionCheckIn, startOfDay, endOfDay).
+			Count(&checkedIn).Error; err != nil {
+			return err
+		}
+		if checkedIn > 0 {
+			alreadyCheckedIn = true
+			return nil
+		}
 		// 记录基础签到积分
 		baseLog := models.PointLog{
 			UserID: userID,
@@ -216,5 +227,8 @@ func CheckIn(userID uint) (points int, bonus int, alreadyCheckedIn bool, err err
 		return nil
 	})
 
+	if alreadyCheckedIn {
+		return 0, 0, true, nil
+	}
 	return points, bonus, false, err
 }

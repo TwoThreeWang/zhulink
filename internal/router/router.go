@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"time"
 	"zhulink/internal/handlers"
 	"zhulink/internal/middleware"
 
@@ -49,19 +50,19 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/rss/popular", rssHandler.PopularFeeds) // 热门订阅（公开）
 	r.GET("/img/:id", imageHandler.Proxy)          // Imgur 图片反代（公开，带防盗链）
 
-	r.GET("/signup", authHandler.ShowRegister)   // 注册页面
-	r.POST("/signup", authHandler.Register)      // 提交注册
-	r.GET("/activate", authHandler.ShowActivate) // 激活页面
-	r.POST("/activate", authHandler.Activate)    // 提交激活
-	r.GET("/login", authHandler.ShowLogin)       // 登录页面
-	r.POST("/login", authHandler.Login)          // 提交登录
-	r.GET("/logout", authHandler.Logout)         // 退出登录
+	r.GET("/signup", authHandler.ShowRegister)                                          // 注册页面
+	r.POST("/signup", middleware.RateLimit(5, 10*time.Minute), authHandler.Register)    // 提交注册
+	r.GET("/activate", authHandler.ShowActivate)                                        // 激活页面
+	r.POST("/activate", middleware.RateLimit(10, 10*time.Minute), authHandler.Activate) // 提交激活
+	r.GET("/login", authHandler.ShowLogin)                                              // 登录页面
+	r.POST("/login", middleware.RateLimit(10, 10*time.Minute), authHandler.Login)       // 提交登录
+	r.GET("/logout", authHandler.Logout)                                                // 退出登录
 
-	r.GET("/forgot_password", authHandler.ShowForgotPassword) // 忘记密码页面
-	r.POST("/forgot_password", authHandler.ForgotPassword)    // 提交忘记密码
-	r.GET("/reset_password", authHandler.ShowResetPassword)   // 重置密码页面
-	r.POST("/reset_password", authHandler.ResetPassword)      // 提交重置密码
-	r.GET("/refresh_captcha", authHandler.RefreshCaptcha)     // 刷新验证码 (AJAX)
+	r.GET("/forgot_password", authHandler.ShowForgotPassword)                                       // 忘记密码页面
+	r.POST("/forgot_password", middleware.RateLimit(3, 10*time.Minute), authHandler.ForgotPassword) // 提交忘记密码
+	r.GET("/reset_password", authHandler.ShowResetPassword)                                         // 重置密码页面
+	r.POST("/reset_password", middleware.RateLimit(10, 10*time.Minute), authHandler.ResetPassword)  // 提交重置密码
+	r.GET("/refresh_captcha", authHandler.RefreshCaptcha)                                           // 刷新验证码 (AJAX)
 
 	// Google OAuth 路由 (Google OAuth Routes)
 	r.GET("/auth/google", authHandler.GoogleLogin)             // Google 登录

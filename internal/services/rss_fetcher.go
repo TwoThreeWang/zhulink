@@ -15,6 +15,9 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
+// itemRetentionDays RSS 文章保留天数：清理任务删除更早的文章，抓取时也跳过更早的文章
+const itemRetentionDays = 30
+
 // RSSFetcher RSS 订阅源抓取服务
 type RSSFetcher struct {
 	parser *gofeed.Parser
@@ -33,13 +36,18 @@ func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// 设置接受的语言
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,*;q=0.5")
 
-	return t.base.RoundTrip(req)
+	resp, err := t.base.RoundTrip(req)
+	if err == nil {
+		resp.Body = limitBody(resp.Body)
+	}
+	return resp, err
 }
 
 // NewRSSFetcher 创建 RSS 抓取服务实例
 func NewRSSFetcher() *RSSFetcher {
 	// 创建基础传输层
 	baseTransport := &http.Transport{
+		DialContext:         safeDialer.DialContext, // 订阅地址由用户提供，禁止访问内网
 		MaxIdleConns:        10,
 		IdleConnTimeout:     60 * time.Second,
 		DisableCompression:  false,
@@ -152,7 +160,7 @@ func (f *RSSFetcher) ParseAndStoreFeed(feedID uint, rssURL string) error {
 			guid = item.Link // 如果没有 GUID，使用 Link 作为唯一标识
 		}
 
-		db.DB.Model(&models.FeedItem{}).Where("guid = ?", guid).Count(&exists)
+		db.DB.Model(&models.FeedItem{}).Where("feed_id = ? AND guid = ?", feedID, guid).Count(&exists)
 		if exists > 0 {
 			continue // 跳过已存在的条目
 		}
@@ -163,6 +171,10 @@ func (f *RSSFetcher) ParseAndStoreFeed(feedID uint, rssURL string) error {
 			publishedAt = *item.PublishedParsed
 		} else if item.UpdatedParsed != nil {
 			publishedAt = *item.UpdatedParsed
+		}
+		// 超过保留期的老文章不入库，否则每天凌晨清理后下一轮抓取又会插回来
+		if publishedAt.Before(time.Now().AddDate(0, 0, -itemRetentionDays)) {
+			continue
 		}
 
 		// 获取内容
@@ -234,6 +246,7 @@ func (f *RSSFetcher) CreateOrGetFeed(rssURL string) (*models.Feed, error) {
 		Timeout: 5 * time.Second,
 		Transport: &customTransport{
 			base: &http.Transport{
+				DialContext:         safeDialer.DialContext, // 订阅地址由用户提供，禁止访问内网
 				MaxIdleConns:        2,
 				IdleConnTimeout:     5 * time.Second,
 				DisableCompression:  false,
@@ -403,7 +416,7 @@ func (f *RSSFetcher) CleanupOldItems() error {
 	}
 
 	// 2. 清除发布时间超过 30 天的文章
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -itemRetentionDays)
 	result := db.DB.Where("published_at < ?", thirtyDaysAgo).Delete(&models.FeedItem{})
 
 	if result.Error != nil {

@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"zhulink/internal/db"
@@ -63,11 +64,16 @@ func main() {
 	log.Println("RSS 定时任务已启动: 拉取间隔 30 分钟, 保留最近 30 天文章")
 
 	// 启动文章分数定时更新任务
-	rankingSvc.StartScheduledScoreUpdate(mainCtx) // 每天凌晨 3 点更新
-	log.Println("文章分数定时任务已启动: 每天凌晨 3 点更新")
+	rankingSvc.StartScheduledScoreUpdate(mainCtx) // 启动时一次，之后每小时一次
+	log.Println("文章分数定时任务已启动: 每小时更新")
 
 	// Initialize Gin
 	r := gin.Default()
+	// 只信任本机和内网的反向代理（如 nginx）转发的 X-Forwarded-For，
+	// 否则客户端可以伪造 IP 绕过限流
+	if err := r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}); err != nil {
+		log.Fatalf("set trusted proxies: %v", err)
+	}
 
 	// Setup Sessions
 	authKey := loadSessionKey("SESSION_AUTH_KEY", 64)
@@ -157,6 +163,9 @@ func loadSessionKey(name string, size int) []byte {
 	return key
 }
 
+// assetURLs 缓存 asset 模板函数算出的带哈希地址
+var assetURLs sync.Map
+
 func loadTemplates(templatesDir string) multitemplate.Renderer {
 	r := multitemplate.NewRenderer()
 
@@ -203,13 +212,19 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 		},
 		// asset 返回带内容哈希的静态文件地址：静态文件缓存一年且 immutable，
 		// 文件内容一变 URL 就变，浏览器和 CDN 才会取新版本
+		// 哈希按文件只算一次（静态文件随镜像发布，运行中不变；本地改了静态文件需重启）
 		"asset": func(path string) string {
+			if u, ok := assetURLs.Load(path); ok {
+				return u.(string)
+			}
 			data, err := os.ReadFile("./web/static/" + path)
 			if err != nil {
 				return "/static/" + path
 			}
 			sum := sha256.Sum256(data)
-			return fmt.Sprintf("/static/%s?v=%x", path, sum[:5])
+			u := fmt.Sprintf("/static/%s?v=%x", path, sum[:5])
+			assetURLs.Store(path, u)
+			return u
 		},
 		"add": func(a, b int) int {
 			return a + b

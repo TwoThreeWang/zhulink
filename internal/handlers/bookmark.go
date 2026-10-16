@@ -47,10 +47,8 @@ func (h *BookmarkHandler) Toggle(c *gin.Context) {
 	// 检查是否已收藏
 	var existing models.Bookmark
 	if err := db.DB.Where("user_id = ? AND post_id = ?", currentUser.ID, postID).First(&existing).Error; err == nil {
-		// 已收藏，取消收藏
-		db.DB.Delete(&existing)
-		// 异步扣除帖子作者积分
-		if post.UserID != currentUser.ID {
+		// 已收藏，取消收藏；并发重复请求只有真正删掉的那次才扣分
+		if db.DB.Delete(&existing).RowsAffected > 0 && post.UserID != currentUser.ID {
 			services.AddPointsAsync(post.UserID, services.PointsPostUnbookmark, services.ActionPostUnbookmark)
 		}
 	} else {
@@ -59,9 +57,8 @@ func (h *BookmarkHandler) Toggle(c *gin.Context) {
 			UserID: currentUser.ID,
 			PostID: postID,
 		}
-		db.DB.Create(&bookmark)
-		// 异步增加帖子作者积分
-		if post.UserID != currentUser.ID {
+		// 并发重复请求会撞唯一索引失败，只有插入成功才给作者加分
+		if db.DB.Create(&bookmark).Error == nil && post.UserID != currentUser.ID {
 			services.AddPointsAsync(post.UserID, services.PointsPostBookmarked, services.ActionPostBookmarked)
 		}
 	}

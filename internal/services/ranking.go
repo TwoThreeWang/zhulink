@@ -172,11 +172,6 @@ func (s *RankingService) Shutdown() {
 	}
 }
 
-// UpdatePostScoreSync 同步更新帖子 Score（用于需要立即生效的场景）
-func UpdatePostScoreSync(postID uint) {
-	GetRankingService().updatePostScore(postID)
-}
-
 // StartScheduledScoreUpdate 启动定时分数更新任务（每小时执行一次）
 func (s *RankingService) StartScheduledScoreUpdate(ctx context.Context) {
 	go func() {

@@ -79,9 +79,9 @@ func (s *UserSubscription) SetReadExceptions(ids []uint) {
 // FeedItem RSS 文章条目
 type FeedItem struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
-	FeedID      uint      `gorm:"not null;index" json:"feed_id"`
+	FeedID      uint      `gorm:"not null;index;uniqueIndex:idx_feed_guid" json:"feed_id"`
 	Feed        Feed      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"feed"`
-	GUID        string    `gorm:"uniqueIndex;not null" json:"guid"` // RSS 唯一标识
+	GUID        string    `gorm:"uniqueIndex:idx_feed_guid;not null" json:"guid"` // 同一订阅源内唯一（不同源可以重复）
 	Title       string    `gorm:"not null" json:"title"`
 	Link        string    `gorm:"not null" json:"link"`               // 原文链接
 	Description string    `gorm:"type:text" json:"description"`       // 摘要

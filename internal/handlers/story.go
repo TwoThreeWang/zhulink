@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"html/template"
+	"log"
 	"maps"
 	"math"
 	"net/http"
@@ -343,14 +344,10 @@ func (h *StoryHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// 到期的禁言已在 LoadUser 中解除
 	if user.Status == 1 {
-		if user.PunishExpires != nil && time.Now().After(*user.PunishExpires) {
-			// 惩罚已过期，恢复状态（实际应该在 middleware 或单独逻辑中处理，这里简单处理）
-			db.DB.Model(user).Update("status", 0)
-		} else {
-			Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态，暂时无法发布内容。"})
-			return
-		}
+		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态，暂时无法发布内容。"})
+		return
 	}
 
 	title := c.PostForm("title")
@@ -404,7 +401,7 @@ func (h *StoryHandler) Create(c *gin.Context) {
 	}()
 
 	// 异步生成 SEO 元数据和向量
-	go h.asyncGeneratePostMeta(post.ID, title, content)
+	go h.asyncGeneratePostMeta(post.ID, title, content, true)
 
 	// 异步提交到 IndexNow
 	services.GetIndexNowService().SubmitURL(post.Pid)
@@ -413,13 +410,18 @@ func (h *StoryHandler) Create(c *gin.Context) {
 }
 
 // asyncGeneratePostMeta 异步生成 SEO 元数据和向量
-func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent string) {
+// needSEO=false 时只补向量：不再调用 SEO 模型，也不重新判定广告（避免管理员恢复过的帖子被再次误删）
+func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent string, needSEO bool) {
 	llm := services.GetLLMService()
-	seoMeta, err := llm.GenerateSEOMetadata(postTitle, postContent)
-	if err != nil {
-		// SEO 生成失败不影响主流程，仅记录日志
-		fmt.Printf("[SEO] 生成 SEO 元数据失败 (postID=%d): %v\n", postID, err)
-		// 继续生成向量，不因为 SEO 失败而终止
+	var seoMeta *services.SEOMetadata
+	if needSEO {
+		var err error
+		seoMeta, err = llm.GenerateSEOMetadata(postTitle, postContent)
+		if err != nil {
+			// SEO 生成失败不影响主流程，仅记录日志
+			fmt.Printf("[SEO] 生成 SEO 元数据失败 (postID=%d): %v\n", postID, err)
+			// 继续生成向量，不因为 SEO 失败而终止
+		}
 	}
 
 	isAd := seoMeta != nil && (seoMeta.IsAd || strings.EqualFold(seoMeta.Keywords, "AD") || seoMeta.IndexStatus == models.PostIndexStatusBlocked)
@@ -452,6 +454,13 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 	if seoMeta != nil {
 		keywords = seoMeta.Keywords
 		description = seoMeta.Description
+	} else if !needSEO {
+		// 只补向量时沿用库里已有的 SEO 字段
+		var existing models.Post
+		if err := db.DB.Select("seo_keywords, seo_description").First(&existing, postID).Error; err == nil {
+			keywords = existing.SEOKeywords
+			description = existing.SEODescription
+		}
 	}
 
 	cleanContentExcerpt := cleanContentExcerptForEmbedding(postContent, 600)
@@ -591,9 +600,14 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	db.DB.Model(&post).UpdateColumn("views", post.Views+1)
 	post.Views++
 
-	// 如果 SEO 描述或向量为空，异步生成
+	// 如果 SEO 描述或向量为空，异步生成；同一帖子每小时最多触发一次，
+	// 否则向量服务挂掉时每次缓存过期的访问都会重新调用付费模型
 	if post.SEODescription == "" || post.Embedding == nil || len(post.Embedding.Slice()) == 0 {
-		go h.asyncGeneratePostMeta(post.ID, post.Title, post.Content)
+		metaKey := "story:meta-attempt:" + post.Pid
+		if utils.GetCache().Get(metaKey) == nil {
+			utils.GetCache().Set(metaKey, true, time.Hour)
+			go h.asyncGeneratePostMeta(post.ID, post.Title, post.Content, post.SEODescription == "")
+		}
 	}
 
 	// 异步更新帖子 Score
@@ -762,20 +776,10 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
+	// 到期的禁言已在 LoadUser 中解除
 	if user.Status == 1 {
-		// 禁言用户,检查是否已过期
-		if user.PunishExpires != nil && time.Now().After(*user.PunishExpires) {
-			// 禁言已过期,恢复状态
-			db.DB.Model(user).Updates(map[string]interface{}{
-				"status":         0,
-				"punish_expires": nil,
-			})
-			user.Status = 0
-		} else {
-			// 仍在禁言期
-			Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态,暂时无法发布评论。"})
-			return
-		}
+		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态,暂时无法发布评论。"})
+		return
 	}
 
 	// 通过Pid查找文章
@@ -820,7 +824,9 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 	}
 
 	if err := db.DB.Create(&comment).Error; err != nil {
-		// handle error
+		log.Printf("保存评论失败 (post=%s, user=%d): %v", pid, user.ID, err)
+		Render(c, http.StatusInternalServerError, "error.html", gin.H{"Error": "评论发布失败，请稍后重试"})
+		return
 	}
 
 	// 主动失效详情页缓存
@@ -1036,6 +1042,10 @@ func (h *StoryHandler) Update(c *gin.Context) {
 		})
 		return
 	}
+
+	// 清掉详情页缓存，并重新生成 SEO/向量、重新做广告检测（防止先发正常内容再改成广告）
+	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
+	go h.asyncGeneratePostMeta(post.ID, title, content, true)
 
 	c.Redirect(http.StatusFound, "/p/"+pid)
 }
