@@ -25,3 +25,10 @@ func TestRenderMarkdownBlocksInjection(t *testing.T) {
 		t.Errorf("正常视频链接未嵌入: %s", out)
 	}
 }
+
+func TestImageAltKeepsCJKPunctuation(t *testing.T) {
+	out := string(RenderMarkdown("![微信图片（1），封面：首页](https://a.example/x.png)"))
+	if !strings.Contains(out, `alt="微信图片（1），封面：首页"`) {
+		t.Fatalf("alt dropped: %s", out)
+	}
+}

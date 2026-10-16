@@ -28,6 +28,8 @@ var (
 func init() {
 	// Allow images
 	policy.AllowImages()
+	// AllowImages 的 alt 正则不含中文标点（，：（）等），含一个就整条丢掉；alt 输出时会转义，放开无风险
+	policy.AllowAttrs("alt").OnElements("img")
 	// Force links to open in new tab
 	policy.AddTargetBlankToFullyQualifiedLinks(true)
 	// Add noopener and follow security best practices, but don't force no-referrer to keep referrer data for targets

@@ -330,7 +330,7 @@ function markdownEditor() {
                 }
 
                 // 文件名里的方括号会破坏 Markdown 图片语法
-                const fileName = (file.name || 'image').replace(/[[\]]/g, '');
+                const fileName = (file.name || 'image').replace(/\.[^.]+$/, '').replace(/[[\]]/g, '');
                 this.replacePlaceholder(placeholder, `![${fileName}](${data.url})`);
 
             } catch (error) {
