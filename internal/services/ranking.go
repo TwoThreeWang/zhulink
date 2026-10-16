@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -127,25 +128,21 @@ func (s *RankingService) updatePostScore(postID uint) {
 	// 获取帖子信息
 	var post models.Post
 	if err := db.DB.First(&post, postID).Error; err != nil {
-		log.Printf("更新 Score 失败：帖子 %d 不存在", postID)
+		log.Printf("更新 Score 失败：读取帖子 %d: %v", postID, err)
 		return
 	}
 
-	// 统计点赞数
-	var upvotes int64
-	db.DB.Model(&models.Vote{}).Where("post_id = ? AND value = 1", postID).Count(&upvotes)
-
-	// 统计点踩数
-	var downvotes int64
-	db.DB.Model(&models.Vote{}).Where("post_id = ? AND value = -1", postID).Count(&downvotes)
-
-	// 统计收藏数
-	var collects int64
-	db.DB.Model(&models.Bookmark{}).Where("post_id = ?", postID).Count(&collects)
-
-	// 统计评论数
-	var comments int64
-	db.DB.Model(&models.Comment{}).Where("post_id = ?", postID).Count(&comments)
+	// 统计点赞、点踩、收藏、评论数；任一失败就不写分数，避免把按 0 算出的偏低分存进库
+	var upvotes, downvotes, collects, comments int64
+	if err := errors.Join(
+		db.DB.Model(&models.Vote{}).Where("post_id = ? AND value = 1", postID).Count(&upvotes).Error,
+		db.DB.Model(&models.Vote{}).Where("post_id = ? AND value = -1", postID).Count(&downvotes).Error,
+		db.DB.Model(&models.Bookmark{}).Where("post_id = ?", postID).Count(&collects).Error,
+		db.DB.Model(&models.Comment{}).Where("post_id = ?", postID).Count(&comments).Error,
+	); err != nil {
+		log.Printf("更新帖子 %d Score 失败：统计互动数: %v", postID, err)
+		return
+	}
 
 	// 计算新 Score
 	newScore := utils.CalculateScore(
@@ -157,7 +154,7 @@ func (s *RankingService) updatePostScore(postID uint) {
 		int(comments),
 	)
 
-	// 更新数据库（Score 现在是 0-100 区间的整数）
+	// 更新数据库（Score 存整数，ScaleFactor 已放大保证区分度）
 	scoreInt := int(newScore)
 
 	if err := db.DB.Model(&post).UpdateColumn("score", scoreInt).Error; err != nil {
@@ -205,15 +202,18 @@ func (s *RankingService) StartScheduledScoreUpdate(ctx context.Context) {
 	}()
 }
 
-// updateHotPosts 更新最近 7 天和分数最高的 30 篇文章的分数（边遍历边去重）
+// updateHotPosts 更新最近 7 天、仍有分数的旧帖、以及分数最高的 30 篇文章的分数（边遍历边去重）
 func (s *RankingService) updateHotPosts() {
 	processed := make(map[uint]bool)
 	count := 0
 
-	// 1. 处理最近 7 天的帖子
+	// 1. 处理最近 7 天的帖子，以及分数还没衰减到 0 的旧帖（否则旧帖分数会冻结在第 7 天）
+	// shortcut: 每篇帖子 5 条查询，帖子上万后改成一条 SQL 批量计算
 	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
 	var recentPosts []models.Post
-	db.DB.Where("created_at >= ?", sevenDaysAgo).Select("id").Find(&recentPosts)
+	if err := db.DB.Where("created_at >= ? OR score > 0", sevenDaysAgo).Select("id").Find(&recentPosts).Error; err != nil {
+		log.Printf("定时更新分数：查询近期帖子失败: %v", err)
+	}
 	for _, p := range recentPosts {
 		s.updatePostScore(p.ID)
 		processed[p.ID] = true
@@ -222,7 +222,9 @@ func (s *RankingService) updateHotPosts() {
 
 	// 2. 处理分数最高的 30 篇帖子（跳过已处理的）
 	var topPosts []models.Post
-	db.DB.Order("score DESC").Limit(30).Select("id").Find(&topPosts)
+	if err := db.DB.Order("score DESC").Limit(30).Select("id").Find(&topPosts).Error; err != nil {
+		log.Printf("定时更新分数：查询高分帖子失败: %v", err)
+	}
 	for _, p := range topPosts {
 		if !processed[p.ID] {
 			s.updatePostScore(p.ID)

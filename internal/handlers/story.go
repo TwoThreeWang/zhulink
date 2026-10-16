@@ -69,29 +69,6 @@ func fillPostCounts(posts []models.Post) {
 	}
 }
 
-// Hacker News Ranking Algorithm: (P-1) / (T+2)^G
-// P = points of an item (and -1 is to negate submitters vote)
-// T = time since submission (in hours)
-// G = Gravity, defaults to 1.8
-func calculateRank(score int, createdAt time.Time) float64 {
-	p := float64(score)
-	t := time.Since(createdAt).Hours()
-	g := 1.8
-	return (p - 1.0) / math.Pow(t+2.0, g)
-}
-
-// In a real app we would compute rank in DB or background worker.
-// For this MVP, we fetch top 100 recent stories and sort them in Go, or use simple DB order.
-// Requirement: "Top/New".
-// "New" is easy: ORDER BY created_at DESC.
-// "Top" is Hacker News rank.
-// Optimization: For now, let's fetch last 200 posts and sort them in memory, or just Sort by Score for simplicity if User prefers?
-// User said: "Ranking Algorithm: 类似 Hacker News ...".
-// Let's implement a simple SQL based approximation or fetch & sort.
-// SQL approximation: score / power(extract(epoch from age(created_at))/3600 + 2, 1.8)
-// PostgreSQL: `score / power((EXTRACT(EPOCH FROM NOW() - created_at)/3600) + 2, 1.8)`
-// Note: This prevents using index effectively. But for MVP it's fine.
-
 // extractFirstImage 从 Markdown 内容中提取第一张图片的 URL
 func extractFirstImage(content string) string {
 	re := regexp.MustCompile(`!\[.*?\]\((.*?)\)`)
