@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"html"
 	"html/template"
@@ -24,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pgvector/pgvector-go"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type StoryHandler struct {
@@ -273,29 +275,54 @@ func (h *StoryHandler) ListByNode(c *gin.Context) {
 	})
 }
 
-func (h *StoryHandler) Search(c *gin.Context) {
-	query := c.Query("q")
+const (
+	searchPerPage = 30
+	// 查询向量与帖子向量的余弦相似度下限，按本地 bge-base-zh 样本标定（相关 ≥0.54，无关 ≤0.42）
+	semanticMinSimilarity = 0.5
+	semanticLimit         = 10
+	searchKeywordCond     = "title ILIKE ? OR content ILIKE ?"
+)
 
-	var posts []models.Post
+func (h *StoryHandler) Search(c *gin.Context) {
+	query := strings.TrimSpace(c.Query("q"))
+	page := 1
+	if p := c.Query("page"); p != "" {
+		if pageNum, err := strconv.Atoi(p); err == nil && pageNum > 0 {
+			page = pageNum
+		}
+	}
+
+	var posts, semanticPosts []models.Post
+	var total int64
+	totalPages := 1
 
 	if query != "" {
-		// 搜索标题和内容
-		searchPattern := "%" + query + "%"
+		// 关键词命中：标题或内容包含即展示，分页
+		searchPattern := "%" + likeEscaper.Replace(query) + "%"
+		db.DB.Model(&models.Post{}).Where(searchKeywordCond, searchPattern, searchPattern).Count(&total)
+		totalPages = searchTotalPages(total)
 		db.DB.Preload("User").Preload("Node").
-			Where("title ILIKE ? OR content ILIKE ?", searchPattern, searchPattern).
+			Where(searchKeywordCond, searchPattern, searchPattern).
 			Order("created_at DESC").
-			Limit(50).
+			Limit(searchPerPage).
+			Offset((page - 1) * searchPerPage).
 			Find(&posts)
+
+		// 语义补充只放在关键词结果的最后一页，避免每次翻页都调 Ollama
+		if page == totalPages {
+			semanticPosts = semanticSearch(c.Request.Context(), query, searchPattern)
+		}
 	}
 
 	fillPostCounts(posts)
+	fillPostCounts(semanticPosts)
 
 	// SEO 数据
 	siteURL := os.Getenv("SITE_URL")
 	if siteURL == "" {
 		siteURL = "https://zhulink.vip"
 	}
-	fullURL := fmt.Sprintf("%s/search?q=%s", siteURL, query)
+	fullURL := fmt.Sprintf("%s/search?q=%s", siteURL, url.QueryEscape(query))
 
 	description := "在 ZhuLink 竹林搜索优质内容和技术文章"
 	if query != "" {
@@ -303,14 +330,52 @@ func (h *StoryHandler) Search(c *gin.Context) {
 	}
 
 	Render(c, http.StatusOK, "search.html", gin.H{
-		"Posts":       posts,
-		"Query":       query,
-		"Active":      "search",
-		"Title":       "搜索 - " + query,
-		"Description": description,
-		"Keywords":    fmt.Sprintf("ZhuLink, 竹林, 搜索, %s", query),
-		"FullURL":     fullURL,
+		"Posts":         posts,
+		"SemanticPosts": semanticPosts,
+		"Total":         total,
+		"CurrentPage":   page,
+		"TotalPages":    totalPages,
+		"Query":         query,
+		"Active":        "search",
+		"Title":         "搜索 - " + query,
+		"Description":   description,
+		"Keywords":      fmt.Sprintf("ZhuLink, 竹林, 搜索, %s", query),
+		"FullURL":       fullURL,
 	})
+}
+
+// likeEscaper 转义 LIKE 通配符，让搜索词里的 % 和 _ 按字面匹配（PostgreSQL 默认转义符是反斜杠）
+var likeEscaper = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`)
+
+func searchTotalPages(total int64) int {
+	return max(1, int(math.Ceil(float64(total)/float64(searchPerPage))))
+}
+
+// semanticSearch 返回语义相近但未命中关键词的帖子；Ollama 不可用时返回 nil，搜索退化为纯关键词
+func semanticSearch(ctx context.Context, query, searchPattern string) []models.Post {
+	// shortcut: 与帖子详情页共用 500 条的全局 LRU，搜索词很多时会挤掉详情页缓存，届时改成独立 LRU
+	cacheKey := "search_embedding:" + query
+	vec, ok := utils.GetCache().Get(cacheKey).(pgvector.Vector)
+	if !ok {
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		embedding, err := services.GetLLMService().GetEmbedding(ctx, query)
+		if err != nil {
+			log.Printf("[Search] 生成查询向量失败，跳过语义补充: %v", err)
+			return nil
+		}
+		vec = pgvector.NewVector(embedding)
+		utils.GetCache().Set(cacheKey, vec, time.Hour)
+	}
+
+	var posts []models.Post
+	db.DB.Preload("User").Preload("Node").
+		Where("embedding IS NOT NULL AND NOT ("+searchKeywordCond+")", searchPattern, searchPattern).
+		Where("1 - (embedding <=> ?) > ?", vec, semanticMinSimilarity).
+		Order(clause.OrderBy{Expression: clause.Expr{SQL: "embedding <=> ?", Vars: []interface{}{vec}, WithoutParentheses: true}}).
+		Limit(semanticLimit).
+		Find(&posts)
+	return posts
 }
 
 func (h *StoryHandler) ShowCreate(c *gin.Context) {
@@ -465,7 +530,7 @@ func (h *StoryHandler) asyncGeneratePostMeta(postID uint, postTitle, postContent
 
 	cleanContentExcerpt := cleanContentExcerptForEmbedding(postContent, 600)
 	vectorText := fmt.Sprintf("标题：%s\n主题：%s\n摘要：%s\n正文片段：%s", postTitle, keywords, description, cleanContentExcerpt)
-	embedding, err := llm.GetEmbedding(vectorText)
+	embedding, err := llm.GetEmbedding(context.Background(), vectorText)
 	vectorUpdateFields := map[string]interface{}{}
 	if err != nil {
 		fmt.Printf("[Vector] 生成向量失败 (postID=%d): %v\n", postID, err)

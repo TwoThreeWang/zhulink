@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -420,7 +421,7 @@ func parseSEOResponse(responseContent string) (*SEOMetadata, error) {
 // ==================== GetEmbedding ====================
 
 // GetEmbedding 调用 Ollama 获取文本向量
-func (s *LLMService) GetEmbedding(text string) ([]float32, error) {
+func (s *LLMService) GetEmbedding(ctx context.Context, text string) ([]float32, error) {
 	if s.config.OllamaBaseURL == "" {
 		return nil, fmt.Errorf("OLLAMA_BASE_URL 未配置")
 	}
@@ -445,7 +446,7 @@ func (s *LLMService) GetEmbedding(text string) ([]float32, error) {
 	}
 
 	apiURL := strings.TrimSuffix(s.config.OllamaBaseURL, "/") + "/api/embeddings"
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request failed: %v", err)
 	}

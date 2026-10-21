@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "server",
+      "runtimeExecutable": "go",
+      "runtimeArgs": ["run", "cmd/server/main.go"],
+      "port": 32919
+    }
+  ]
+}

@@ -52,14 +52,14 @@
 
         {{ if .Query }}
         <p class="text-sm text-stone-500 mt-3">
-            搜索 "{{ .Query }}" 找到 {{ len .Posts }} 个结果
+            搜索 "{{ .Query }}" 找到 {{ .Total }} 个结果
         </p>
         {{ end }}
     </header>
 
     <!-- 搜索结果 -->
     {{ if .Query }}
-    {{ if not .Posts }}
+    {{ if and (not .Posts) (not .SemanticPosts) }}
     <!-- 空状态 -->
     <section class="py-16 text-center">
         <svg class="icon w-12 h-12 text-stone-300 mx-auto mb-4" aria-hidden="true"><use href="#i-search-x"/></svg>
@@ -69,9 +69,60 @@
         </p>
     </section>
     {{ else }}
-    <!-- 结果列表: 复用 story/list.html 的列表样式 -->
+    {{ if .Posts }}
+    <!-- 关键词命中 -->
     <ul class="divide-y divide-stone-200/60">
-        {{ range $index, $post := .Posts }}
+        {{ range .Posts }}{{ template "search-result-item" . }}{{ end }}
+    </ul>
+
+    {{ if gt .TotalPages 1 }}
+    <nav class="mt-8 flex justify-center items-center gap-4 text-sm" aria-label="分页导航">
+        {{ if gt .CurrentPage 1 }}
+        <a href="/search?q={{ .Query }}&page={{ sub .CurrentPage 1 }}"
+            class="inline-flex items-center gap-1 px-3 py-2 font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">
+            <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-left"/></svg>
+            <span>上一页</span>
+        </a>
+        {{ end }}
+        <span class="text-stone-500">第 {{ .CurrentPage }} / {{ .TotalPages }} 页</span>
+        {{ if lt .CurrentPage .TotalPages }}
+        <a href="/search?q={{ .Query }}&page={{ add .CurrentPage 1 }}"
+            class="inline-flex items-center gap-1 px-3 py-2 font-medium text-ink bg-stone-50 rounded-md hover:bg-moss/10 hover:text-moss transition-colors">
+            <span>下一页</span>
+            <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+        </a>
+        {{ end }}
+    </nav>
+    {{ end }}
+    {{ end }}
+
+    {{ if .SemanticPosts }}
+    <!-- 语义补充：未命中关键词但内容相近 -->
+    <section class="mt-10">
+        <h2 class="text-sm font-medium text-stone-500 mb-1">你可能在找</h2>
+        <p class="text-xs text-stone-400 mb-2">以下内容不包含关键词，但主题相近</p>
+        <ul class="divide-y divide-stone-200/60">
+            {{ range .SemanticPosts }}{{ template "search-result-item" . }}{{ end }}
+        </ul>
+    </section>
+    {{ end }}
+    {{ end }}
+    {{ else }}
+    <!-- 初始状态: 搜索提示 -->
+    <section class="py-16 text-center">
+        <svg class="icon w-12 h-12 text-stone-300 mx-auto mb-4" aria-hidden="true"><use href="#i-search"/></svg>
+        <h2 class="font-sans font-bold text-xl text-ink">搜索竹林</h2>
+        <p class="text-base text-stone-500 mt-2">
+            在上方输入关键词开始搜索
+        </p>
+    </section>
+    {{ end }}
+
+</div>
+
+{{ end }}
+
+{{ define "search-result-item" }}
         <li class="py-3 flex items-start gap-2 md:gap-3">
 
             <!-- 点赞数（共识信号） -->
@@ -126,20 +177,4 @@
             </div>
 
         </li>
-        {{ end }}
-    </ul>
-    {{ end }}
-    {{ else }}
-    <!-- 初始状态: 搜索提示 -->
-    <section class="py-16 text-center">
-        <svg class="icon w-12 h-12 text-stone-300 mx-auto mb-4" aria-hidden="true"><use href="#i-search"/></svg>
-        <h2 class="font-sans font-bold text-xl text-ink">搜索竹林</h2>
-        <p class="text-base text-stone-500 mt-2">
-            在上方输入关键词开始搜索
-        </p>
-    </section>
-    {{ end }}
-
-</div>
-
 {{ end }}
