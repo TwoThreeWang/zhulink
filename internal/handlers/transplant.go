@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
@@ -48,6 +49,9 @@ func (h *TransplantHandler) ShowTransplantModal(c *gin.Context) {
 	})
 }
 
+// 每个用户每小时最多 10 次 AI 摘要
+var transplantAILimiter = middleware.NewLimiter(10, time.Hour)
+
 // Transplant 提交移栽
 func (h *TransplantHandler) Transplant(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
@@ -79,8 +83,23 @@ func (h *TransplantHandler) Transplant(c *gin.Context) {
 		return
 	}
 
+	// 推荐到社区等同于发帖，走和普通发帖一样的禁言、积分门槛和频率检查
+	if user.Status == 1 {
+		c.HTML(http.StatusOK, "rss/transplant_result.html", gin.H{"Success": false, "Message": "您处于禁言状态，暂时无法发布内容。"})
+		return
+	}
+	if err := services.CheckPostPermission(user, false); err != nil {
+		c.HTML(http.StatusOK, "rss/transplant_result.html", gin.H{"Success": false, "Message": err.Error()})
+		return
+	}
+
 	// LLM 逻辑
 	if content == "" {
+		// 被判不适宜的文章不会发帖，频率检查拦不住反复提交，单独限制 AI 摘要次数
+		if !transplantAILimiter.Allow(strconv.FormatUint(uint64(user.ID), 10)) {
+			c.HTML(http.StatusOK, "rss/transplant_result.html", gin.H{"Success": false, "Message": "AI 摘要次数已达上限，请手动填写推荐语后重试。"})
+			return
+		}
 		// 如果推荐语为空，调用 LLM 生成摘要
 		llm := services.GetLLMService()
 		summary, err := llm.GenerateSummary(item.Title, item.Description)

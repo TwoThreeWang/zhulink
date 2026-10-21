@@ -40,15 +40,15 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/:key.txt", seoHandler.IndexNowKeyFile)   // IndexNow 验证文件 (格式: {apiKey}.txt)
 
 	// 公共路由 (Public Routes)
-	r.GET("/", storyHandler.ListTop)               // 首页 - 热门文章
-	r.GET("/new", storyHandler.ListNew)            // 最新文章
-	r.GET("/search", storyHandler.Search)          // 搜索页面
-	r.GET("/p/:pid", storyHandler.Detail)          // 文章详情页
-	r.GET("/t/:name", storyHandler.ListByNode)     // 节点下的文章列表
-	r.GET("/nodes", nodeHandler.ListNodes)         // 所有节点列表
-	r.GET("/u/:id", userHandler.Profile)           // 用户主页
-	r.GET("/rss/popular", rssHandler.PopularFeeds) // 热门订阅（公开）
-	r.GET("/img/:id", imageHandler.Proxy)          // Imgur 图片反代（公开，带防盗链）
+	r.GET("/", storyHandler.ListTop)                                             // 首页 - 热门文章
+	r.GET("/new", storyHandler.ListNew)                                          // 最新文章
+	r.GET("/search", middleware.RateLimit(30, time.Minute), storyHandler.Search) // 搜索页面（新搜索词会调 Ollama，按 IP 限流）
+	r.GET("/p/:pid", storyHandler.Detail)                                        // 文章详情页
+	r.GET("/t/:name", storyHandler.ListByNode)                                   // 节点下的文章列表
+	r.GET("/nodes", nodeHandler.ListNodes)                                       // 所有节点列表
+	r.GET("/u/:id", userHandler.Profile)                                         // 用户主页
+	r.GET("/rss/popular", rssHandler.PopularFeeds)                               // 热门订阅（公开）
+	r.GET("/img/:id", imageHandler.Proxy)                                        // Imgur 图片反代（公开，带防盗链）
 
 	r.GET("/signup", authHandler.ShowRegister)                                          // 注册页面
 	r.POST("/signup", middleware.RateLimit(5, 10*time.Minute), authHandler.Register)    // 提交注册
@@ -96,12 +96,13 @@ func RegisterRoutes(r *gin.Engine) {
 	dashboard := r.Group("/dashboard")
 	dashboard.Use(middleware.AuthRequired())
 	{
-		dashboard.GET("", userHandler.Dashboard)                  // 仪表盘概览
-		dashboard.GET("/notifications", notificationHandler.List) // 我的通知列表
-		dashboard.GET("/points", userHandler.PointLogs)           // 积分记录
-		dashboard.GET("/settings", userHandler.ShowSettings)      // 用户设置页面
-		dashboard.POST("/settings", userHandler.UpdateSettings)   // 提交用户设置更新
-		dashboard.POST("/checkin", userHandler.CheckIn)           // 每日签到
+		dashboard.GET("", userHandler.Dashboard)                            // 仪表盘概览
+		dashboard.GET("/notifications", notificationHandler.List)           // 我的通知列表
+		dashboard.GET("/points", userHandler.PointLogs)                     // 积分记录
+		dashboard.GET("/settings", userHandler.ShowSettings)                // 用户设置页面
+		dashboard.POST("/settings", userHandler.UpdateSettings)             // 提交用户设置更新
+		dashboard.POST("/settings/confirm-email", userHandler.ConfirmEmail) // 输入验证码确认新邮箱
+		dashboard.POST("/checkin", userHandler.CheckIn)                     // 每日签到
 
 		// Google 账号绑定路由
 		dashboard.GET("/settings/bind-google", authHandler.BindGoogle)                  // 绑定 Google 账号

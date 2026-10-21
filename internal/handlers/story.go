@@ -23,6 +23,7 @@ import (
 	"regexp"
 
 	"github.com/gin-gonic/gin"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/pgvector/pgvector-go"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -351,11 +352,12 @@ func searchTotalPages(total int64) int {
 	return max(1, int(math.Ceil(float64(total)/float64(searchPerPage))))
 }
 
+// 搜索词向量单独缓存，刷搜索不会挤掉详情页缓存；同一模型下向量不变，无需过期
+var searchEmbeddingCache, _ = lru.New[string, pgvector.Vector](2000)
+
 // semanticSearch 返回语义相近但未命中关键词的帖子；Ollama 不可用时返回 nil，搜索退化为纯关键词
 func semanticSearch(ctx context.Context, query, searchPattern string) []models.Post {
-	// shortcut: 与帖子详情页共用 500 条的全局 LRU，搜索词很多时会挤掉详情页缓存，届时改成独立 LRU
-	cacheKey := "search_embedding:" + query
-	vec, ok := utils.GetCache().Get(cacheKey).(pgvector.Vector)
+	vec, ok := searchEmbeddingCache.Get(query)
 	if !ok {
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
@@ -365,7 +367,7 @@ func semanticSearch(ctx context.Context, query, searchPattern string) []models.P
 			return nil
 		}
 		vec = pgvector.NewVector(embedding)
-		utils.GetCache().Set(cacheKey, vec, time.Hour)
+		searchEmbeddingCache.Add(query, vec)
 	}
 
 	var posts []models.Post
@@ -1051,6 +1053,9 @@ func (h *StoryHandler) ShowEdit(c *gin.Context) {
 	})
 }
 
+// 每个用户 10 分钟内最多保存 5 次编辑
+var editLimiter = middleware.NewLimiter(5, 10*time.Minute)
+
 func (h *StoryHandler) Update(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
 	pid := c.Param("pid")
@@ -1096,6 +1101,18 @@ func (h *StoryHandler) Update(c *gin.Context) {
 	post.URL = url
 	post.Content = content
 	post.NodeID = nodeID
+
+	// 每次保存都会重新调用付费 LLM 做 SEO 和广告检测，按用户限频；带回已填内容，避免用户丢稿
+	if !editLimiter.Allow(strconv.FormatUint(uint64(user.ID), 10)) {
+		var nodes []models.Node
+		db.DB.Order("id ASC").Find(&nodes)
+		Render(c, http.StatusTooManyRequests, "story/edit.html", gin.H{
+			"Error": "编辑太频繁，请稍后再保存",
+			"Post":  post,
+			"Nodes": nodes,
+		})
+		return
+	}
 
 	if err := db.DB.Save(&post).Error; err != nil {
 		var nodes []models.Node

@@ -103,6 +103,8 @@ func migrateUniqueConstraints() {
 		`DELETE FROM votes a USING votes b WHERE a.id > b.id AND a.user_id = b.user_id AND a.comment_id = b.comment_id`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_vote_user_post ON votes (user_id, post_id) WHERE post_id IS NOT NULL`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_vote_user_comment ON votes (user_id, comment_id) WHERE comment_id IS NOT NULL`,
+		// 登录、注册按 LOWER(email) 查用户；不建唯一索引，历史数据里可能有只差大小写的重复邮箱
+		`CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email))`,
 		// RSS 条目改为"同一订阅源内 GUID 唯一"，删掉旧的全局唯一索引
 		`DROP INDEX IF EXISTS idx_feed_items_guid`,
 	}

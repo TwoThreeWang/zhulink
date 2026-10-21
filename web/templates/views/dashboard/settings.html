@@ -30,6 +30,23 @@
             </div>
             {{ end }}
 
+            {{ if .PendingEmail }}
+            <!-- 待确认的新邮箱 (独立表单,不能嵌在主表单里) -->
+            <section class="mb-8 max-w-2xl p-4 border border-moss/30 bg-moss/5 rounded">
+                <p class="text-sm text-ink mb-3">
+                    新邮箱 <strong>{{ .PendingEmail }}</strong> 待验证，请输入发到该邮箱的 6 位验证码（15 分钟内有效）
+                </p>
+                <form method="POST" action="/dashboard/settings/confirm-email" class="flex gap-2">
+                    <label for="email-code" class="sr-only">邮箱验证码</label>
+                    <input type="text" name="code" id="email-code" inputmode="numeric" autocomplete="one-time-code"
+                        maxlength="6" required placeholder="验证码"
+                        class="w-40 px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm">
+                    <button type="submit"
+                        class="px-4 py-2 bg-moss text-white rounded hover:bg-moss/90 transition-colors text-sm font-bold">确认修改</button>
+                </form>
+            </section>
+            {{ end }}
+
             <!-- Google 账号绑定 (独立区域,不在表单内) -->
             <section class="mb-8 max-w-2xl">
                 <h2
@@ -114,7 +131,7 @@
                         <label for="email" class="block text-sm font-medium text-ink mb-1.5">邮箱</label>
                         <input type="email" name="email" id="email" value="{{ .User.Email }}"
                             class="w-full px-3 py-2 border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-moss focus:border-moss bg-white text-sm transition-colors group-hover:border-stone-300">
-                        <p class="mt-1 text-xs text-stone-400">用于登录和接收通知，修改邮箱需在下方填写原密码</p>
+                        <p class="mt-1 text-xs text-stone-400">用于登录和接收通知，修改邮箱需在下方填写原密码，并到新邮箱查收验证码确认</p>
                     </div>
 
                     <!-- 个人简介 -->

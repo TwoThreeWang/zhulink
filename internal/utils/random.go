@@ -1,6 +1,8 @@
 package utils
 
 import (
+	crand "crypto/rand"
+	"math/big"
 	"math/rand"
 	"time"
 )
@@ -36,10 +38,15 @@ func RandStringBytesMaskImpr(n int) string {
 }
 
 // GenerateRandomCode generates a random numeric string of length n
+// 用于邮件验证码，必须用 crypto/rand，math/rand 的输出可被预测
 func GenerateRandomCode(n int) string {
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = byte(rand.Intn(10)) + '0'
+		d, err := crand.Int(crand.Reader, big.NewInt(10))
+		if err != nil {
+			panic(err) // 系统随机源不可用时不能退化成可预测的验证码
+		}
+		b[i] = byte(d.Int64()) + '0'
 	}
 	return string(b)
 }

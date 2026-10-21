@@ -1,23 +1,80 @@
 package handlers
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
+	"time"
 	"zhulink/internal/db"
+	"zhulink/internal/middleware"
 	"zhulink/internal/models"
 	"zhulink/internal/services"
 	"zhulink/internal/utils"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"gorm.io/gorm"
 )
 
-type UserHandler struct{}
+type UserHandler struct {
+	mailService *services.MailService
+}
 
 func NewUserHandler() *UserHandler {
-	return &UserHandler{}
+	return &UserHandler{mailService: services.NewMailService()}
+}
+
+// 改邮箱：先给新邮箱发验证码，ConfirmEmail 验证通过才生效，防止把别人的邮箱占为己有
+const emailChangeTTL = 15 * time.Minute
+
+type pendingEmailChange struct {
+	email    string
+	code     string
+	expires  time.Time
+	attempts int
+}
+
+// shortcut: 待确认的改邮箱请求存在进程内存里，重启后需重新获取验证码；多实例部署时要换成数据库或 Redis
+var (
+	pendingEmailChanges, _ = lru.New[uint, *pendingEmailChange](10000)
+	pendingEmailMu         sync.Mutex
+	// 每个用户每分钟 1 封、每天 5 封改邮箱验证码
+	emailChangeMinuteLimiter = middleware.NewLimiter(1, time.Minute)
+	emailChangeDayLimiter    = middleware.NewLimiter(5, 24*time.Hour)
+)
+
+// getPendingEmail 返回用户待确认的新邮箱，没有或已过期返回空串
+func getPendingEmail(userID uint) string {
+	pendingEmailMu.Lock()
+	defer pendingEmailMu.Unlock()
+	if p, ok := pendingEmailChanges.Get(userID); ok && time.Now().Before(p.expires) {
+		return p.email
+	}
+	return ""
+}
+
+// takePendingEmail 校验验证码，通过则取出新邮箱并删除记录；最多校验 maxVerifyAttempts 次
+func takePendingEmail(userID uint, code string) (string, bool) {
+	pendingEmailMu.Lock()
+	defer pendingEmailMu.Unlock()
+	p, ok := pendingEmailChanges.Get(userID)
+	if !ok || code == "" || time.Now().After(p.expires) {
+		return "", false
+	}
+	p.attempts++
+	if p.attempts > maxVerifyAttempts {
+		pendingEmailChanges.Remove(userID)
+		return "", false
+	}
+	if subtle.ConstantTimeCompare([]byte(p.code), []byte(code)) != 1 {
+		return "", false
+	}
+	pendingEmailChanges.Remove(userID)
+	return p.email, true
 }
 
 // Profile - 用户主页 /u/:id
@@ -235,6 +292,10 @@ func (h *UserHandler) ShowSettings(c *gin.Context) {
 		successMsg = "Google 账号已成功绑定"
 	} else if c.Query("success") == "google_unbound" {
 		successMsg = "Google 账号已成功解除绑定"
+	} else if c.Query("success") == "email_code_sent" {
+		successMsg = "其他设置已保存。验证码已发送至新邮箱，请在下方输入后完成邮箱修改"
+	} else if c.Query("success") == "email_changed" {
+		successMsg = "邮箱已修改"
 	}
 
 	if errParam := c.Query("error"); errParam != "" {
@@ -259,6 +320,10 @@ func (h *UserHandler) ShowSettings(c *gin.Context) {
 			errorMsg = "解除绑定失败"
 		case "set_password_first":
 			errorMsg = "您的账号还没有密码，请先设置密码再解除 Google 绑定"
+		case "email_code_invalid":
+			errorMsg = "验证码错误或已失效，输错 5 次或超过 15 分钟需重新修改邮箱获取"
+		case "email_taken":
+			errorMsg = "该邮箱已被使用"
 		default:
 			errorMsg = "操作失败"
 		}
@@ -270,6 +335,7 @@ func (h *UserHandler) ShowSettings(c *gin.Context) {
 		"CommonEmojis": utils.GetCommonEmojis(),
 		"Success":      successMsg,
 		"Error":        errorMsg,
+		"PendingEmail": getPendingEmail(user.ID),
 	})
 }
 
@@ -286,7 +352,7 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 
 	// 获取表单数据
 	username := c.PostForm("username")
-	email := c.PostForm("email")
+	email := normalizeEmail(c.PostForm("email"))
 	avatar := c.PostForm("avatar")
 	bio := c.PostForm("bio")
 	oldPassword := c.PostForm("old_password")
@@ -297,12 +363,13 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 
 	// 更新基本信息
 	updates := make(map[string]interface{})
+	pendingEmail := ""
 
 	if username != "" && username != user.Username {
 		updates["username"] = username
 	}
 
-	if email != "" && email != user.Email {
+	if email != "" && email != normalizeEmail(user.Email) {
 		// 否则拿到会话的人可以改掉邮箱，再走"忘记密码"永久夺走账号
 		if !passwordValid {
 			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
@@ -314,7 +381,7 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 		}
 		// 检查邮箱是否已被使用
 		var existingUser models.User
-		if err := db.DB.Where("email = ? AND id != ?", email, user.ID).First(&existingUser).Error; err == nil {
+		if err := db.DB.Where("LOWER(email) = ? AND id != ?", email, user.ID).First(&existingUser).Error; err == nil {
 			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
 				"Error":        "该邮箱已被使用",
 				"User":         user,
@@ -322,7 +389,8 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 			})
 			return
 		}
-		updates["email"] = email
+		// 不直接改：所有校验通过后再给新邮箱发验证码
+		pendingEmail = email
 	}
 
 	if avatar != "" {
@@ -365,6 +433,17 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 		updates["password"] = hash
 	}
 
+	// 放在所有校验之后计数，表单其他项填错不会白白占掉发信次数
+	uid := strconv.FormatUint(uint64(user.ID), 10)
+	if pendingEmail != "" && (!emailChangeMinuteLimiter.Allow(uid) || !emailChangeDayLimiter.Allow(uid)) {
+		Render(c, http.StatusTooManyRequests, "dashboard/settings.html", gin.H{
+			"Error":        "邮箱验证码发送太频繁，请稍后再试",
+			"User":         user,
+			"CommonEmojis": utils.GetCommonEmojis(),
+		})
+		return
+	}
+
 	// 执行更新
 	if len(updates) > 0 {
 		if err := db.DB.Model(&user).Updates(updates).Error; err != nil {
@@ -377,7 +456,41 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 		}
 	}
 
+	if pendingEmail != "" {
+		code := utils.GenerateRandomCode(6)
+		pendingEmailMu.Lock()
+		pendingEmailChanges.Add(user.ID, &pendingEmailChange{email: pendingEmail, code: code, expires: time.Now().Add(emailChangeTTL)})
+		pendingEmailMu.Unlock()
+		h.mailService.SendEmailChangeCode(pendingEmail, code)
+		c.Redirect(http.StatusFound, "/dashboard/settings?success=email_code_sent")
+		return
+	}
+
 	c.Redirect(http.StatusFound, "/dashboard/settings?success=1")
+}
+
+// ConfirmEmail - 输入新邮箱收到的验证码，完成邮箱修改
+func (h *UserHandler) ConfirmEmail(c *gin.Context) {
+	user := c.MustGet(middleware.CheckUserKey).(*models.User)
+
+	newEmail, ok := takePendingEmail(user.ID, strings.TrimSpace(c.PostForm("code")))
+	if !ok {
+		c.Redirect(http.StatusFound, "/dashboard/settings?error=email_code_invalid")
+		return
+	}
+
+	// 发码到确认之间，这个邮箱可能已被别人注册
+	var existingUser models.User
+	if err := db.DB.Where("LOWER(email) = ? AND id != ?", newEmail, user.ID).First(&existingUser).Error; err == nil {
+		c.Redirect(http.StatusFound, "/dashboard/settings?error=email_taken")
+		return
+	}
+	if err := db.DB.Model(user).Update("email", newEmail).Error; err != nil {
+		c.Redirect(http.StatusFound, "/dashboard/settings?error=email_taken") // 唯一索引冲突
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/dashboard/settings?success=email_changed")
 }
 
 // AddPointLog 添加积分记录并更新用户积分

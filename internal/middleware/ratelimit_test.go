@@ -35,3 +35,17 @@ func TestRateLimit(t *testing.T) {
 		t.Fatalf("other ip got %d", w.Code)
 	}
 }
+
+func TestLimiter(t *testing.T) {
+	l := NewLimiter(1, 50*time.Millisecond)
+	if !l.Allow("a") || l.Allow("a") {
+		t.Fatal("key a: want first allowed, second denied")
+	}
+	if !l.Allow("b") {
+		t.Fatal("key b should be counted separately")
+	}
+	time.Sleep(60 * time.Millisecond)
+	if !l.Allow("a") {
+		t.Fatal("key a should be allowed again after the window")
+	}
+}

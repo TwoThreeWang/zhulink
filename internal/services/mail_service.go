@@ -109,6 +109,17 @@ func (s *MailService) SendPasswordResetEmail(email, code string) {
 	s.sendAsync([]string{email}, "[ZhuLink]安全提醒：您正在申请重置 ZhuLink 密码", body)
 }
 
+func (s *MailService) SendEmailChangeCode(email, code string) {
+	body, err := s.parseTemplate("change_email.html", map[string]string{
+		"Code": code,
+	})
+	if err != nil {
+		log.Printf("Error rendering change email: %v", err)
+		return
+	}
+	s.sendAsync([]string{email}, "[ZhuLink]请验证您的新邮箱", body)
+}
+
 func (s *MailService) SendCommentNotification(email, activeUser, articleTitle, replyContent, originalContent, postLink string) {
 	data := map[string]string{
 		"ActiveUser":      activeUser,

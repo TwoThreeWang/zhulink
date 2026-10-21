@@ -22,9 +22,10 @@ type LLMConfig struct {
 }
 
 type LLMService struct {
-	config    LLMConfig
-	client    *http.Client
-	semaphore chan struct{}
+	config         LLMConfig
+	client         *http.Client
+	semaphore      chan struct{}
+	embedSemaphore chan struct{} // Ollama 单独限并发，搜索刷量时不会拖住付费 LLM 的名额，反之亦然
 }
 
 type ChatMessage struct {
@@ -78,7 +79,8 @@ func GetLLMService() *LLMService {
 			client: &http.Client{
 				Timeout: 30 * time.Second,
 			},
-			semaphore: make(chan struct{}, 5),
+			semaphore:      make(chan struct{}, 5),
+			embedSemaphore: make(chan struct{}, 3),
 		}
 	})
 	return llmService
@@ -424,6 +426,14 @@ func parseSEOResponse(responseContent string) (*SEOMetadata, error) {
 func (s *LLMService) GetEmbedding(ctx context.Context, text string) ([]float32, error) {
 	if s.config.OllamaBaseURL == "" {
 		return nil, fmt.Errorf("OLLAMA_BASE_URL 未配置")
+	}
+
+	// 排队也受 ctx 超时约束，搜索等不到名额就直接退化为纯关键词
+	select {
+	case s.embedSemaphore <- struct{}{}:
+		defer func() { <-s.embedSemaphore }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 
 	type OllamaEmbeddingRequest struct {

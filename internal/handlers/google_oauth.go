@@ -146,7 +146,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	// 查找用户(通过 GoogleID 或 Email)
 	var user models.User
-	err = db.DB.Where("google_id = ?", userInfo.ID).Or("email = ?", userInfo.Email).First(&user).Error
+	err = db.DB.Where("google_id = ?", userInfo.ID).Or("LOWER(email) = ?", normalizeEmail(userInfo.Email)).First(&user).Error
 
 	if err != nil {
 		// 新用户,自动注册
@@ -175,6 +175,10 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 			if user.GoogleID == "" {
 				user.GoogleID = userInfo.ID
 				user.GoogleEmail = userInfo.Email
+			}
+			if !user.IsActivated {
+				// 未激活账号的密码没人验证过，可能是别人抢注时设的；不清掉的话对方激活后就能用密码登录
+				user.Password = ""
 			}
 			user.IsActivated = true
 			db.DB.Save(&user)
