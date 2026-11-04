@@ -18,8 +18,6 @@ func RegisterRoutes(r *gin.Engine) {
 	nodeHandler := handlers.NewNodeHandler()
 	bookmarkHandler := handlers.NewBookmarkHandler()
 	notificationHandler := handlers.NewNotificationHandler()
-	rssHandler := handlers.NewRSSHandler()
-	transplantHandler := handlers.NewTransplantHandler()
 	adminHandler := handlers.NewAdminHandler()
 	seoHandler := handlers.NewSEOHandler()
 	imageHandler := handlers.NewImageHandler()
@@ -47,7 +45,6 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/t/:name", storyHandler.ListByNode)                                   // 节点下的文章列表
 	r.GET("/nodes", nodeHandler.ListNodes)                                       // 所有节点列表
 	r.GET("/u/:id", userHandler.Profile)                                         // 用户主页
-	r.GET("/rss/popular", rssHandler.PopularFeeds)                               // 热门订阅（公开）
 	r.GET("/img/:id", imageHandler.Proxy)                                        // Imgur 图片反代（公开，带防盗链）
 
 	r.GET("/signup", authHandler.ShowRegister)                                          // 注册页面
@@ -110,25 +107,10 @@ func RegisterRoutes(r *gin.Engine) {
 		dashboard.POST("/settings/unbind-google", authHandler.UnbindGoogle)             // 解除 Google 绑定
 	}
 
-	// RSS 阅读器路由 (RSS Reader Routes)
-	rss := r.Group("/rss")
-	rss.Use(middleware.AuthRequired())
-	{
-		rss.GET("", rssHandler.Index)                          // RSS 阅读器主页
-		rss.GET("/feeds", rssHandler.GetFeeds)                 // 获取订阅源列表
-		rss.GET("/items", rssHandler.GetItems)                 // 获取文章项列表
-		rss.GET("/read/:id", rssHandler.ReadItem)              // 获取单篇文章内容
-		rss.POST("/subscribe", rssHandler.Subscribe)           // 订阅新的 RSS 源
-		rss.DELETE("/unsubscribe/:id", rssHandler.Unsubscribe) // 取消订阅
-
-		rss.POST("/subscription/update", rssHandler.UpdateSubscription)       // 更新订阅设置
-		rss.POST("/refresh/:id", rssHandler.RefreshFeed)                      // 手动刷新订阅源
-		rss.POST("/anchor/:id", rssHandler.UpdateAnchor)                      // 更新阅读进度
-		rss.POST("/update-read-anchor/:id", rssHandler.UpdateReadAnchorBatch) // 批量更新已读锚点（hover标记）
-
-		rss.POST("/transplant/:id", transplantHandler.Transplant)         // 提交推荐到社区
-		rss.GET("/transplant/:id", transplantHandler.ShowTransplantModal) // 显示推荐到社区的弹窗
-	}
+	// RSS 阅读器（苗圃）已下线：旧入口和已被收录的热门订阅页永久跳回首页
+	rssGone := func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/") }
+	r.GET("/rss", rssGone)
+	r.GET("/rss/popular", rssGone)
 
 	// 管理员路由 (Admin Routes)
 	admin := r.Group("/admin")

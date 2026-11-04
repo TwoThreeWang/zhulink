@@ -53,10 +53,6 @@ func Init() {
 		&models.PointLog{},
 		&models.Bookmark{},
 		&models.Notification{},
-		// RSS 相关模型
-		&models.Feed{},
-		&models.UserSubscription{},
-		&models.FeedItem{},
 		&models.Report{},
 	)
 	if err != nil {
@@ -105,8 +101,6 @@ func migrateUniqueConstraints() {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_vote_user_comment ON votes (user_id, comment_id) WHERE comment_id IS NOT NULL`,
 		// 登录、注册按 LOWER(email) 查用户；不建唯一索引，历史数据里可能有只差大小写的重复邮箱
 		`CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email))`,
-		// RSS 条目改为"同一订阅源内 GUID 唯一"，删掉旧的全局唯一索引
-		`DROP INDEX IF EXISTS idx_feed_items_guid`,
 	}
 	for _, stmt := range stmts {
 		if err := DB.Exec(stmt).Error; err != nil {

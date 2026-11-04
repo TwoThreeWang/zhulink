@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// maxFetchBody 抓取用户提供的外部地址（RSS、文章正文）时，单个响应最多读取的字节数
+// maxFetchBody 抓取用户提供的外部地址时，单个响应最多读取的字节数
 const maxFetchBody = 5 << 20
 
 var errBlockedAddress = errors.New("不允许访问内网或本机地址")

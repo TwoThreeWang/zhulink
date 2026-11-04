@@ -93,12 +93,6 @@
                         {{ if eq .Active "nodes" }}<span
                             class="absolute bottom-0 left-0 right-0 h-0.5 bg-moss rounded-full"></span>{{ end }}
                     </a>
-                    <a href="/rss" class="relative py-0.5 transition-colors {{ if eq .Active "rss" }}text-ink
-                        font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
-                        苗圃
-                        {{ if eq .Active "rss" }}<span
-                            class="absolute bottom-0 left-0 right-0 h-0.5 bg-moss rounded-full"></span>{{ end }}
-                    </a>
                     <a href="/search" class="relative py-0.5 transition-colors {{ if eq .Active "search" }}text-ink
                         font-semibold{{ else }}text-ink-light hover:text-ink{{ end }}">
                         搜索
@@ -202,8 +196,6 @@
                     class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "new" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">最新</a>
                 <a href="/nodes"
                     class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "nodes" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">节点</a>
-                <a href="/rss"
-                    class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "rss" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">苗圃</a>
                 <a href="/search"
                     class="flex-shrink-0 px-2.5 py-1 rounded-md transition-colors {{ if eq .Active "search" }}bg-moss/10 text-green-800 font-medium{{ else }}text-ink-light hover:text-ink hover:bg-stone-50{{ end }}">搜索</a>
             </nav>

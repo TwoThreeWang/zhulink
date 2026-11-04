@@ -57,12 +57,6 @@ func main() {
 	// 初始化异步排名服务
 	rankingSvc := services.GetRankingService()
 
-	// 启动 RSS 定时任务
-	rssFetcher := services.GetRSSFetcher()
-	rssFetcher.StartScheduledFetch(mainCtx)   // 每 30 分钟拉取新文章
-	rssFetcher.StartScheduledCleanup(mainCtx) // 每天凌晨 2 点清除过期文章
-	log.Println("RSS 定时任务已启动: 拉取间隔 30 分钟, 保留最近 30 天文章")
-
 	// 启动文章分数定时更新任务
 	rankingSvc.StartScheduledScoreUpdate(mainCtx) // 启动时一次，之后每小时一次
 	log.Println("文章分数定时任务已启动: 每小时更新")
@@ -326,14 +320,6 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("node/list.html", funcMap, assemble(templatesDir+"/views/node/list.html")...)
 	r.AddFromFilesFuncs("search.html", funcMap, assemble(templatesDir+"/views/search.html")...)
 	r.AddFromFilesFuncs("error.html", funcMap, assemble(templatesDir+"/views/error.html")...)
-	r.AddFromFilesFuncs("rss/index.html", funcMap, assemble(templatesDir+"/views/rss/index.html")...)
-	r.AddFromFilesFuncs("rss/feed_list.html", funcMap, templatesDir+"/views/rss/feed_list.html")
-	r.AddFromFilesFuncs("rss/item_list.html", funcMap, templatesDir+"/views/rss/item_list.html")
-	r.AddFromFilesFuncs("rss/item_list_items.html", funcMap, templatesDir+"/views/rss/item_list_items.html")
-	r.AddFromFilesFuncs("rss/reader_content.html", funcMap, templatesDir+"/views/rss/reader_content.html")
-	r.AddFromFilesFuncs("rss/transplant_modal.html", funcMap, templatesDir+"/views/rss/transplant_modal.html")
-	r.AddFromFilesFuncs("rss/transplant_result.html", funcMap, templatesDir+"/views/rss/transplant_result.html")
-	r.AddFromFilesFuncs("rss/popular.html", funcMap, assemble(templatesDir+"/views/rss/popular.html")...)
 	r.AddFromFilesFuncs("admin/reports.html", funcMap, assemble(templatesDir+"/views/admin/reports.html")...)
 	r.AddFromFilesFuncs("admin/users.html", funcMap, assemble(templatesDir+"/views/admin/users.html")...)
 

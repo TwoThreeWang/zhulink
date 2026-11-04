@@ -130,14 +130,6 @@ func (h *SEOHandler) SitemapStaticXML(c *gin.Context) {
   </url>
 `, siteURL, now))
 
-	xml.WriteString(fmt.Sprintf(`  <url>
-    <loc>%s/rss/popular</loc>
-    <lastmod>%s</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-`, siteURL, now))
-
 	var nodes []models.Node
 	db.DB.Find(&nodes)
 

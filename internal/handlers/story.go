@@ -135,8 +135,8 @@ func (h *StoryHandler) ListTop(c *gin.Context) {
 		"Title":       "热门话题",
 		"CurrentPage": page,
 		"TotalPages":  totalPages,
-		"Description": "汇聚 ZhuLink 社区近期热度最高的科技资讯、深度讨论与 RSS 精选。依靠用户“竹笋”共识筛选，拒绝算法推荐，只看最有价值的内容。",
-		"Keywords":    "ZhuLink, 竹林, 技术社区, 热门文章, 高质量内容, 去算法, 技术社区, RSS聚合, Go语言, 独立开发, 深度阅读, ZhuLink",
+		"Description": "汇聚 ZhuLink 社区近期热度最高的科技资讯与深度讨论。依靠用户“竹笋”共识筛选，拒绝算法推荐，只看最有价值的内容。",
+		"Keywords":    "ZhuLink, 竹林, 技术社区, 热门文章, 高质量内容, 去算法, Go语言, 独立开发, 深度阅读, ZhuLink",
 		"FullURL":     fullURL,
 	}
 
@@ -195,8 +195,8 @@ func (h *StoryHandler) ListNew(c *gin.Context) {
 		"Title":       "最新发布",
 		"CurrentPage": page,
 		"TotalPages":  totalPages,
-		"Description": "实时追踪 ZhuLink 社区的最新动态。第一时间获取 RSS 移栽的科技新闻、独立开发者的新作展示以及新鲜的技术问答。",
-		"Keywords":    "ZhuLink, 竹林, 最新文章, 技术分享, 社区动态, 最新资讯, 科技新闻, 实时动态, RSS更新",
+		"Description": "实时追踪 ZhuLink 社区的最新动态。第一时间获取社区分享的科技新闻、独立开发者的新作展示以及新鲜的技术问答。",
+		"Keywords":    "ZhuLink, 竹林, 最新文章, 技术分享, 社区动态, 最新资讯, 科技新闻, 实时动态",
 		"FullURL":     fullURL,
 	})
 }
