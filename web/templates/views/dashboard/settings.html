@@ -186,6 +186,23 @@
                     </div>
                 </section>
 
+                <!-- 通知设置 -->
+                <section>
+                    <h2
+                        class="text-xs text-stone-400 uppercase tracking-widest font-sans mb-4 border-b border-stone-100 pb-2">
+                        通知设置</h2>
+
+                    <input type="hidden" name="email_digest_form" value="1">
+                    <label for="email_digest" class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" name="email_digest" id="email_digest" value="1"
+                            class="mt-0.5 w-4 h-4 accent-moss" {{ if .User.EmailDigest }}checked{{ end }}>
+                        <span>
+                            <span class="block text-sm font-medium text-ink">接收每日回复汇总邮件</span>
+                            <span class="block mt-0.5 text-xs text-stone-400">每天汇总一次过去 24 小时里还没看的评论和回复，已读的不会再发</span>
+                        </span>
+                    </label>
+                </section>
+
                 <!-- 修改密码 -->
                 <section>
                     <h2

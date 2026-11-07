@@ -21,6 +21,7 @@ type User struct {
 	VerifyCode          string     `gorm:"size:20" json:"-"`                            // 验证码(激活/重置通用)
 	VerifyCodeExpiresAt *time.Time `json:"-"`                                           // 验证码过期时间，nil 视为已过期
 	VerifyAttempts      int        `gorm:"default:0" json:"-"`                          // 当前验证码已校验次数
+	EmailDigest         bool       `gorm:"default:true" json:"email_digest"`            // 是否接收每日评论汇总邮件
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
 	// No DeletedAt for hard delete

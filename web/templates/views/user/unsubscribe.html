@@ -1,0 +1,21 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<section class="py-24 md:py-32 text-center max-w-2xl mx-auto px-4">
+    {{ if .Invalid }}
+    <h1 class="font-sans font-bold text-2xl text-ink mb-4">退订链接无效</h1>
+    <p class="text-base text-stone-500 mb-8">链接可能不完整，请登录后在个人设置中关闭汇总邮件。</p>
+    {{ else if .Done }}
+    <h1 class="font-sans font-bold text-2xl text-ink mb-4">已退订</h1>
+    <p class="text-base text-stone-500 mb-8">之后不会再收到每日回复汇总邮件，站内通知不受影响。想恢复的话，可以在个人设置里重新打开。</p>
+    {{ else }}
+    <h1 class="font-sans font-bold text-2xl text-ink mb-4">退订每日回复汇总邮件</h1>
+    <p class="text-base text-stone-500 mb-8">确认后不再发送汇总邮件，站内通知照常保留。</p>
+    <form method="POST" action="/unsubscribe?u={{ .UID }}&s={{ .Sig }}">
+        <button type="submit"
+            class="inline-block bg-moss text-white px-6 py-2.5 rounded-md font-medium hover:opacity-90 transition">确认退订</button>
+    </form>
+    {{ end }}
+    <a href="/" class="inline-block mt-6 text-sm text-stone-500 hover:text-moss">返回首页</a>
+</section>
+{{ end }}

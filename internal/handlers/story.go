@@ -29,14 +29,10 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type StoryHandler struct {
-	mailService *services.MailService
-}
+type StoryHandler struct{}
 
 func NewStoryHandler() *StoryHandler {
-	return &StoryHandler{
-		mailService: services.NewMailService(),
-	}
+	return &StoryHandler{}
 }
 
 // fillPostCounts 批量填充列表展示用的评论数和点赞数
@@ -872,13 +868,15 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 		uPID := uint(pID)
 		parentID = &uPID
 
-		// 获取被回复评论的信息用于拼接引用
+		// 被回复的评论必须在这篇文章下，否则可以借任意文章给全站任何人发回复通知
 		var parentComment models.Comment
-		if err := db.DB.Preload("User").First(&parentComment, uPID).Error; err == nil {
-			// 拼接回复引用：↳ 回复 [#楼层](#comment-ID)
-			replyPrefix := fmt.Sprintf("↳ 回复 [#%s @%s](#comment-%d)\n\n", replyFloor, parentComment.User.Username, parentComment.ID)
-			content = replyPrefix + content
+		if err := db.DB.Preload("User").Where("post_id = ?", post.ID).First(&parentComment, uPID).Error; err != nil {
+			Render(c, http.StatusBadRequest, "error.html", gin.H{"Error": "回复的评论不存在"})
+			return
 		}
+		// 拼接回复引用：↳ 回复 [#楼层](#comment-ID)
+		replyPrefix := fmt.Sprintf("↳ 回复 [#%s @%s](#comment-%d)\n\n", replyFloor, parentComment.User.Username, parentComment.ID)
+		content = replyPrefix + content
 	}
 
 	comment := models.Comment{
@@ -924,18 +922,8 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 						Reason: fmt.Sprintf("在文章 <a href=\"/p/%s#comment-%d\" target=\"_blank\" class=\"text-moss font-medium hover:underline tracking-tight\">《%s》</a> 中回复了您的评论",
 							post.Pid, comment.ID, html.EscapeString(post.Title)),
 					}
+					// 邮件不再实时发送，由每日评论汇总统一发出
 					db.DB.Create(&notification)
-
-					// Send Email Notification
-					postLink := fmt.Sprintf("%s/p/%s#comment-%d", os.Getenv("SITE_URL"), post.Pid, comment.ID)
-					h.mailService.SendCommentNotification(
-						parentComment.User.Email,
-						user.Username,
-						post.Title,
-						content, // This includes "Reply to #X..." prefix which gives context
-						parentComment.Content,
-						postLink,
-					)
 				}
 			}
 		} else {

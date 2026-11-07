@@ -401,6 +401,13 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 		updates["bio"] = bio
 	}
 
+	// 复选框不勾选时不会提交，用隐藏字段确认表单里确实有这一项
+	if c.PostForm("email_digest_form") == "1" {
+		if emailDigest := c.PostForm("email_digest") == "1"; emailDigest != user.EmailDigest {
+			updates["email_digest"] = emailDigest
+		}
+	}
+
 	// 如果要修改密码
 	if newPassword != "" {
 		if len(newPassword) < 6 {
@@ -548,4 +555,28 @@ func getCurrentUser(c *gin.Context) (*models.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// ShowUnsubscribe 邮件里的退订链接：GET 只显示确认页，避免邮箱的链接预检把人误退订
+func (h *UserHandler) ShowUnsubscribe(c *gin.Context) {
+	uid, sig := c.Query("u"), c.Query("s")
+	if _, ok := services.VerifyUnsubscribe(uid, sig); !ok {
+		Render(c, http.StatusBadRequest, "user/unsubscribe.html", gin.H{"Title": "退订", "Invalid": true})
+		return
+	}
+	Render(c, http.StatusOK, "user/unsubscribe.html", gin.H{"Title": "退订", "UID": uid, "Sig": sig})
+}
+
+// Unsubscribe 确认退订；也接收邮箱客户端按 RFC 8058 发来的一键退订 POST。凭签名鉴权，不需要登录
+func (h *UserHandler) Unsubscribe(c *gin.Context) {
+	userID, ok := services.VerifyUnsubscribe(c.Query("u"), c.Query("s"))
+	if !ok {
+		Render(c, http.StatusBadRequest, "user/unsubscribe.html", gin.H{"Title": "退订", "Invalid": true})
+		return
+	}
+	if err := db.DB.Model(&models.User{}).Where("id = ?", userID).Update("email_digest", false).Error; err != nil {
+		RenderError(c, http.StatusInternalServerError, "退订失败，请稍后重试")
+		return
+	}
+	Render(c, http.StatusOK, "user/unsubscribe.html", gin.H{"Title": "退订", "Done": true})
 }

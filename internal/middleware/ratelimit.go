@@ -42,6 +42,17 @@ func (l *Limiter) Allow(key string) bool {
 	return b.count <= l.limit
 }
 
+// Count 返回 key 在当前窗口内已记的次数，只读不计数
+func (l *Limiter) Count(key string) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	b, ok := l.buckets.Peek(key)
+	if !ok || time.Since(b.start) >= l.window {
+		return 0
+	}
+	return b.count
+}
+
 // RateLimit 按客户端 IP 限制：每个 window 内最多 limit 次请求，超出返回 429。
 // 每次调用返回一个独立计数的中间件，所以每个接口各算各的。
 func RateLimit(limit int, window time.Duration) gin.HandlerFunc {

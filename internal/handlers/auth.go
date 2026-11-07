@@ -18,8 +18,7 @@ import (
 )
 
 type AuthHandler struct {
-	mailService    *services.MailService
-	captchaService *services.CaptchaService
+	mailService *services.MailService
 }
 
 const sessionAbsoluteLifetime = 180 * 24 * time.Hour
@@ -38,17 +37,29 @@ func startUserSession(c *gin.Context, userID uint) error {
 
 func NewAuthHandler() *AuthHandler {
 	return &AuthHandler{
-		mailService:    services.NewMailService(),
-		captchaService: services.NewCaptchaService(),
+		mailService: services.NewMailService(),
 	}
 }
 
+// checkHuman 人机校验：陷阱字段（正常用户看不到、不会填）+ 工作量证明
+func checkHuman(c *gin.Context, scope string, minBits int) error {
+	if c.PostForm("zl_trap") != "" {
+		return services.ErrPowInvalid
+	}
+	return services.GetPowService().Verify(c.PostForm("pow_challenge"), c.PostForm("pow_nonce"), scope, minBits)
+}
+
+// renderRegister 渲染注册页，每次都签发新的 PoW 挑战；出错时保留已填的邮箱
+func (h *AuthHandler) renderRegister(c *gin.Context, status int, errMsg, email string) {
+	Render(c, status, "auth/register.html", gin.H{
+		"Error": errMsg,
+		"Email": email,
+		"Pow":   services.GetPowService().Issue("register", registerPowBits()),
+	})
+}
+
 func (h *AuthHandler) ShowRegister(c *gin.Context) {
-	question, answer := h.captchaService.GenerateMathProblem()
-	session := sessions.Default(c)
-	session.Set("captcha_answer", answer)
-	session.Save()
-	Render(c, http.StatusOK, "auth/register.html", gin.H{"Captcha": question})
+	h.renderRegister(c, http.StatusOK, "", "")
 }
 
 // createUser 创建新用户的通用函数
@@ -85,8 +96,25 @@ const (
 	unactivatedReclaimAfter = time.Hour
 )
 
-// 全站每小时最多发 200 封激活邮件：被批量注册时保护发信域名的信誉
-var registerMailLimiter = middleware.NewLimiter(200, time.Hour)
+// 激活邮件的发送上限：只统计真正发出的邮件，填错表单不占次数
+const (
+	registerSurgePerHour = 50  // 全站每小时超过这个数就熔断：新挑战改用高难度 PoW
+	registerHardPerHour  = 200 // 发信硬上限，保护发信域名的信誉，到了才真正暂停注册
+)
+
+var (
+	registerMailCounter  = middleware.NewLimiter(registerHardPerHour, time.Hour) // 全站计数，key 固定为 "all"
+	registerMailPerEmail = middleware.NewLimiter(3, 24*time.Hour)                // 同一邮箱每天最多 3 封
+	registerMailPerIP    = middleware.NewLimiter(10, 24*time.Hour)               // 同一 IP 每天最多 10 封
+)
+
+// registerPowBits 注册页当前要求的 PoW 难度：发信量激增时自动提高，正常用户只是多算几秒
+func registerPowBits() int {
+	if registerMailCounter.Count("all") >= registerSurgePerHour {
+		return services.PowBitsHigh
+	}
+	return services.PowBitsNormal
+}
 
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
@@ -130,26 +158,16 @@ func checkVerifyCode(user *models.User, code string) bool {
 func (h *AuthHandler) Register(c *gin.Context) {
 	email := normalizeEmail(c.PostForm("email"))
 	password := c.PostForm("password")
-	captchaInput := c.PostForm("captcha")
 
-	session := sessions.Default(c)
-	// 出错时换一道新验证码重新渲染注册页
+	// 出错时换一个新挑战重新渲染注册页
 	fail := func(status int, msg string) {
-		question, answer := h.captchaService.GenerateMathProblem()
-		session.Set("captcha_answer", answer)
-		session.Save()
-		Render(c, status, "auth/register.html", gin.H{"Error": msg, "Captcha": question})
+		h.renderRegister(c, status, msg, email)
 	}
 
-	// Validate Captcha
-	expectedAnswer, ok := session.Get("captcha_answer").(int)
-	if !ok || utils.StringToInt(captchaInput) != expectedAnswer {
-		fail(http.StatusBadRequest, "验证码错误")
+	if err := checkHuman(c, "register", registerPowBits()); err != nil {
+		fail(http.StatusBadRequest, err.Error())
 		return
 	}
-	// Clear captcha after use
-	session.Delete("captcha_answer")
-	session.Save()
 
 	// Extract username from email
 	parts := strings.Split(email, "@")
@@ -173,10 +191,21 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	if !registerMailLimiter.Allow("all") {
-		log.Printf("[Register] 激活邮件已达每小时上限，暂停注册 (email=%s)", email)
+	if !registerMailPerEmail.Allow(email) {
+		fail(http.StatusTooManyRequests, "该邮箱今天收到的激活邮件已达上限，请明天再试")
+		return
+	}
+	if !registerMailPerIP.Allow(c.ClientIP()) {
+		fail(http.StatusTooManyRequests, "注册太频繁，请明天再试")
+		return
+	}
+	if !registerMailCounter.Allow("all") {
+		log.Printf("[Register] 激活邮件已达每小时硬上限，暂停注册 (email=%s)", email)
 		fail(http.StatusServiceUnavailable, "当前注册人数过多，请稍后再试")
 		return
+	}
+	if registerMailCounter.Count("all") == registerSurgePerHour {
+		log.Printf("[Register] 激活邮件 1 小时内达到 %d 封，注册页 PoW 难度提高到 %d 位", registerSurgePerHour, services.PowBitsHigh)
 	}
 
 	var user *models.User
@@ -203,7 +232,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	code := issueVerifyCode(user, activationCodeTTL)
 	h.mailService.SendWelcomeEmail(email, code)
 
-	Render(c, http.StatusOK, "auth/login.html", gin.H{"Success": "注册成功！激活码已发送至您的邮箱，请登录后激活。"})
+	renderLogin(c, http.StatusOK, gin.H{"Success": "注册成功！激活码已发送至您的邮箱，请登录后激活。"})
 }
 
 func (h *AuthHandler) ShowActivate(c *gin.Context) {
@@ -225,7 +254,7 @@ func (h *AuthHandler) Activate(c *gin.Context) {
 	}
 
 	if user.IsActivated {
-		Render(c, http.StatusOK, "auth/login.html", gin.H{"Success": "账号已激活，请登录"})
+		renderLogin(c, http.StatusOK, gin.H{"Success": "账号已激活，请登录"})
 		return
 	}
 
@@ -240,36 +269,51 @@ func (h *AuthHandler) Activate(c *gin.Context) {
 
 	// 激活成功后自动登录
 	if err := startUserSession(c, user.ID); err != nil {
-		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "登录状态保存失败，请重试"})
+		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "登录状态保存失败，请重试"})
 		return
 	}
 
 	c.Redirect(http.StatusFound, "/")
 }
 
+// renderLogin 渲染登录页，每次都签发新的 PoW 挑战。所有渲染登录页的地方都要走这里
+func renderLogin(c *gin.Context, status int, data gin.H) {
+	if data == nil {
+		data = gin.H{}
+	}
+	data["Pow"] = services.GetPowService().Issue("login", services.PowBitsNormal)
+	Render(c, status, "auth/login.html", data)
+}
+
 func (h *AuthHandler) ShowLogin(c *gin.Context) {
-	Render(c, http.StatusOK, "auth/login.html", nil)
+	renderLogin(c, http.StatusOK, nil)
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	email := c.PostForm("email")
 	password := c.PostForm("password")
 
+	// 先做人机校验再查库、比对密码：撞库时每试一次都要付出算力
+	if err := checkHuman(c, "login", services.PowBitsNormal); err != nil {
+		renderLogin(c, http.StatusBadRequest, gin.H{"Error": err.Error(), "Email": email})
+		return
+	}
+
 	var user models.User
 	if err := findUserByEmail(email, &user); err != nil {
-		Render(c, http.StatusUnauthorized, "auth/login.html", gin.H{"Error": "邮箱或密码错误"})
+		renderLogin(c, http.StatusUnauthorized, gin.H{"Error": "邮箱或密码错误", "Email": email})
 		return
 	}
 
 	if !utils.CheckPasswordHash(password, user.Password) {
-		Render(c, http.StatusUnauthorized, "auth/login.html", gin.H{"Error": "邮箱或密码错误"})
+		renderLogin(c, http.StatusUnauthorized, gin.H{"Error": "邮箱或密码错误", "Email": email})
 		return
 	}
 
 	// 检查用户是否被封禁（到期的惩罚先解除）
 	middleware.ClearExpiredPunishment(&user)
 	if user.Status == 2 {
-		Render(c, http.StatusForbidden, "auth/login.html", gin.H{"Error": "您的账号已被封禁,无法登录。"})
+		renderLogin(c, http.StatusForbidden, gin.H{"Error": "您的账号已被封禁,无法登录。"})
 		return
 	}
 
@@ -280,7 +324,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	if err := startUserSession(c, user.ID); err != nil {
-		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "登录状态保存失败，请重试"})
+		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "登录状态保存失败，请重试"})
 		return
 	}
 
@@ -290,18 +334,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	session := sessions.Default(c)
 	if err := middleware.ClearSession(session); err != nil {
-		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "退出登录失败，请重试"})
+		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "退出登录失败，请重试"})
 		return
 	}
 	c.Redirect(http.StatusFound, "/")
 }
 
+// renderForgotPassword 渲染找回密码页，每次都签发新的 PoW 挑战
+func (h *AuthHandler) renderForgotPassword(c *gin.Context, status int, errMsg, email string) {
+	Render(c, status, "auth/forgot_password.html", gin.H{
+		"Error": errMsg,
+		"Email": email,
+		"Pow":   services.GetPowService().Issue("reset", services.PowBitsNormal),
+	})
+}
+
 func (h *AuthHandler) ShowForgotPassword(c *gin.Context) {
-	question, answer := h.captchaService.GenerateMathProblem()
-	session := sessions.Default(c)
-	session.Set("reset_captcha_answer", answer)
-	session.Save()
-	Render(c, http.StatusOK, "auth/forgot_password.html", gin.H{"Captcha": question})
+	h.renderForgotPassword(c, http.StatusOK, "", "")
 }
 
 // 同一邮箱每分钟 1 封、每天 5 封重置邮件
@@ -312,29 +361,18 @@ var (
 
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	email := c.PostForm("email")
-	captchaInput := c.PostForm("captcha")
 
-	session := sessions.Default(c)
-	expectedAnswer, ok := session.Get("reset_captcha_answer").(int)
-	if !ok || utils.StringToInt(captchaInput) != expectedAnswer {
-		question, answer := h.captchaService.GenerateMathProblem()
-		session.Set("reset_captcha_answer", answer)
-		session.Save()
-		Render(c, http.StatusBadRequest, "auth/forgot_password.html", gin.H{"Error": "验证码错误", "Captcha": question})
+	if err := checkHuman(c, "reset", services.PowBitsNormal); err != nil {
+		h.renderForgotPassword(c, http.StatusBadRequest, err.Error(), email)
 		return
 	}
-	session.Delete("reset_captcha_answer")
 
 	// 按邮箱冷却，防止换 IP 轰炸同一个邮箱；在查库之前判断，不暴露邮箱是否存在
 	emailKey := normalizeEmail(email)
 	if !resetMailMinuteLimiter.Allow(emailKey) || !resetMailDayLimiter.Allow(emailKey) {
-		question, answer := h.captchaService.GenerateMathProblem()
-		session.Set("reset_captcha_answer", answer)
-		session.Save()
-		Render(c, http.StatusTooManyRequests, "auth/forgot_password.html", gin.H{"Error": "该邮箱请求过于频繁，请稍后再试", "Captcha": question})
+		h.renderForgotPassword(c, http.StatusTooManyRequests, "该邮箱请求过于频繁，请稍后再试", email)
 		return
 	}
-	session.Save()
 
 	var user models.User
 	if err := findUserByEmail(email, &user); err != nil {
@@ -389,21 +427,5 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	clearVerifyCode(&user)
 	db.DB.Save(&user)
 
-	Render(c, http.StatusOK, "auth/login.html", gin.H{"Success": "密码重置成功，请登录"})
-}
-
-// RefreshCaptcha 刷新验证码 (AJAX)
-func (h *AuthHandler) RefreshCaptcha(c *gin.Context) {
-	captchaType := c.Query("type") // "register" or "reset"
-	question, answer := h.captchaService.GenerateMathProblem()
-
-	session := sessions.Default(c)
-	if captchaType == "reset" {
-		session.Set("reset_captcha_answer", answer)
-	} else {
-		session.Set("captcha_answer", answer)
-	}
-	session.Save()
-
-	c.JSON(http.StatusOK, gin.H{"captcha": question})
+	renderLogin(c, http.StatusOK, gin.H{"Success": "密码重置成功，请登录"})
 }

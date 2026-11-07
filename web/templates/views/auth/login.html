@@ -13,10 +13,17 @@
         </div>
         {{ end }}
 
-        <form action="/login" method="POST" class="space-y-6">
+        <form action="/login" method="POST" class="space-y-6 relative" data-pow-salt="{{ .Pow.Salt }}"
+            data-pow-bits="{{ .Pow.Bits }}">
+            <input type="hidden" name="pow_challenge" value="{{ .Pow.Token }}">
+            <input type="hidden" name="pow_nonce">
+            <!-- 陷阱字段：正常用户看不到也不会填，填了就是脚本 -->
+            <div class="absolute -left-[9999px]" aria-hidden="true">
+                <input type="text" name="zl_trap" tabindex="-1" autocomplete="off">
+            </div>
             <div>
                 <label class="block text-sm font-medium text-ink-light mb-1">邮箱</label>
-                <input type="email" name="email"
+                <input type="email" name="email" value="{{ .Email }}"
                     class="w-full border border-stone-200 p-3 focus:ring-1 focus:ring-moss focus:border-moss outline-none transition-colors"
                     placeholder="your@email.com" required>
             </div>
@@ -69,4 +76,5 @@
         </div>
     </div>
 </div>
+<script src="{{ asset "js/pow.js" }}"></script>
 {{ end }}

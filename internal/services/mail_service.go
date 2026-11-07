@@ -44,6 +44,11 @@ func NewMailService() *MailService {
 }
 
 func (s *MailService) sendAsync(to []string, subject string, body string) {
+	s.sendAsyncWithHeaders(to, subject, body, "")
+}
+
+// sendAsyncWithHeaders extraHeaders 是额外的邮件头，每行以 \r\n 结尾，由调用方拼好（不能含用户输入）
+func (s *MailService) sendAsyncWithHeaders(to []string, subject string, body string, extraHeaders string) {
 	if !s.Enabled {
 		return
 	}
@@ -59,7 +64,7 @@ func (s *MailService) sendAsync(to []string, subject string, body string) {
 		msg := []byte(fmt.Sprintf("To: %s\r\n"+
 			"From: ZhuLink 通讯员 <%s>\r\n"+
 			"Subject: %s\r\n"+
-			"%s\r\n%s", strings.Join(to, ","), s.From, subject, mime, body))
+			"%s%s\r\n%s", strings.Join(to, ","), s.From, subject, extraHeaders, mime, body))
 
 		err := smtp.SendMail(addr, auth, s.From, to, msg)
 		if err != nil {
@@ -120,18 +125,22 @@ func (s *MailService) SendEmailChangeCode(email, code string) {
 	s.sendAsync([]string{email}, "[ZhuLink]请验证您的新邮箱", body)
 }
 
-func (s *MailService) SendCommentNotification(email, activeUser, articleTitle, replyContent, originalContent, postLink string) {
-	data := map[string]string{
-		"ActiveUser":      activeUser,
-		"ArticleTitle":    articleTitle,
-		"ReplyContent":    replyContent,
-		"OriginalContent": originalContent,
-		"PostLink":        postLink,
-	}
-	body, err := s.parseTemplate("notification.html", data)
+// SendCommentDigest 每日评论汇总邮件。total 是窗口内的通知总数，items 最多列 digestMaxItems 条
+func (s *MailService) SendCommentDigest(email, username string, items []DigestItem, total int, moreLink, unsubscribeURL string) {
+	body, err := s.parseTemplate("digest.html", map[string]interface{}{
+		"Username":       username,
+		"Items":          items,
+		"Total":          total,
+		"More":           total - len(items),
+		"MoreLink":       moreLink,
+		"UnsubscribeURL": unsubscribeURL,
+	})
 	if err != nil {
-		log.Printf("Error rendering notification email: %v", err)
+		log.Printf("Error rendering digest email: %v", err)
 		return
 	}
-	s.sendAsync([]string{email}, "💬 [新回响] "+activeUser+" 回复了你在《"+articleTitle+"》下的评论", body)
+	// RFC 8058 一键退订：Gmail 等邮箱会在邮件顶部显示"退订"按钮，直接 POST 到这个地址
+	headers := "List-Unsubscribe: <" + unsubscribeURL + ">\r\n" +
+		"List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n"
+	s.sendAsyncWithHeaders([]string{email}, fmt.Sprintf("[ZhuLink] 你有 %d 条新回复", total), body, headers)
 }

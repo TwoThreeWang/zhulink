@@ -109,7 +109,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	// 验证 state 参数
 	if savedState == nil || c.Query("state") != savedState.(string) {
-		Render(c, http.StatusBadRequest, "auth/login.html", gin.H{"Error": "无效的状态参数"})
+		renderLogin(c, http.StatusBadRequest, gin.H{"Error": "无效的状态参数"})
 		return
 	}
 
@@ -120,27 +120,27 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	// 获取授权码
 	code := c.Query("code")
 	if code == "" {
-		Render(c, http.StatusBadRequest, "auth/login.html", gin.H{"Error": "未获取到授权码"})
+		renderLogin(c, http.StatusBadRequest, gin.H{"Error": "未获取到授权码"})
 		return
 	}
 
 	// 交换 token
 	token, err := googleOauthConfig.Exchange(context.Background(), code)
 	if err != nil {
-		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "获取访问令牌失败"})
+		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "获取访问令牌失败"})
 		return
 	}
 
 	// 获取用户信息
 	userInfo, err := h.getGoogleUserInfo(token.AccessToken)
 	if err != nil {
-		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "获取用户信息失败"})
+		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "获取用户信息失败"})
 		return
 	}
 
 	// 检查邮箱是否已验证
 	if !userInfo.VerifiedEmail {
-		Render(c, http.StatusBadRequest, "auth/login.html", gin.H{"Error": "Google 邮箱未验证"})
+		renderLogin(c, http.StatusBadRequest, gin.H{"Error": "Google 邮箱未验证"})
 		return
 	}
 
@@ -158,7 +158,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		// 不设密码：GoogleID 可被公开工具查到，不能当密码；用户可在设置里自行设置密码
 		newUser, err := h.createUser(username, userInfo.Email, "")
 		if err != nil {
-			Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "创建用户失败"})
+			renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "创建用户失败"})
 			return
 		}
 
@@ -187,14 +187,14 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		// 检查用户是否被封禁（到期的惩罚先解除）
 		middleware.ClearExpiredPunishment(&user)
 		if user.Status == 2 {
-			Render(c, http.StatusForbidden, "auth/login.html", gin.H{"Error": "您的账号已被封禁,无法登录。"})
+			renderLogin(c, http.StatusForbidden, gin.H{"Error": "您的账号已被封禁,无法登录。"})
 			return
 		}
 	}
 
 	// 登录
 	if err := startUserSession(c, user.ID); err != nil {
-		Render(c, http.StatusInternalServerError, "auth/login.html", gin.H{"Error": "登录状态保存失败，请重试"})
+		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "登录状态保存失败，请重试"})
 		return
 	}
 

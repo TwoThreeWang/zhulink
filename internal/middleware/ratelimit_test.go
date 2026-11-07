@@ -49,3 +49,22 @@ func TestLimiter(t *testing.T) {
 		t.Fatal("key a should be allowed again after the window")
 	}
 }
+
+func TestLimiterCount(t *testing.T) {
+	l := NewLimiter(5, 50*time.Millisecond)
+	if l.Count("a") != 0 {
+		t.Fatal("unseen key should count 0")
+	}
+	l.Allow("a")
+	l.Allow("a")
+	if got := l.Count("a"); got != 2 {
+		t.Fatalf("got %d, want 2", got)
+	}
+	if got := l.Count("a"); got != 2 {
+		t.Fatalf("Count must not increment, got %d", got)
+	}
+	time.Sleep(60 * time.Millisecond)
+	if got := l.Count("a"); got != 0 {
+		t.Fatalf("expired window should count 0, got %d", got)
+	}
+}

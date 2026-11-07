@@ -57,6 +57,9 @@ func main() {
 	// 初始化异步排名服务
 	rankingSvc := services.GetRankingService()
 
+	// 启动每日评论汇总邮件任务
+	services.StartCommentDigest(mainCtx)
+
 	// 启动文章分数定时更新任务
 	rankingSvc.StartScheduledScoreUpdate(mainCtx) // 启动时一次，之后每小时一次
 	log.Println("文章分数定时任务已启动: 每小时更新")
@@ -313,6 +316,7 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("story/create.html", funcMap, assemble(templatesDir+"/views/story/create.html")...)
 	r.AddFromFilesFuncs("story/edit.html", funcMap, assemble(templatesDir+"/views/story/edit.html")...)
 	r.AddFromFilesFuncs("user/public.html", funcMap, assemble(templatesDir+"/views/user/public.html")...)
+	r.AddFromFilesFuncs("user/unsubscribe.html", funcMap, assemble(templatesDir+"/views/user/unsubscribe.html")...)
 	r.AddFromFilesFuncs("dashboard/overview.html", funcMap, assemble(templatesDir+"/views/dashboard/overview.html")...)
 	r.AddFromFilesFuncs("notification/list.html", funcMap, assemble(templatesDir+"/views/notification/list.html")...)
 	r.AddFromFilesFuncs("dashboard/points.html", funcMap, assemble(templatesDir+"/views/dashboard/points.html")...)

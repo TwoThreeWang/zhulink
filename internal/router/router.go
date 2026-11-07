@@ -46,6 +46,8 @@ func RegisterRoutes(r *gin.Engine) {
 	r.GET("/nodes", nodeHandler.ListNodes)                                       // 所有节点列表
 	r.GET("/u/:id", userHandler.Profile)                                         // 用户主页
 	r.GET("/img/:id", imageHandler.Proxy)                                        // Imgur 图片反代（公开，带防盗链）
+	r.GET("/unsubscribe", userHandler.ShowUnsubscribe)                           // 汇总邮件退订确认页（凭签名，无需登录）
+	r.POST("/unsubscribe", userHandler.Unsubscribe)                              // 确认退订 / RFC 8058 一键退订
 
 	r.GET("/signup", authHandler.ShowRegister)                                          // 注册页面
 	r.POST("/signup", middleware.RateLimit(5, 10*time.Minute), authHandler.Register)    // 提交注册
@@ -59,7 +61,6 @@ func RegisterRoutes(r *gin.Engine) {
 	r.POST("/forgot_password", middleware.RateLimit(3, 10*time.Minute), authHandler.ForgotPassword) // 提交忘记密码
 	r.GET("/reset_password", authHandler.ShowResetPassword)                                         // 重置密码页面
 	r.POST("/reset_password", middleware.RateLimit(10, 10*time.Minute), authHandler.ResetPassword)  // 提交重置密码
-	r.GET("/refresh_captcha", authHandler.RefreshCaptcha)                                           // 刷新验证码 (AJAX)
 
 	// Google OAuth 路由 (Google OAuth Routes)
 	r.GET("/auth/google", authHandler.GoogleLogin)             // Google 登录

@@ -656,6 +656,10 @@ body {
   inset: 0px;
 }
 
+.-left-\[9999px\] {
+  left: -9999px;
+}
+
 .-right-0\.5 {
   right: -0.125rem;
 }
@@ -2211,10 +2215,6 @@ body {
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
 
-.underline {
-  text-decoration-line: underline;
-}
-
 .antialiased {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -2228,6 +2228,10 @@ body {
 .placeholder-stone-400::placeholder {
   --tw-placeholder-opacity: 1;
   color: rgb(168 162 158 / var(--tw-placeholder-opacity, 1));
+}
+
+.accent-moss {
+  accent-color: #15803d;
 }
 
 .opacity-0 {
