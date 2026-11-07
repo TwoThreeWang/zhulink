@@ -389,6 +389,14 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 			})
 			return
 		}
+		if !services.EmailDomainAcceptsMail(email) {
+			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
+				"Error":        services.ErrEmailDomain.Error(),
+				"User":         user,
+				"CommonEmojis": utils.GetCommonEmojis(),
+			})
+			return
+		}
 		// 不直接改：所有校验通过后再给新邮箱发验证码
 		pendingEmail = email
 	}

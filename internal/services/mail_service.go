@@ -57,6 +57,20 @@ func (s *MailService) sendAsyncWithHeaders(to []string, subject string, body str
 	subject = mime.QEncoding.Encode("utf-8", strings.NewReplacer("\r", "", "\n", "").Replace(subject))
 
 	go func() {
+		// 兜底：所有邮件发送前都检查收件域名，收不了信的直接跳过，不产生退信
+		valid := to[:0:0]
+		for _, addr := range to {
+			if EmailDomainAcceptsMail(addr) {
+				valid = append(valid, addr)
+			} else {
+				log.Printf("⚠️ 收件域名无法收信，跳过: %s", addr)
+			}
+		}
+		if len(valid) == 0 {
+			return
+		}
+		to = valid
+
 		auth := smtp.PlainAuth("", s.Username, s.Password, s.Host)
 		addr := fmt.Sprintf("%s:%s", s.Host, s.Port)
 

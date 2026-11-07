@@ -175,6 +175,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		fail(http.StatusBadRequest, "邮箱格式不正确")
 		return
 	}
+	// 域名收不了信就不发激活邮件，避免退信拉低发信信誉；放在计数之前，不占用发信次数
+	if !services.EmailDomainAcceptsMail(email) {
+		fail(http.StatusBadRequest, services.ErrEmailDomain.Error())
+		return
+	}
 	username := parts[0]
 
 	if len(password) < 6 {
