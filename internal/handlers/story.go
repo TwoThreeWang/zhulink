@@ -696,7 +696,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 		}
 	}
 
-	postContentHTML := utils.RenderMarkdown(post.Content)
+	postContentHTML, toc := utils.RenderArticle(post.Content)
 
 	var bookmarkCount int64
 	db.DB.Model(&models.Bookmark{}).Where("post_id = ?", post.ID).Count(&bookmarkCount)
@@ -782,6 +782,7 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	renderData := gin.H{
 		"Post":          post,
 		"PostContent":   postContentHTML,
+		"TOC":           toc,
 		"Comments":      flatComments,
 		"Title":         post.Title,
 		"BookmarkCount": bookmarkCount,

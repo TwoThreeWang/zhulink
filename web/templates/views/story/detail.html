@@ -555,6 +555,10 @@
                 发布新内容
             </a>
 
+            {{ if .TOC }}
+            <!-- 文章目录（有目录时替换站点介绍） -->
+            {{ template "toc_sidebar" .TOC }}
+            {{ else }}
             <!-- Site Description -->
             <div class="bg-stone-50 rounded-lg p-5 border border-stone-100">
                 <h3 class="font-bold text-ink mb-2 text-sm">关于 ZhuLink</h3>
@@ -562,6 +566,7 @@
                     一个由用户分享、推荐优质资讯的社区，依靠用户共识挑出值得一读的内容。在这里，我们推崇"白纸墨字"的阅读体验。
                 </p>
             </div>
+            {{ end }}
 
             <!-- 广告：侧栏 -->
             {{ template "ad_unit" 250 }}
@@ -570,6 +575,8 @@
     </aside>
 
 </div>
+
+{{ if .TOC }}{{ template "toc_mobile" .TOC }}{{ end }}
 
 
 

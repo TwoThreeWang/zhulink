@@ -1,0 +1,138 @@
+{{/*
+  文章目录：电脑端放在侧栏（toc_sidebar），手机端为悬浮按钮 + 底部抽屉（toc_mobile）。
+  两处共用 data-toc-link / data-toc-id，由 toc_mobile 内的脚本统一处理跳转与当前小节高亮。
+  参数均为 []utils.TOCItem。
+*/}}
+
+{{ define "toc_sidebar" }}
+<nav aria-label="文章目录">
+    <h3 class="font-bold text-ink mb-3 text-sm">目录</h3>
+    <ol data-toc-scroll class="overflow-y-auto overscroll-contain scrollbar-hide"
+        style="max-height: max(12rem, calc(100vh - 28rem))">
+        {{ range . }}
+        <li>
+            <a href="#{{ .ID }}" data-toc-link data-toc-id="{{ .ID }}"
+                class="block border-l-2 border-stone-200 py-1 pr-2 text-[13px] leading-snug text-stone-500 transition-colors hover:text-ink line-clamp-2 aria-[current=true]:border-moss aria-[current=true]:text-ink aria-[current=true]:font-medium {{ if eq .Depth 2 }}pl-9{{ else if eq .Depth 1 }}pl-6{{ else }}pl-3{{ end }}">{{ .Text }}</a>
+        </li>
+        {{ end }}
+    </ol>
+</nav>
+{{ end }}
+
+{{ define "toc_mobile" }}
+<div class="lg:hidden" x-data="{ open: false, shown: false }"
+    x-init="shown = scrollY > 300"
+    @scroll.window.passive="shown = scrollY > 300"
+    @keydown.escape.window="open = false"
+    @toc-close.window="open = false"
+    x-effect="document.documentElement.style.overflow = open ? 'hidden' : ''">
+
+    <!-- 悬浮按钮：位于「回到顶部」上方，与其同时出现 -->
+    <button type="button" @click="open = true" aria-label="文章目录" :aria-expanded="open"
+        class="fixed bottom-24 right-8 z-50 w-12 h-12 rounded-full bg-white border border-stone-200 text-moss shadow-lg transition-opacity active:scale-95"
+        :class="shown ? 'opacity-100' : 'opacity-0 pointer-events-none'">
+        <svg class="icon w-5 h-5 mx-auto" aria-hidden="true"><use href="#i-list"/></svg>
+    </button>
+
+    <!-- 遮罩 -->
+    <div x-show="open" x-cloak @click="open = false"
+        x-transition:enter="transition-opacity ease-out duration-200" x-transition:enter-start="opacity-0"
+        x-transition:leave="transition-opacity ease-in duration-150" x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-[60] bg-stone-900/30"></div>
+
+    <!-- 底部抽屉 -->
+    <nav x-show="open" x-cloak aria-label="文章目录" role="dialog" aria-modal="true"
+        x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-y-full"
+        x-transition:enter-end="translate-y-0"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-y-0"
+        x-transition:leave-end="translate-y-full"
+        x-effect="if (open) $nextTick(() => window.zlTocReveal && window.zlTocReveal($refs.list))"
+        class="fixed inset-x-0 bottom-0 z-[70] flex max-h-[70vh] flex-col rounded-t-2xl bg-paper shadow-2xl"
+        style="padding-bottom: env(safe-area-inset-bottom)">
+        <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+            <h3 class="font-bold text-ink text-sm">目录</h3>
+            <button type="button" @click="open = false" aria-label="关闭目录"
+                class="-mr-2 p-2 text-stone-400 hover:text-ink transition-colors">
+                <svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-x"/></svg>
+            </button>
+        </div>
+        <ol x-ref="list" data-toc-scroll class="overflow-y-auto overscroll-contain px-3 py-2">
+            {{ range . }}
+            <li>
+                <a href="#{{ .ID }}" data-toc-link data-toc-id="{{ .ID }}"
+                    class="block rounded-md py-2.5 pr-3 text-[15px] leading-snug text-stone-600 transition-colors active:bg-stone-100 line-clamp-2 aria-[current=true]:bg-moss/5 aria-[current=true]:text-moss aria-[current=true]:font-medium {{ if eq .Depth 2 }}pl-10{{ else if eq .Depth 1 }}pl-7{{ else }}pl-3{{ end }}">{{ .Text }}</a>
+            </li>
+            {{ end }}
+        </ol>
+    </nav>
+</div>
+
+<script>
+    (function () {
+        const links = document.querySelectorAll('[data-toc-link]');
+        const ids = [...new Set([...links].map(a => a.dataset.tocId))];
+        const headings = ids.map(id => document.getElementById(id)).filter(Boolean);
+        if (!headings.length) return;
+
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+        // 标题越过视口上方 30% 这条线即视为进入该小节
+        const ACTIVE_LINE = 0.3;
+        let current = null;
+        let lockUntil = 0; // 点击跳转的平滑滚动期间不更新高亮，避免闪烁
+
+        function setActive(id) {
+            if (id === current) return;
+            current = id;
+            links.forEach(a => {
+                if (a.dataset.tocId === id) a.setAttribute('aria-current', 'true');
+                else a.removeAttribute('aria-current');
+            });
+            document.querySelectorAll('[data-toc-scroll]').forEach(reveal);
+        }
+
+        // 让当前项在目录自身的滚动区域内可见（只滚目录，不滚页面）
+        function reveal(list) {
+            const a = list && list.querySelector('[aria-current="true"]');
+            if (!a || list.scrollHeight <= list.clientHeight) return;
+            const top = a.offsetTop - list.offsetTop;
+            if (top < list.scrollTop || top + a.offsetHeight > list.scrollTop + list.clientHeight) {
+                list.scrollTop = top - list.clientHeight / 3;
+            }
+        }
+        window.zlTocReveal = reveal;
+
+        function update() {
+            if (Date.now() < lockUntil) return;
+            const line = window.innerHeight * ACTIVE_LINE;
+            let active = null;
+            for (const h of headings) {
+                if (h.getBoundingClientRect().top <= line) active = h.id;
+                else break;
+            }
+            setActive(active);
+        }
+
+        // 只在标题穿过视口顶部或那条线时重新计算，无需监听每次 scroll
+        const io = new IntersectionObserver(update, { rootMargin: `0px 0px -${(1 - ACTIVE_LINE) * 100}% 0px` });
+        headings.forEach(h => io.observe(h));
+
+        links.forEach(a => a.addEventListener('click', e => {
+            const target = document.getElementById(a.dataset.tocId);
+            if (!target) return;
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent('toc-close'));
+            document.documentElement.style.overflow = ''; // 抽屉的滚动锁要先解开才能滚动
+            setActive(target.id);
+            lockUntil = Date.now() + 1000;
+            const smooth = !reduceMotion.matches;
+            target.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+            history.replaceState(null, '', a.getAttribute('href'));
+            const unlock = () => { lockUntil = 0; update(); };
+            if (smooth && 'onscrollend' in window) window.addEventListener('scrollend', unlock, { once: true });
+            else setTimeout(unlock, smooth ? 1000 : 0);
+        }));
+
+        update();
+    })();
+</script>
+{{ end }}

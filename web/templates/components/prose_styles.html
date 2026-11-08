@@ -25,6 +25,17 @@
         color: #292524;
     }
 
+    /* 目录跳转时让标题停在固定顶栏下方 */
+    .prose :is(h1, h2, h3, h4)[id] {
+        scroll-margin-top: 6.5rem;
+    }
+
+    @media (min-width: 768px) {
+        .prose :is(h1, h2, h3, h4)[id] {
+            scroll-margin-top: 4.5rem;
+        }
+    }
+
     .prose p {
         margin-top: 0;
         margin-bottom: 1em;
