@@ -5,6 +5,8 @@ import (
 	"html"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
@@ -21,6 +23,36 @@ func NewVoteHandler() *VoteHandler {
 	return &VoteHandler{}
 }
 
+const downvoteMinPoints = 10 // 和发帖门槛一致
+
+var (
+	// 每个用户每小时最多踩 20 次
+	downvoteLimiter = middleware.NewLimiter(20, time.Hour)
+	// 每个用户 10 分钟内最多举报 5 次（每次举报都会给所有管理员发通知）
+	reportLimiter = middleware.NewLimiter(5, 10*time.Minute)
+)
+
+// voteTarget 解析并校验投票/举报对象：类型必须是 post 或 comment，对应的记录必须存在。
+// 不通过时已写好响应，调用方直接 return
+func voteTarget(c *gin.Context, itemType string) (uint, bool) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || (itemType != "post" && itemType != "comment") {
+		c.Status(http.StatusBadRequest)
+		return 0, false
+	}
+	var count int64
+	if itemType == "post" {
+		db.DB.Model(&models.Post{}).Where("id = ?", uint(id)).Count(&count)
+	} else {
+		db.DB.Model(&models.Comment{}).Where("id = ?", uint(id)).Count(&count)
+	}
+	if count == 0 {
+		c.Status(http.StatusNotFound)
+		return 0, false
+	}
+	return uint(id), true
+}
+
 // Vote handles upvote logic
 func (h *VoteHandler) Vote(c *gin.Context) {
 	user, exists := c.Get(middleware.CheckUserKey)
@@ -33,9 +65,10 @@ func (h *VoteHandler) Vote(c *gin.Context) {
 	currentUser := user.(*models.User)
 
 	itemType := c.Param("type") // "post" or "comment"
-	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
-	uID := uint(id)
+	uID, ok := voteTarget(c, itemType)
+	if !ok {
+		return
+	}
 
 	tx := db.DB.Begin()
 
@@ -43,12 +76,8 @@ func (h *VoteHandler) Vote(c *gin.Context) {
 
 	if itemType == "post" {
 		query = query.Where("post_id = ?", uID)
-	} else if itemType == "comment" {
-		query = query.Where("comment_id = ?", uID)
 	} else {
-		tx.Rollback()
-		c.Status(http.StatusBadRequest)
-		return
+		query = query.Where("comment_id = ?", uID)
 	}
 
 	// Check if already voted
@@ -169,9 +198,21 @@ func (h *VoteHandler) Downvote(c *gin.Context) {
 	currentUser := user.(*models.User)
 
 	itemType := c.Param("type") // "post" or "comment"
-	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
-	uID := uint(id)
+	uID, ok := voteTarget(c, itemType)
+	if !ok {
+		return
+	}
+
+	// 点踩会扣对方 3 分：禁言用户不能踩，新号要攒够积分才能踩，并按用户限频，
+	// 否则批量注册的 0 分小号可以无成本地把别人的积分踩光
+	if currentUser.Status == 1 {
+		c.String(http.StatusForbidden, "您处于禁言状态，暂时无法点踩")
+		return
+	}
+	if currentUser.Points < downvoteMinPoints {
+		c.String(http.StatusForbidden, fmt.Sprintf("竹笋达到 %d 才能点踩", downvoteMinPoints))
+		return
+	}
 
 	tx := db.DB.Begin()
 
@@ -179,12 +220,8 @@ func (h *VoteHandler) Downvote(c *gin.Context) {
 
 	if itemType == "post" {
 		query = query.Where("post_id = ?", uID)
-	} else if itemType == "comment" {
-		query = query.Where("comment_id = ?", uID)
 	} else {
-		tx.Rollback()
-		c.Status(http.StatusBadRequest)
-		return
+		query = query.Where("comment_id = ?", uID)
 	}
 
 	// 检查是否已投票
@@ -199,6 +236,13 @@ func (h *VoteHandler) Downvote(c *gin.Context) {
 			db.DB.Model(&models.Vote{}).Where("comment_id = ? AND value = -1", uID).Count(&downvotes)
 		}
 		c.String(http.StatusOK, fmt.Sprintf("%d", downvotes))
+		return
+	}
+
+	// 放在"已投过票"的判断之后计数：重复点同一个按钮不占次数
+	if !downvoteLimiter.Allow(strconv.FormatUint(uint64(currentUser.ID), 10)) {
+		tx.Rollback()
+		c.String(http.StatusTooManyRequests, "点踩太频繁，请稍后再试")
 		return
 	}
 
@@ -304,10 +348,30 @@ func (h *VoteHandler) Report(c *gin.Context) {
 	currentUser := user.(*models.User)
 
 	itemType := c.Param("type") // "post" or "comment"
-	idStr := c.Param("id")
-	id, _ := strconv.Atoi(idStr)
-	uID := uint(id)
-	reason := c.PostForm("reason")
+	uID, ok := voteTarget(c, itemType)
+	if !ok {
+		return
+	}
+	// 举报原因列宽 200，超长会写库失败
+	reason := utils.TruncateRunes(strings.TrimSpace(c.PostForm("reason")), utils.MaxReasonRunes)
+
+	if currentUser.Status == 1 {
+		c.String(http.StatusForbidden, "您处于禁言状态，暂时无法举报")
+		return
+	}
+
+	// 同一个人对同一内容只记一次举报，重复提交不再通知管理员
+	var existing int64
+	db.DB.Model(&models.Report{}).Where("user_id = ? AND item_type = ? AND item_id = ?", currentUser.ID, itemType, uID).Count(&existing)
+	if existing > 0 {
+		c.String(http.StatusOK, "已举报")
+		return
+	}
+
+	if !reportLimiter.Allow(strconv.FormatUint(uint64(currentUser.ID), 10)) {
+		c.String(http.StatusTooManyRequests, "举报太频繁，请稍后再试")
+		return
+	}
 
 	// 查询项目的 Pid (如果是帖子直接用，如果是评论查询所属帖子)
 	var itemPid string

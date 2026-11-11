@@ -21,7 +21,7 @@ func TestStartUserSession(t *testing.T) {
 	router.Use(sessions.Sessions("zhulink_session", store))
 	router.GET("/start", func(c *gin.Context) {
 		sessions.Default(c).Options(middleware.SessionCookieOptions(-1))
-		if err := startUserSession(c, 42); err != nil {
+		if err := startUserSession(c, 42, 3); err != nil {
 			_ = c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
@@ -30,6 +30,10 @@ func TestStartUserSession(t *testing.T) {
 	router.GET("/read", func(c *gin.Context) {
 		session := sessions.Default(c)
 		if session.Get(middleware.SessionUserIDKey) != uint(42) {
+			c.Status(http.StatusUnauthorized)
+			return
+		}
+		if session.Get(middleware.SessionVersionKey) != 3 {
 			c.Status(http.StatusUnauthorized)
 			return
 		}

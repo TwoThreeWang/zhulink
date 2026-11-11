@@ -2,6 +2,7 @@ package models
 
 import (
 	"time"
+	"zhulink/internal/utils"
 
 	"github.com/pgvector/pgvector-go"
 	"gorm.io/gorm"
@@ -40,4 +41,12 @@ type Post struct {
 	CommentCount int  `gorm:"-" json:"comment_count"`
 	UpvoteCount  int  `gorm:"-" json:"upvote_count"`
 	IsNew        bool `gorm:"-" json:"-"` // 发布 48 小时内，列表里没人点赞时显示"新"
+}
+
+// SafeURL 返回可以放进页面的外链：只认 http/https，其余（如历史数据里的 javascript:）一律当作没有外链
+func (p Post) SafeURL() string {
+	if utils.IsHTTPURL(p.URL) {
+		return p.URL
+	}
+	return ""
 }

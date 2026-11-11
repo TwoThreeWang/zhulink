@@ -22,6 +22,7 @@ type User struct {
 	VerifyCodeExpiresAt *time.Time `json:"-"`                                           // 验证码过期时间，nil 视为已过期
 	VerifyAttempts      int        `gorm:"default:0" json:"-"`                          // 当前验证码已校验次数
 	EmailDigest         bool       `gorm:"default:true" json:"email_digest"`            // 是否接收每日评论汇总邮件
+	SessionVersion      int        `gorm:"default:0;not null" json:"-"`                 // 会话版本：退出、改密码时加 1，旧 Cookie 随即失效
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
 	// No DeletedAt for hard delete

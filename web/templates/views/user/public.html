@@ -182,8 +182,8 @@
                     <div class="flex-grow min-w-0">
                         <!-- Title -->
                         <div class="mb-1.5">
-                            {{ if .URL }}
-                            <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
+                            {{ if .SafeURL }}
+                            <a href="/p/{{ .Pid }}" data-ext-url="{{ .SafeURL }}" onclick="window.open(this.dataset.extUrl, '_blank', 'noopener'); return true;"
                                 class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug visited-link">
                                 {{ .Title }}
                                 <svg
@@ -280,8 +280,8 @@
                     <div class="flex-grow min-w-0">
                         <!-- Title -->
                         <div class="mb-1.5">
-                            {{ if .URL }}
-                            <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
+                            {{ if .SafeURL }}
+                            <a href="/p/{{ .Pid }}" data-ext-url="{{ .SafeURL }}" onclick="window.open(this.dataset.extUrl, '_blank', 'noopener'); return true;"
                                 class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1.5 leading-snug visited-link">
                                 {{ .Title }}
                                 <svg

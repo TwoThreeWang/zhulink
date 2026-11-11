@@ -2,7 +2,7 @@
 
 {{ define "scripts" }}
 <!-- Marked.js -->
-<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
 <script src="{{ asset "js/editor.js" }}"></script>
 {{ end }}
 
@@ -37,9 +37,9 @@
             <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                 <label for="title" class="text-sm font-medium text-ink whitespace-nowrap w-8">标题 <span
                         class="text-red-500">*</span></label>
-                <input type="text" id="title" name="title"
+                <input type="text" id="title" name="title" value="{{ with .FormTitle }}{{ . }}{{ end }}"
                     class="flex-grow bg-white border border-stone-200 rounded-lg px-4 py-2.5 text-base text-ink placeholder-stone-400 focus:outline-none focus:border-moss focus:ring-1 focus:ring-moss transition-colors"
-                    placeholder="输入一个吸引人的标题" required autofocus>
+                    placeholder="输入一个吸引人的标题" maxlength="200" required autofocus>
             </div>
 
             <!-- 节点选择 -->
@@ -50,7 +50,7 @@
                     class="flex-grow md:max-w-xs appearance-none bg-white border border-stone-200 rounded-lg px-4 py-2.5 text-base text-ink focus:outline-none focus:border-moss focus:ring-1 focus:ring-moss transition-colors cursor-pointer">
                     <option value="" disabled selected>选择一个节点...</option>
                     {{ range .Nodes }}
-                    <option value="{{ .ID }}">{{ .Name }}</option>
+                    <option value="{{ .ID }}" {{ if eq .ID $.FormNodeID }}selected{{ end }}>{{ .Name }}</option>
                     {{ end }}
                 </select>
             </div>
@@ -58,7 +58,7 @@
             <!-- 链接 (可选) -->
             <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                 <label for="url" class="text-sm font-medium text-ink whitespace-nowrap w-8">链接</label>
-                <input type="url" id="url" name="url"
+                <input type="url" id="url" name="url" value="{{ with .FormURL }}{{ . }}{{ end }}"
                     class="flex-grow bg-white border border-stone-200 rounded-lg px-4 py-2.5 text-base text-ink placeholder-stone-400 focus:outline-none focus:border-moss focus:ring-1 focus:ring-moss transition-colors"
                     placeholder="https://example.com(可选)">
             </div>
@@ -67,7 +67,7 @@
             <div>
                 <label class="block text-sm font-medium text-ink mb-2">内容 <span
                         class="text-stone-400 font-normal">(Markdown)</span></label>
-                {{ template "markdown_editor" dict "Name" "content" "Placeholder" "在此输入内容，支持 Markdown 语法..." }}
+                {{ template "markdown_editor" dict "Name" "content" "Value" .FormContent "Placeholder" "在此输入内容，支持 Markdown 语法..." }}
             </div>
 
             <!-- 提交按钮 -->

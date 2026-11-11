@@ -11,8 +11,10 @@ services:
     # 将宿主机的 .env 文件映射到容器中
     volumes:
       - ./.env:/app/.env:ro
+    # 默认只监听本机，由宿主机上的 Nginx 等反向代理转发；直接对外暴露会绕过反代的 HTTPS 和限流。
+    # 反代不在本机（或确实需要直接访问）时，在 .env 里设置 APP_BIND=0.0.0.0
     ports:
-      - "32919:32919"
+      - "${APP_BIND:-127.0.0.1}:32919:32919"
     # 如果数据库在同一 Docker 网络中,取消下面的注释并配置网络
     networks:
       - postgres_default

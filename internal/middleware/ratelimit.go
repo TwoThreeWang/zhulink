@@ -24,7 +24,12 @@ type bucket struct {
 }
 
 func NewLimiter(limit int, window time.Duration) *Limiter {
-	buckets, _ := lru.New[string, *bucket](10000) // 只在 size<=0 时报错
+	return NewLimiterSize(limit, window, 10000)
+}
+
+// NewLimiterSize 同 NewLimiter，可指定最多同时跟踪多少个 key（超出后最久没用的先被挤掉）
+func NewLimiterSize(limit int, window time.Duration, size int) *Limiter {
+	buckets, _ := lru.New[string, *bucket](size) // 只在 size<=0 时报错
 	return &Limiter{limit: limit, window: window, buckets: buckets}
 }
 

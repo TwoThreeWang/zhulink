@@ -80,6 +80,11 @@ func main() {
 	// 配置cookie选项以支持iOS等移动设备
 	store.Options(middleware.SessionCookieOptions(middleware.SessionIdleMaxAge))
 
+	// 基础安全响应头，放在最前面，静态文件和错误页也带上
+	r.Use(middleware.SecurityHeaders())
+	// 请求体上限：普通表单 2MB（10 万字的中文正文经 URL 编码约 1MB），图片上传 12MB
+	r.Use(middleware.BodyLimit(2<<20, "/api/upload", 12<<20))
+
 	r.Use(sessions.Sessions("zhulink_session", store))
 
 	// Gzip 压缩中间件（对文本类型响应启用压缩）
@@ -105,12 +110,15 @@ func main() {
 
 	// 配置 http.Server
 	srv := &http.Server{
-		Addr:           ":" + port,
-		Handler:        r,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   20 * time.Second,
-		IdleTimeout:    120 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+		Addr:    ":" + port,
+		Handler: r,
+		// 请求头 10 秒内必须发完（防慢速连接占用）；整个请求和响应各留 60 秒：
+		// 上传图片要先收完最大 10MB 的文件，再等 Imgur 最长 30 秒，原来的 10s/20s 会把慢网上传掐断
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	// 在 goroutine 中启动服务器
@@ -326,6 +334,7 @@ func loadTemplates(templatesDir string) multitemplate.Renderer {
 	r.AddFromFilesFuncs("error.html", funcMap, assemble(templatesDir+"/views/error.html")...)
 	r.AddFromFilesFuncs("admin/reports.html", funcMap, assemble(templatesDir+"/views/admin/reports.html")...)
 	r.AddFromFilesFuncs("admin/users.html", funcMap, assemble(templatesDir+"/views/admin/users.html")...)
+	r.AddFromFilesFuncs("admin/restore_confirm.html", funcMap, assemble(templatesDir+"/views/admin/restore_confirm.html")...)
 
 	return r
 }

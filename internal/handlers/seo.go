@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 	"zhulink/internal/db"
 	"zhulink/internal/models"
 	"zhulink/internal/services"
+	"zhulink/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -256,8 +256,8 @@ func (h *SEOHandler) RSSFeed(c *gin.Context) {
 		// 构建文章链接
 		link := fmt.Sprintf("%s/p/%s", siteURL, post.Pid)
 
-		// 按段落截取HTML内容（前3个块级元素）
-		content := truncateByParagraph(post.Content, 3)
+		// 用净化过的渲染结果，不能直接输出用户原文：原文里的 "]]>" 能跳出 CDATA 注入任意 XML
+		content := rssItemContent(post.Content, siteURL)
 		// 添加查看更多链接
 		content += fmt.Sprintf(`<p><br><a href="%s">评论也是内容的一部分，点击查看完整内容与讨论 →</a></p>`, link)
 
@@ -268,7 +268,7 @@ func (h *SEOHandler) RSSFeed(c *gin.Context) {
 		rss += `    <item>
       <title>` + title + `</title>
       <link>` + link + `</link>
-      <description><![CDATA[` + content + `]]></description>
+      <description><![CDATA[` + cdataSafe(content) + `]]></description>
       <author>` + author + `</author>
       <category>` + escapeXML(post.Node.Name) + `</category>
       <pubDate>` + post.CreatedAt.Format(time.RFC1123Z) + `</pubDate>
@@ -285,34 +285,31 @@ func (h *SEOHandler) RSSFeed(c *gin.Context) {
 	c.String(http.StatusOK, rss)
 }
 
-// escapeXML 转义XML特殊字符
+// escapeXML 转义XML特殊字符，并去掉 XML 不允许出现的控制字符
 func escapeXML(s string) string {
 	// 使用html.EscapeString处理XML转义,它能正确处理中文
-	return html.EscapeString(s)
+	return html.EscapeString(stripInvalidXMLChars(s))
 }
 
-// truncateByParagraph 按段落截取HTML，保留前几个完整块级元素
-func truncateByParagraph(content string, maxBlocks int) string {
-	// 匹配块级元素: <p>, <div>, <h1-6>, <ul>, <ol>, <blockquote>, <pre>
-	re := regexp.MustCompile(`(?s)(<(?:p|div|h[1-6]|ul|ol|blockquote|pre)[^>]*>.*?</(?:p|div|h[1-6]|ul|ol|blockquote|pre)>)`)
-	matches := re.FindAllString(content, maxBlocks)
+// rssItemContent 把帖子正文渲染成净化后的 HTML，取前 3 个块，站内相对地址补成绝对地址
+func rssItemContent(markdown, siteURL string) string {
+	content := utils.FirstBlocks(string(utils.RenderMarkdown(markdown)), 3)
+	return strings.NewReplacer(`src="/`, `src="`+siteURL+`/`, `href="/`, `href="`+siteURL+`/`).Replace(content)
+}
 
-	if len(matches) == 0 {
-		// 没有匹配到块级元素，回退到纯文本截取
-		runes := []rune(stripHTML(content))
-		if len(runes) > 300 {
-			return string(runes[:300]) + "..."
+// cdataSafe 让内容可以安全放进 CDATA：拆开 "]]>"，去掉非法字符
+func cdataSafe(s string) string {
+	return strings.ReplaceAll(stripInvalidXMLChars(s), "]]>", "]]]]><![CDATA[>")
+}
+
+// stripInvalidXMLChars 去掉 XML 1.0 不允许的字符（除 \t \n \r 外的控制字符等），否则整个 feed 解析失败
+func stripInvalidXMLChars(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\n' || r == '\r' || (r >= 0x20 && r <= 0xD7FF) || (r >= 0xE000 && r <= 0xFFFD) || r >= 0x10000 {
+			return r
 		}
-		return content
-	}
-
-	return strings.Join(matches, "\n")
-}
-
-// stripHTML 去除HTML标签
-func stripHTML(s string) string {
-	re := regexp.MustCompile(`<[^>]*>`)
-	return re.ReplaceAllString(s, "")
+		return -1
+	}, s)
 }
 
 // IndexNowKeyFile 返回 IndexNow 验证文件内容

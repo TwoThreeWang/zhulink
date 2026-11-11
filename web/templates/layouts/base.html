@@ -11,8 +11,8 @@
     {{ end }}
     <link rel="icon" type="image/svg+xml" href="/static/img/logo.svg">
     <link href="{{ asset "css/style.css" }}" rel="stylesheet">
-    <!-- HTMX -->
-    <script defer src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js"></script>
+    <!-- HTMX。CDN 脚本都带 integrity 校验：升级版本号时必须同步更新哈希，否则浏览器会拒绝加载 -->
+    <script defer src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.10/dist/htmx.min.js" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
     <!-- 禁用 HTMX 历史缓存，避免内存累积 -->
     <meta name="htmx-config" content='{"historyCacheSize":0}'>
     <!-- Sitemap引用 -->
@@ -38,7 +38,7 @@
     <!-- Marked.js & Editor.js (Optional via block) -->
     {{ block "scripts" . }}{{ end }}
     <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js" integrity="sha384-5/joNqFnRyVWzXp99bHot6RHG+EksGp+USSgZwPar7T9SD9PKKER37n/8bXBAZGd" crossorigin="anonymous"></script>
     <style>
         [x-cloak] {
             display: none !important;
@@ -139,8 +139,10 @@
                         <a href="/dashboard/notifications"
                             class="block px-3 py-1.5 text-ink-light hover:text-moss hover:bg-stone-50 transition-colors">消息中心</a>
                         <div class="h-px bg-stone-50 my-1"></div>
-                        <a href="/logout"
-                            class="block px-3 py-1.5 text-ink-light hover:text-red-600 hover:bg-stone-50 transition-colors">退出</a>
+                        <form action="/logout" method="POST">
+                            <button type="submit"
+                                class="block w-full text-left px-3 py-1.5 text-ink-light hover:text-red-600 hover:bg-stone-50 transition-colors">退出</button>
+                        </form>
                     </div>
                 </div>
                 {{ else }}
@@ -306,6 +308,12 @@
                 } catch (e) {
                     console.error('Failed to parse HX-Trigger from error response:', e);
                 }
+                return;
+            }
+            // 被拒绝（禁言、积分不足）或限频时，服务端返回一句纯文本说明，用 Toast 显示出来
+            const contentType = xhr.getResponseHeader('Content-Type') || '';
+            if ((xhr.status === 403 || xhr.status === 429) && contentType.startsWith('text/plain') && xhr.responseText && xhr.responseText.length < 100) {
+                window.dispatchEvent(new CustomEvent('show-error', { detail: { message: xhr.responseText } }));
             }
         });
     </script>

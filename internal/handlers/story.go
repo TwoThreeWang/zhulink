@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
@@ -387,23 +388,37 @@ func (h *StoryHandler) ShowCreate(c *gin.Context) {
 	})
 }
 
+// validatePostInput 校验发帖/编辑表单，返回整理后的标题和链接；errMsg 非空表示不通过
+func validatePostInput(title, rawURL, content string) (cleanTitle, cleanURL, errMsg string) {
+	cleanTitle = strings.TrimSpace(title)
+	if cleanTitle == "" {
+		return "", "", "标题不能为空"
+	}
+	if utf8.RuneCountInString(cleanTitle) > utils.MaxTitleRunes {
+		return "", "", fmt.Sprintf("标题不能超过 %d 个字", utils.MaxTitleRunes)
+	}
+	// 链接会出现在标题的点击事件和详情页里，只允许 http/https，挡掉 javascript: 之类的协议
+	cleanURL, ok := utils.NormalizeHTTPURL(rawURL)
+	if !ok {
+		return "", "", "链接必须是以 http:// 或 https:// 开头的完整地址"
+	}
+	if utf8.RuneCountInString(content) > utils.MaxPostRunes {
+		return "", "", fmt.Sprintf("正文不能超过 %d 个字", utils.MaxPostRunes)
+	}
+	return cleanTitle, cleanURL, ""
+}
+
+// invalidatePostCache 清掉帖子详情页的共享缓存
+func invalidatePostCache(pid string) {
+	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", pid))
+}
+
 func (h *StoryHandler) Create(c *gin.Context) {
 	user := c.MustGet(middleware.CheckUserKey).(*models.User)
 
 	// 检查用户状态
 	if user.Status == 2 {
 		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您的账号已被封禁，无法发布内容。"})
-		return
-	}
-
-	// 阶梯频率与权限检查
-	if err := services.CheckPostPermission(user, false); err != nil {
-		var nodes []models.Node
-		db.DB.Order("id ASC").Find(&nodes)
-		Render(c, http.StatusBadRequest, "story/create.html", gin.H{
-			"Error": err.Error(),
-			"Nodes": nodes,
-		})
 		return
 	}
 
@@ -414,57 +429,74 @@ func (h *StoryHandler) Create(c *gin.Context) {
 	}
 
 	title := c.PostForm("title")
-	url := c.PostForm("url")
+	rawURL := c.PostForm("url")
 	content := c.PostForm("content")
 	nodeIDStr := c.PostForm("node_id")
-
-	if title == "" {
-		var nodes []models.Node
-		db.DB.Order("id ASC").Find(&nodes)
-		Render(c, http.StatusBadRequest, "story/create.html", gin.H{
-			"Error": "标题不能为空",
-			"Nodes": nodes,
-		})
-		return
-	}
 
 	// 解析节点ID,默认为1(技术)
 	nodeID := uint(1)
 	if nodeIDStr != "" {
-		if id, err := strconv.Atoi(nodeIDStr); err == nil {
+		if id, err := strconv.ParseUint(nodeIDStr, 10, 32); err == nil {
 			nodeID = uint(id)
 		}
+	}
+
+	// 出错时带回已填内容，避免用户丢稿
+	renderForm := func(status int, errMsg string) {
+		var nodes []models.Node
+		db.DB.Order("id ASC").Find(&nodes)
+		Render(c, status, "story/create.html", gin.H{
+			"Error":       errMsg,
+			"Nodes":       nodes,
+			"FormTitle":   title,
+			"FormURL":     rawURL,
+			"FormContent": content,
+			"FormNodeID":  nodeID,
+		})
+	}
+
+	cleanTitle, cleanURL, errMsg := validatePostInput(title, rawURL, content)
+	if errMsg != "" {
+		renderForm(http.StatusBadRequest, errMsg)
+		return
 	}
 
 	post := models.Post{
 		Pid:     utils.RandStringBytesMaskImpr(8),
 		UserID:  user.ID,
 		NodeID:  nodeID,
-		Title:   title,
-		URL:     url,
+		Title:   cleanTitle,
+		URL:     cleanURL,
 		Content: content, // Helper will handle markdown render in view, here we store raw text/md
 		Score:   1,       // Self vote
 	}
 
-	if err := db.DB.Create(&post).Error; err != nil {
-		var nodes []models.Node
-		db.DB.Order("id ASC").Find(&nodes)
-		Render(c, http.StatusInternalServerError, "story/create.html", gin.H{
-			"Error": "发布失败",
-			"Nodes": nodes,
-		})
+	// 阶梯频率与权限检查和写入放在同一个事务里，并锁住用户行：
+	// 否则并发提交的请求都能通过"距上一篇是否够久"的检查
+	var permErr error
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := services.LockUser(tx, user.ID); err != nil {
+			return err
+		}
+		if permErr = services.CheckPostPermission(tx, user, false); permErr != nil {
+			return permErr
+		}
+		return tx.Create(&post).Error
+	})
+	if permErr != nil {
+		renderForm(http.StatusBadRequest, permErr.Error())
+		return
+	}
+	if err != nil {
+		renderForm(http.StatusInternalServerError, "发布失败")
 		return
 	}
 
 	// 异步增加积分（每天前3篇）
-	go func() {
-		if services.CanEarnPostPoints(user.ID) {
-			services.AddPoints(user.ID, services.PointsPostCreate, services.ActionPostCreate)
-		}
-	}()
+	go services.AddDailyLimitedPoints(user.ID, services.PointsPostCreate, services.ActionPostCreate, services.DailyPostLimit)
 
 	// 异步生成 SEO 元数据和向量
-	go h.asyncGeneratePostMeta(post.ID, title, content, true)
+	go h.asyncGeneratePostMeta(post.ID, cleanTitle, content, true)
 
 	// 异步提交到 IndexNow
 	services.GetIndexNowService().SubmitURL(post.Pid)
@@ -638,6 +670,20 @@ func (h *StoryHandler) handleAdPostPunishment(postID uint) {
 	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
 }
 
+// 浏览量去重：同一 IP 对同一篇帖子 1 小时内只计 1 次。
+// 浏览量计入热度分，不去重的话写个循环刷请求就能把帖子顶上首页
+var viewLimiter = middleware.NewLimiterSize(1, time.Hour, 200000)
+
+// countView 记一次浏览，返回这次是否真的计数了
+func countView(c *gin.Context, postID uint, pid string) bool {
+	if !viewLimiter.Allow(c.ClientIP() + "|" + pid) {
+		return false
+	}
+	// 用 views + 1 原子自增，不能写回读出来的值：并发请求会互相覆盖
+	db.DB.Model(&models.Post{}).Where("id = ?", postID).UpdateColumn("views", gorm.Expr("views + 1"))
+	return true
+}
+
 func (h *StoryHandler) Detail(c *gin.Context) {
 	pid := c.Param("pid")
 
@@ -646,8 +692,9 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	if hData, ok := utils.GetCache().Get(cacheKey).(gin.H); ok {
 		// 即使是缓存，也要增加浏览量
 		if postData, ok := hData["Post"].(models.Post); ok {
-			db.DB.Model(&models.Post{}).Where("id = ?", postData.ID).UpdateColumn("views", gorm.Expr("views + 1"))
-			services.GetRankingService().ScheduleUpdate(postData.ID)
+			if countView(c, postData.ID, postData.Pid) {
+				services.GetRankingService().ScheduleUpdate(postData.ID)
+			}
 			renderDetail(c, hData, postData.ID)
 			return
 		}
@@ -660,8 +707,9 @@ func (h *StoryHandler) Detail(c *gin.Context) {
 	}
 
 	// 增加浏览量
-	db.DB.Model(&post).UpdateColumn("views", post.Views+1)
-	post.Views++
+	if countView(c, post.ID, post.Pid) {
+		post.Views++
+	}
 
 	// 如果 SEO 描述或向量为空，异步生成；同一帖子每小时最多触发一次，
 	// 否则向量服务挂掉时每次缓存过期的访问都会重新调用付费模型
@@ -834,12 +882,6 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	// 阶梯频率检查
-	if err := services.CheckPostPermission(user, true); err != nil {
-		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": err.Error()})
-		return
-	}
-
 	// 到期的禁言已在 LoadUser 中解除
 	if user.Status == 1 {
 		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态,暂时无法发布评论。"})
@@ -855,17 +897,24 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 
 	content := c.PostForm("content")
 	parentIDStr := c.PostForm("parent_id")
-	replyFloor := c.PostForm("reply_floor") // 被回复评论的楼层号
 
-	if content == "" {
+	if strings.TrimSpace(content) == "" {
 		c.Redirect(http.StatusFound, "/p/"+pid)
+		return
+	}
+	if utf8.RuneCountInString(content) > utils.MaxCommentRunes {
+		Render(c, http.StatusBadRequest, "error.html", gin.H{"Error": fmt.Sprintf("评论不能超过 %d 个字", utils.MaxCommentRunes)})
 		return
 	}
 
 	// 如果是回复评论，在内容开头拼接回复引用
 	var parentID *uint
 	if parentIDStr != "" {
-		pID, _ := strconv.Atoi(parentIDStr)
+		pID, err := strconv.ParseUint(parentIDStr, 10, 32)
+		if err != nil {
+			Render(c, http.StatusBadRequest, "error.html", gin.H{"Error": "回复的评论不存在"})
+			return
+		}
 		uPID := uint(pID)
 		parentID = &uPID
 
@@ -875,8 +924,11 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 			Render(c, http.StatusBadRequest, "error.html", gin.H{"Error": "回复的评论不存在"})
 			return
 		}
-		// 拼接回复引用：↳ 回复 [#楼层](#comment-ID)
-		replyPrefix := fmt.Sprintf("↳ 回复 [#%s @%s](#comment-%d)\n\n", replyFloor, parentComment.User.Username, parentComment.ID)
+		// 楼层号由服务端按发布顺序算，不用表单里传来的值（那个值可以随便填，会原样拼进 Markdown）
+		var floor int64
+		db.DB.Model(&models.Comment{}).Where("post_id = ? AND created_at <= ?", post.ID, parentComment.CreatedAt).Count(&floor)
+		// 拼接回复引用：↳ 回复 [#楼层 @用户名](#comment-ID)
+		replyPrefix := fmt.Sprintf("↳ 回复 [#%d @%s](#comment-%d)\n\n", floor, markdownLinkTextEscaper.Replace(parentComment.User.Username), parentComment.ID)
 		content = replyPrefix + content
 	}
 
@@ -889,7 +941,22 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 		ParentID: parentID,
 	}
 
-	if err := db.DB.Create(&comment).Error; err != nil {
+	// 阶梯频率检查和写入放在同一个事务里并锁住用户行，防止并发请求绕过发言间隔
+	var permErr error
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := services.LockUser(tx, user.ID); err != nil {
+			return err
+		}
+		if permErr = services.CheckPostPermission(tx, user, true); permErr != nil {
+			return permErr
+		}
+		return tx.Create(&comment).Error
+	})
+	if permErr != nil {
+		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": permErr.Error()})
+		return
+	}
+	if err != nil {
 		log.Printf("保存评论失败 (post=%s, user=%d): %v", pid, user.ID, err)
 		Render(c, http.StatusInternalServerError, "error.html", gin.H{"Error": "评论发布失败，请稍后重试"})
 		return
@@ -902,11 +969,7 @@ func (h *StoryHandler) CreateComment(c *gin.Context) {
 	services.GetRankingService().ScheduleUpdate(post.ID)
 
 	// 异步增加积分（每天前3条评论）
-	go func() {
-		if services.CanEarnCommentPoints(user.ID) {
-			services.AddPoints(user.ID, services.PointsCommentCreate, services.ActionCommentCreate)
-		}
-	}()
+	go services.AddDailyLimitedPoints(user.ID, services.PointsCommentCreate, services.ActionCommentCreate, services.DailyCommentLimit)
 
 	// Create Notifications
 	go func() {
@@ -963,20 +1026,43 @@ func (h *StoryHandler) DeleteComment(c *gin.Context) {
 	}
 
 	// 软删除：只替换内容
-	comment.Content = "该评论已删除。"
-	db.DB.Save(&comment)
+	deleted, err := markCommentDeleted(comment.ID, commentDeletedByUser)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 
 	// 主动失效详情页缓存
 	var post models.Post
 	if err := db.DB.First(&post, comment.PostID).Error; err == nil {
-		utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))
+		invalidatePostCache(post.Pid)
 	}
 
-	// 异步扣除积分
-	services.AddPointsAsync(user.ID, services.PointsCommentDeleted, services.ActionCommentDeleted)
+	// 异步扣除积分；已经删过的评论再点删除不重复扣
+	if deleted {
+		services.AddPointsAsync(user.ID, services.PointsCommentDeleted, services.ActionCommentDeleted)
+	}
 
 	c.Status(http.StatusOK)
 }
+
+// 软删除的评论只保留这两句占位文字
+const (
+	commentDeletedByUser  = "该评论已删除。"
+	commentDeletedByAdmin = "该评论已被管理员删除。"
+)
+
+// markCommentDeleted 把评论内容换成占位文字，返回这次是否真的删除了（已删除过的返回 false）。
+// 条件写在 UPDATE 里，并发的重复请求只有一个能生效
+func markCommentDeleted(commentID uint, placeholder string) (bool, error) {
+	res := db.DB.Model(&models.Comment{}).
+		Where("id = ? AND content NOT IN ?", commentID, []string{commentDeletedByUser, commentDeletedByAdmin}).
+		Update("content", placeholder)
+	return res.RowsAffected > 0, res.Error
+}
+
+// markdownLinkTextEscaper 转义会打断 Markdown 链接文字的字符
+var markdownLinkTextEscaper = strings.NewReplacer(`\`, `\\`, `[`, `\[`, `]`, `\]`)
 
 func (h *StoryHandler) Delete(c *gin.Context) {
 	// HTMX delete
@@ -1061,58 +1147,63 @@ func (h *StoryHandler) Update(c *gin.Context) {
 		return
 	}
 
-	title := c.PostForm("title")
-	url := c.PostForm("url")
-	content := c.PostForm("content")
-	nodeIDStr := c.PostForm("node_id")
-
-	if title == "" {
-		var nodes []models.Node
-		db.DB.Order("id ASC").Find(&nodes)
-		Render(c, http.StatusBadRequest, "story/edit.html", gin.H{
-			"Error": "标题不能为空",
-			"Post":  post,
-			"Nodes": nodes,
-		})
+	// 禁言期间不能改帖：否则可以把已有的帖子改成广告，绕过禁言
+	if user.Status == 1 {
+		Render(c, http.StatusForbidden, "error.html", gin.H{"Error": "您处于禁言状态，暂时无法编辑内容。"})
 		return
 	}
+
+	title := c.PostForm("title")
+	rawURL := c.PostForm("url")
+	content := c.PostForm("content")
+	nodeIDStr := c.PostForm("node_id")
 
 	// 解析节点ID
 	nodeID := post.NodeID
 	if nodeIDStr != "" {
-		if id, err := strconv.Atoi(nodeIDStr); err == nil {
+		if id, err := strconv.ParseUint(nodeIDStr, 10, 32); err == nil {
 			nodeID = uint(id)
 		}
 	}
 
-	// 更新文章
+	// 出错时带回已填内容，避免用户丢稿
 	post.Title = title
-	post.URL = url
+	post.URL = rawURL
 	post.Content = content
 	post.NodeID = nodeID
+	renderForm := func(status int, errMsg string) {
+		var nodes []models.Node
+		db.DB.Order("id ASC").Find(&nodes)
+		Render(c, status, "story/edit.html", gin.H{
+			"Error": errMsg,
+			"Post":  post,
+			"Nodes": nodes,
+		})
+	}
 
-	// 每次保存都会重新调用付费 LLM 做 SEO 和广告检测，按用户限频；带回已填内容，避免用户丢稿
+	cleanTitle, cleanURL, errMsg := validatePostInput(title, rawURL, content)
+	if errMsg != "" {
+		renderForm(http.StatusBadRequest, errMsg)
+		return
+	}
+
+	// 每次保存都会重新调用付费 LLM 做 SEO 和广告检测，按用户限频
 	if !editLimiter.Allow(strconv.FormatUint(uint64(user.ID), 10)) {
-		var nodes []models.Node
-		db.DB.Order("id ASC").Find(&nodes)
-		Render(c, http.StatusTooManyRequests, "story/edit.html", gin.H{
-			"Error": "编辑太频繁，请稍后再保存",
-			"Post":  post,
-			"Nodes": nodes,
-		})
+		renderForm(http.StatusTooManyRequests, "编辑太频繁，请稍后再保存")
 		return
 	}
 
-	if err := db.DB.Save(&post).Error; err != nil {
-		var nodes []models.Node
-		db.DB.Order("id ASC").Find(&nodes)
-		Render(c, http.StatusInternalServerError, "story/edit.html", gin.H{
-			"Error": "保存失败",
-			"Post":  post,
-			"Nodes": nodes,
-		})
+	// 只更新编辑过的列。整行 Save 会把读出来之后才变动的浏览量、分数覆盖回旧值
+	if err := db.DB.Model(&models.Post{}).Where("id = ?", post.ID).Updates(map[string]interface{}{
+		"title":   cleanTitle,
+		"url":     cleanURL,
+		"content": content,
+		"node_id": nodeID,
+	}).Error; err != nil {
+		renderForm(http.StatusInternalServerError, "保存失败")
 		return
 	}
+	title = cleanTitle
 
 	// 清掉详情页缓存，并重新生成 SEO/向量、重新做广告检测（防止先发正常内容再改成广告）
 	utils.GetCache().Delete(fmt.Sprintf("story:detail:shared:%s", post.Pid))

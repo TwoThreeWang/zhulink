@@ -20,6 +20,7 @@ const (
 	SessionIssuedKey  = "issued_at"
 	SessionRenewedKey = "renewed_at"
 	SessionExpiresKey = "absolute_expires_at"
+	SessionVersionKey = "session_version"
 
 	SessionIdleMaxAge = int((30 * 24 * time.Hour) / time.Second)
 )
@@ -100,6 +101,13 @@ func ClearExpiredPunishment(user *models.User) {
 	user.PunishExpires = nil
 }
 
+// RevokeSessions 让该用户所有已签发的会话失效（所有设备都要重新登录），返回新的会话版本号
+func RevokeSessions(userID uint) (int, error) {
+	var version int
+	err := db.DB.Raw("UPDATE users SET session_version = session_version + 1 WHERE id = ? RETURNING session_version", userID).Scan(&version).Error
+	return version, err
+}
+
 // LoadUser retrieves user from session and sets to context
 func LoadUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -133,6 +141,17 @@ func LoadUser() gin.HandlerFunc {
 				return
 			}
 			c.AbortWithStatus(http.StatusServiceUnavailable)
+			return
+		}
+
+		// 会话版本对不上：用户已退出登录或改过密码，这个 Cookie 作废。
+		// 老会话里没有这个字段，按 0 处理，和数据库默认值一致
+		sessionVersion, _ := session.Get(SessionVersionKey).(int)
+		if sessionVersion != user.SessionVersion {
+			if err := ClearSession(session); err != nil {
+				log.Printf("clear revoked session failed: %v", err)
+			}
+			redirectToLogin(c)
 			return
 		}
 

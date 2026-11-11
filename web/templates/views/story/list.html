@@ -108,8 +108,8 @@
                             置顶
                         </span>
                         {{ end }}
-                        {{ if .URL }}
-                        <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
+                        {{ if .SafeURL }}
+                        <a href="/p/{{ .Pid }}" data-ext-url="{{ .SafeURL }}" onclick="window.open(this.dataset.extUrl, '_blank', 'noopener'); return true;"
                             class="font-sans font-medium text-base text-ink hover:text-moss transition-colors visited-link">
                             {{ .Title }}
                             <svg class="icon w-3.5 h-3.5 text-stone-400 inline-block ml-1" aria-hidden="true"><use href="#i-external-link"/></svg>

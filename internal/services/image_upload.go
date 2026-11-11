@@ -98,19 +98,21 @@ func UploadToImgur(file multipart.File, header *multipart.FileHeader) (*ImageUpl
 		return nil, fmt.Errorf("Imgur 上传失败: status %d", imgurResp.Status)
 	}
 
-	// 获取文件扩展名
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext == "" {
-		// 根据 MIME 类型推断扩展名
-		switch imgurResp.Data.Type {
-		case "image/jpeg":
-			ext = ".jpg"
-		case "image/png":
-			ext = ".png"
-		case "image/gif":
-			ext = ".gif"
-		case "image/webp":
-			ext = ".webp"
+	// 扩展名按 Imgur 识别出的类型来定，不用客户端传来的文件名（文件名可以随便起，如 x.html）
+	var ext string
+	switch imgurResp.Data.Type {
+	case "image/png":
+		ext = ".png"
+	case "image/gif":
+		ext = ".gif"
+	case "image/webp":
+		ext = ".webp"
+	case "image/jpeg":
+		ext = ".jpg"
+	default:
+		// Imgur 没给出认识的类型时才参考文件名，且只接受图片扩展名
+		switch ext = strings.ToLower(filepath.Ext(header.Filename)); ext {
+		case ".jpg", ".jpeg", ".png", ".gif", ".webp":
 		default:
 			ext = ".jpg"
 		}

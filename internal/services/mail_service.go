@@ -21,6 +21,9 @@ type MailService struct {
 	Enabled  bool
 }
 
+// mailSlots 限制同时进行的 SMTP 发送数
+var mailSlots = make(chan struct{}, 3)
+
 func NewMailService() *MailService {
 	host := os.Getenv("SMTP_HOST")
 	port := os.Getenv("SMTP_PORT")
@@ -57,6 +60,10 @@ func (s *MailService) sendAsyncWithHeaders(to []string, subject string, body str
 	subject = mime.QEncoding.Encode("utf-8", strings.NewReplacer("\r", "", "\n", "").Replace(subject))
 
 	go func() {
+		// 排队发送：每日汇总会一次性产生很多封邮件，同时开太多 SMTP 连接会被发信服务限流或拒绝
+		mailSlots <- struct{}{}
+		defer func() { <-mailSlots }()
+
 		// 兜底：所有邮件发送前都检查收件域名，收不了信的直接跳过，不产生退信
 		valid := to[:0:0]
 		for _, addr := range to {

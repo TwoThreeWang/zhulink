@@ -3,7 +3,7 @@
 {{ define "scripts" }}
 {{ template "ad_script" }}
 <!-- Marked.js -->
-<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
 <script src="{{ asset "js/editor.js" }}"></script>
 
 <!-- SEO Meta标签 -->
@@ -100,10 +100,10 @@
                 <h1 class="font-sans font-bold text-2xl md:text-3xl text-ink leading-tight mb-3 break-words">
                     {{ .Post.Title }}
                 </h1>
-                {{ if .Post.URL }}
-                <a href="{{ .Post.URL }}" target="_blank" rel="noopener nofollow"
+                {{ if .Post.SafeURL }}
+                <a href="{{ .Post.SafeURL }}" target="_blank" rel="noopener nofollow"
                     class="block text-sm font-normal text-stone-400 -mt-2 mb-3 truncate hover:text-moss transition-colors">
-                    {{ .Post.URL }} <svg
+                    {{ .Post.SafeURL }} <svg
                         class="icon w-4 h-4 inline-block -mt-1 ml-0.5 text-stone-300" aria-hidden="true"><use href="#i-external-link"/></svg>
                 </a>
                 {{ end }}
@@ -359,8 +359,14 @@
                             method: 'POST',
                             body: formData,
                             headers: { 'HX-Request': 'true' }
-                        }).then(r => {
-                            if (r.ok) alert('举报已提交，感谢您的维护！');
+                        }).then(async r => {
+                            if (r.ok) {
+                                alert('举报已提交，感谢您的维护！');
+                            } else {
+                                // 被限频或禁言时，服务端会返回一句说明
+                                const msg = (await r.text()).trim();
+                                alert(msg && msg.length < 100 ? msg : '举报失败，请稍后再试');
+                            }
                         });
                     }
                 }

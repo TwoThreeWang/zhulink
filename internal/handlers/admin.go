@@ -49,7 +49,11 @@ func (h *AdminHandler) ToggleTop(c *gin.Context) {
 	}
 
 	post.IsTop = !post.IsTop
-	db.DB.Model(&post).Update("is_top", post.IsTop)
+	if err := db.DB.Model(&post).Update("is_top", post.IsTop).Error; err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	invalidatePostCache(post.Pid)
 
 	// HTMX: 返回按钮新状态
 	label := "置顶"
@@ -68,12 +72,22 @@ func (h *AdminHandler) MoveNode(c *gin.Context) {
 
 	pid := c.Param("pid")
 	nodeIDStr := c.PostForm("node_id")
-	nodeID, _ := strconv.Atoi(nodeIDStr)
+	nodeID, err := strconv.ParseUint(nodeIDStr, 10, 32)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	var node models.Node
+	if err := db.DB.First(&node, uint(nodeID)).Error; err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
 
-	if err := db.DB.Model(&models.Post{}).Where("pid = ?", pid).Update("node_id", nodeID).Error; err != nil {
+	if err := db.DB.Model(&models.Post{}).Where("pid = ?", pid).Update("node_id", node.ID).Error; err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+	invalidatePostCache(pid)
 
 	c.Header("HX-Refresh", "true")
 	c.Status(http.StatusOK)
@@ -87,9 +101,13 @@ func (h *AdminHandler) PunishUser(c *gin.Context) {
 	}
 
 	userIDStr := c.Param("id")
-	userID, _ := strconv.Atoi(userIDStr)
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
 	statusStr := c.PostForm("status") // 0: 正常, 1: 禁言, 2: 封禁
-	status, _ := strconv.Atoi(statusStr)
+	status, statusErr := strconv.Atoi(statusStr)
+	if err != nil || statusErr != nil || status < 0 || status > 2 {
+		c.Status(http.StatusBadRequest)
+		return
+	}
 	daysStr := c.PostForm("days")
 	days, _ := strconv.Atoi(daysStr)
 	reason := c.PostForm("reason") // 惩罚原因
@@ -105,7 +123,7 @@ func (h *AdminHandler) PunishUser(c *gin.Context) {
 		updates["punish_expires"] = nil
 	}
 
-	if err := db.DB.Model(&models.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
+	if err := db.DB.Model(&models.User{}).Where("id = ?", uint(userID)).Updates(updates).Error; err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -176,9 +194,30 @@ func (h *AdminHandler) AdminDeletePost(c *gin.Context) {
 
 	// 3. 彻底删除帖子
 	db.DB.Unscoped().Delete(&post)
+	invalidatePostCache(post.Pid)
 
 	c.Header("HX-Redirect", "/")
 	c.Status(http.StatusOK)
+}
+
+// ShowRestoreAIBlockedPost 恢复确认页。通知里的链接是 GET，这里只展示帖子信息，
+// 真正的恢复要点确认按钮发 POST：否则帖子里放一张指向这个地址的图片，管理员一浏览就自动恢复了
+func (h *AdminHandler) ShowRestoreAIBlockedPost(c *gin.Context) {
+	if h.checkAdmin(c) == nil {
+		c.Status(http.StatusForbidden)
+		return
+	}
+
+	var post models.Post
+	if err := db.DB.Unscoped().Preload("User").Where("pid = ?", c.Param("pid")).First(&post).Error; err != nil {
+		Render(c, http.StatusNotFound, "error.html", gin.H{"Error": "文章不存在或无法恢复"})
+		return
+	}
+
+	Render(c, http.StatusOK, "admin/restore_confirm.html", gin.H{
+		"Title": "恢复被拦截的文章",
+		"Post":  post,
+	})
 }
 
 // RestoreAIBlockedPost 恢复 AI 误判软删除的帖子，并解除自动禁言。
@@ -257,9 +296,17 @@ func (h *AdminHandler) HandleReport(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	// 必须先转成数字：GORM 把字符串主键当成原始 SQL 条件，"1 OR 1=1" 会删光整张表
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
 	// 这里可以实现删除举报记录或者标记已处理
-	db.DB.Delete(&models.Report{}, id)
+	if err := db.DB.Delete(&models.Report{}, uint(id)).Error; err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 
 	c.Status(http.StatusOK)
 }
@@ -283,10 +330,22 @@ func (h *AdminHandler) AdminDeleteComment(c *gin.Context) {
 	originalContent := comment.Content
 	postLink := "/p/" + comment.Post.Pid
 
-	// 1. 扣除评论作者积分 (-3分)
+	// 1. 软删除：只替换内容。已经删除过的不再处理，否则每点一次就多扣一次分、多发一条通知
+	deleted, err := markCommentDeleted(comment.ID, commentDeletedByAdmin)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	invalidatePostCache(comment.Post.Pid)
+	if !deleted {
+		c.Status(http.StatusOK)
+		return
+	}
+
+	// 2. 扣除评论作者积分 (-3分)
 	services.AddPointsAsync(comment.UserID, services.PointsCommentDeleted, "评论被管理员删除")
 
-	// 2. 发送系统通知给评论作者，附上原评论内容和文章链接
+	// 3. 发送系统通知给评论作者，附上原评论内容和文章链接
 	safeOriginal := strings.ReplaceAll(html.EscapeString(originalContent), "\n", "<br>")
 	notification := models.Notification{
 		UserID: comment.UserID,
@@ -294,10 +353,6 @@ func (h *AdminHandler) AdminDeleteComment(c *gin.Context) {
 		Reason: "很抱歉，您的评论因违规已被管理员删除。如有疑问请联系管理。<br><br>原评论内容：<br>" + safeOriginal + "<br><br>文章链接：<a href='" + postLink + "#comment-" + strconv.FormatUint(uint64(comment.ID), 10) + "'>" + postLink + "</a>",
 	}
 	db.DB.Create(&notification)
-
-	// 3. 软删除：只替换内容
-	comment.Content = "该评论已被管理员删除。"
-	db.DB.Save(&comment)
 
 	c.Status(http.StatusOK)
 }

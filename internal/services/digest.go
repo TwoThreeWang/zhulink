@@ -55,6 +55,14 @@ func nextDigestTime(now time.Time, hour int) time.Time {
 	return t
 }
 
+// digestSiteURL 邮件里的链接必须是绝对地址；没配置 SITE_URL 时用默认域名，和页面渲染保持一致
+func digestSiteURL() string {
+	if siteURL := strings.TrimRight(os.Getenv("SITE_URL"), "/"); siteURL != "" {
+		return siteURL
+	}
+	return "https://zhulink.vip"
+}
+
 // StartCommentDigest 启动每日评论汇总定时任务
 func StartCommentDigest(ctx context.Context) {
 	hour := digestHour()
@@ -104,7 +112,7 @@ func SendCommentDigests(from, to time.Time) {
 	var users []models.User
 	db.DB.Where("id IN ?", userIDs).Find(&users)
 	mail := NewMailService()
-	siteURL := strings.TrimRight(os.Getenv("SITE_URL"), "/")
+	siteURL := digestSiteURL()
 	for _, u := range users {
 		list := byUser[u.ID]
 		items := make([]DigestItem, 0, digestMaxItems)
@@ -198,7 +206,7 @@ func signUnsubscribe(userID uint) string {
 
 // DigestUnsubscribeURL 邮件里的一键退订链接
 func DigestUnsubscribeURL(userID uint) string {
-	return strings.TrimRight(os.Getenv("SITE_URL"), "/") + "/unsubscribe?u=" + strconv.FormatUint(uint64(userID), 10) + "&s=" + signUnsubscribe(userID)
+	return digestSiteURL() + "/unsubscribe?u=" + strconv.FormatUint(uint64(userID), 10) + "&s=" + signUnsubscribe(userID)
 }
 
 // VerifyUnsubscribe 校验退订链接，返回用户 ID

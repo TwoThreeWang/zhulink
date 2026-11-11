@@ -55,7 +55,7 @@ func RegisterRoutes(r *gin.Engine) {
 	r.POST("/activate", middleware.RateLimit(10, 10*time.Minute), authHandler.Activate) // 提交激活
 	r.GET("/login", authHandler.ShowLogin)                                              // 登录页面
 	r.POST("/login", middleware.RateLimit(10, 10*time.Minute), authHandler.Login)       // 提交登录
-	r.GET("/logout", authHandler.Logout)                                                // 退出登录
+	r.POST("/logout", authHandler.Logout)                                               // 退出登录（POST：GET 会被帖子里的图片地址触发）
 
 	r.GET("/forgot_password", authHandler.ShowForgotPassword)                                       // 忘记密码页面
 	r.POST("/forgot_password", middleware.RateLimit(3, 10*time.Minute), authHandler.ForgotPassword) // 提交忘记密码
@@ -87,7 +87,7 @@ func RegisterRoutes(r *gin.Engine) {
 		authorized.DELETE("/notifications/:id", notificationHandler.Delete)     // 删除单条通知
 		authorized.POST("/notifications/read-all", notificationHandler.ReadAll) // 全部通知标记为已读
 
-		authorized.POST("/api/upload", imageHandler.Upload) // 图片上传
+		authorized.POST("/api/upload", imageHandler.Upload) // 图片上传（handler 内按用户限流）
 	}
 
 	// 仪表盘路由 (Dashboard Routes)
@@ -103,9 +103,9 @@ func RegisterRoutes(r *gin.Engine) {
 		dashboard.POST("/checkin", userHandler.CheckIn)                     // 每日签到
 
 		// Google 账号绑定路由
-		dashboard.GET("/settings/bind-google", authHandler.BindGoogle)                  // 绑定 Google 账号
-		dashboard.GET("/settings/bind-google/callback", authHandler.GoogleBindCallback) // Google 绑定回调
-		dashboard.POST("/settings/unbind-google", authHandler.UnbindGoogle)             // 解除 Google 绑定
+		// 绑定和登录共用 /auth/google/callback 回调
+		dashboard.GET("/settings/bind-google", authHandler.BindGoogle)      // 绑定 Google 账号
+		dashboard.POST("/settings/unbind-google", authHandler.UnbindGoogle) // 解除 Google 绑定
 	}
 
 	// RSS 阅读器（苗圃）已下线：旧入口和已被收录的热门订阅页永久跳回首页
@@ -117,14 +117,15 @@ func RegisterRoutes(r *gin.Engine) {
 	admin := r.Group("/admin")
 	admin.Use(middleware.AuthRequired())
 	{
-		admin.POST("/post/:pid/top", adminHandler.ToggleTop)                        // 置顶
-		admin.POST("/post/:pid/move", adminHandler.MoveNode)                        // 移动节点
-		admin.GET("/post/:pid/restore-ai-block", adminHandler.RestoreAIBlockedPost) // 恢复 AI 误判软删除帖子
-		admin.POST("/user/:id/punish", adminHandler.PunishUser)                     // 惩罚用户
-		admin.DELETE("/post/:pid", adminHandler.AdminDeletePost)                    // 管理员删除文章
-		admin.DELETE("/comment/:cid", adminHandler.AdminDeleteComment)              // 管理员删除评论
-		admin.GET("/reports", adminHandler.ListReports)                             // 举报列表
-		admin.DELETE("/reports/:id", adminHandler.HandleReport)                     // 处理举报
-		admin.GET("/users", adminHandler.ListUsers)                                 // 用户管理
+		admin.POST("/post/:pid/top", adminHandler.ToggleTop)                            // 置顶
+		admin.POST("/post/:pid/move", adminHandler.MoveNode)                            // 移动节点
+		admin.GET("/post/:pid/restore-ai-block", adminHandler.ShowRestoreAIBlockedPost) // 恢复确认页（通知里的链接指向这里，只展示不改数据）
+		admin.POST("/post/:pid/restore-ai-block", adminHandler.RestoreAIBlockedPost)    // 恢复 AI 误判软删除帖子
+		admin.POST("/user/:id/punish", adminHandler.PunishUser)                         // 惩罚用户
+		admin.DELETE("/post/:pid", adminHandler.AdminDeletePost)                        // 管理员删除文章
+		admin.DELETE("/comment/:cid", adminHandler.AdminDeleteComment)                  // 管理员删除评论
+		admin.GET("/reports", adminHandler.ListReports)                                 // 举报列表
+		admin.DELETE("/reports/:id", adminHandler.HandleReport)                         // 处理举报
+		admin.GET("/users", adminHandler.ListUsers)                                     // 用户管理
 	}
 }

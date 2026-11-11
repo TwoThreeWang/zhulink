@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -22,6 +23,15 @@ var emailDomainCache = expirable.NewLRU[string, bool](10000, nil, time.Hour)
 // lookupMX 测试时替换成假的 DNS
 var lookupMX = func(ctx context.Context, domain string) ([]*net.MX, error) {
 	return net.DefaultResolver.LookupMX(ctx, domain)
+}
+
+// ValidEmailAddress 邮箱格式是否合法：按 RFC 5322 解析，且不能带显示名、注释、空白
+func ValidEmailAddress(email string) bool {
+	if email == "" || len(email) > 254 || strings.ContainsAny(email, " \t\r\n<>(),;:\"") {
+		return false
+	}
+	addr, err := mail.ParseAddress(email)
+	return err == nil && addr.Name == "" && addr.Address == email
 }
 
 // EmailDomainAcceptsMail 检查邮箱域名能不能收信：DNS 里必须有 MX 记录。

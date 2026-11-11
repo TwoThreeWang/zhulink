@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 	"zhulink/internal/db"
 	"zhulink/internal/middleware"
 	"zhulink/internal/models"
@@ -350,11 +351,20 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
+	// 校验不通过时回到设置页并显示原因
+	fail := func(status int, errMsg string) {
+		Render(c, status, "dashboard/settings.html", gin.H{
+			"Error":        errMsg,
+			"User":         user,
+			"CommonEmojis": utils.GetCommonEmojis(),
+		})
+	}
+
 	// 获取表单数据
-	username := c.PostForm("username")
+	username := strings.TrimSpace(c.PostForm("username"))
 	email := normalizeEmail(c.PostForm("email"))
-	avatar := c.PostForm("avatar")
-	bio := c.PostForm("bio")
+	avatar := strings.TrimSpace(c.PostForm("avatar"))
+	bio := strings.TrimSpace(c.PostForm("bio"))
 	oldPassword := c.PostForm("old_password")
 	newPassword := c.PostForm("new_password")
 
@@ -365,7 +375,19 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 	updates := make(map[string]interface{})
 	pendingEmail := ""
 
+	// 只在改动时校验：老账号里不合新规则的用户名、头像不动它就不受影响
 	if username != "" && username != user.Username {
+		if !utils.ValidUsername(username) {
+			fail(http.StatusBadRequest, fmt.Sprintf("用户名最多 %d 个字符，只能包含字母、数字、中文和 _ - .", utils.MaxUsernameRunes))
+			return
+		}
+		// 不允许改成别人正在用的名字（不区分大小写），防止冒充
+		var taken int64
+		db.DB.Model(&models.User{}).Where("LOWER(username) = LOWER(?) AND id != ?", username, user.ID).Count(&taken)
+		if taken > 0 {
+			fail(http.StatusBadRequest, "该用户名已被使用")
+			return
+		}
 		updates["username"] = username
 	}
 
@@ -389,6 +411,10 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 			})
 			return
 		}
+		if !services.ValidEmailAddress(email) {
+			fail(http.StatusBadRequest, "邮箱格式不正确")
+			return
+		}
 		if !services.EmailDomainAcceptsMail(email) {
 			Render(c, http.StatusBadRequest, "dashboard/settings.html", gin.H{
 				"Error":        services.ErrEmailDomain.Error(),
@@ -401,11 +427,19 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 		pendingEmail = email
 	}
 
-	if avatar != "" {
+	if avatar != "" && avatar != user.Avatar {
+		if !utils.ValidAvatar(avatar) {
+			fail(http.StatusBadRequest, "头像只能是 Emoji 表情")
+			return
+		}
 		updates["avatar"] = avatar
 	}
 
 	if bio != user.Bio {
+		if utf8.RuneCountInString(bio) > utils.MaxBioRunes {
+			fail(http.StatusBadRequest, fmt.Sprintf("个人简介最多 %d 个字", utils.MaxBioRunes))
+			return
+		}
 		updates["bio"] = bio
 	}
 
@@ -446,6 +480,8 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 			return
 		}
 		updates["password"] = hash
+		// 改密码后其他设备上的旧会话全部作废；当前设备在更新成功后重新签发
+		updates["session_version"] = gorm.Expr("session_version + 1")
 	}
 
 	// 放在所有校验之后计数，表单其他项填错不会白白占掉发信次数
@@ -467,6 +503,13 @@ func (h *UserHandler) UpdateSettings(c *gin.Context) {
 				"User":         user,
 				"CommonEmojis": utils.GetCommonEmojis(),
 			})
+			return
+		}
+	}
+
+	if _, changed := updates["password"]; changed {
+		if err := reissueSession(c, user.ID); err != nil {
+			c.Redirect(http.StatusFound, "/login")
 			return
 		}
 	}
@@ -500,12 +543,29 @@ func (h *UserHandler) ConfirmEmail(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/dashboard/settings?error=email_taken")
 		return
 	}
-	if err := db.DB.Model(user).Update("email", newEmail).Error; err != nil {
+	// 换邮箱和改密码一样，顺带让其他设备上的旧会话失效
+	if err := db.DB.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]interface{}{
+		"email":           newEmail,
+		"session_version": gorm.Expr("session_version + 1"),
+	}).Error; err != nil {
 		c.Redirect(http.StatusFound, "/dashboard/settings?error=email_taken") // 唯一索引冲突
+		return
+	}
+	if err := reissueSession(c, user.ID); err != nil {
+		c.Redirect(http.StatusFound, "/login")
 		return
 	}
 
 	c.Redirect(http.StatusFound, "/dashboard/settings?success=email_changed")
+}
+
+// reissueSession 会话版本号变了之后，给当前设备重新签发会话，让它继续保持登录
+func reissueSession(c *gin.Context, userID uint) error {
+	var fresh models.User
+	if err := db.DB.Select("id", "session_version").First(&fresh, userID).Error; err != nil {
+		return err
+	}
+	return startUserSession(c, fresh.ID, fresh.SessionVersion)
 }
 
 // AddPointLog 添加积分记录并更新用户积分

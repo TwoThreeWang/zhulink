@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"zhulink/internal/services"
 )
@@ -23,11 +24,14 @@ type AuthHandler struct {
 
 const sessionAbsoluteLifetime = 180 * 24 * time.Hour
 
-func startUserSession(c *gin.Context, userID uint) error {
+// startUserSession 签发登录会话。sessionVersion 取用户当前的 SessionVersion，
+// 之后用户退出或改密码使版本号加 1，这个会话就失效
+func startUserSession(c *gin.Context, userID uint, sessionVersion int) error {
 	now := time.Now()
 	session := sessions.Default(c)
 	session.Clear()
 	session.Set(middleware.SessionUserIDKey, userID)
+	session.Set(middleware.SessionVersionKey, sessionVersion)
 	session.Set(middleware.SessionIssuedKey, now.Unix())
 	session.Set(middleware.SessionRenewedKey, now.Unix())
 	session.Set(middleware.SessionExpiresKey, now.Add(sessionAbsoluteLifetime).Unix())
@@ -134,8 +138,25 @@ func issueVerifyCode(user *models.User, ttl time.Duration) string {
 	return code
 }
 
-func clearVerifyCode(user *models.User) {
-	user.VerifyCode, user.VerifyCodeExpiresAt, user.VerifyAttempts = "", nil, 0
+// verifyCodeCleared 清掉验证码的字段更新。只更新用到的列，不整行 Save：
+// 整行保存会把并发变动的积分等字段覆盖回旧值
+func verifyCodeCleared() map[string]interface{} {
+	return map[string]interface{}{"verify_code": "", "verify_code_expires_at": nil, "verify_attempts": 0}
+}
+
+// uniqueUsername 用户名被占用（不区分大小写）时加随机后缀，避免注册 admin@任意域名 就得到和别人一样的名字
+func uniqueUsername(base string) string {
+	name := base
+	for i := 0; i < 5; i++ {
+		var count int64
+		db.DB.Model(&models.User{}).Where("LOWER(username) = LOWER(?)", name).Count(&count)
+		if count == 0 {
+			return name
+		}
+		suffix := "_" + strings.ToLower(utils.RandStringBytesMaskImpr(4))
+		name = utils.TruncateRunes(base, utils.MaxUsernameRunes-len(suffix)) + suffix
+	}
+	return name
 }
 
 // checkVerifyCode 校验邮件验证码：空码、过期、校验超过 maxVerifyAttempts 次都不通过。
@@ -171,7 +192,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// Extract username from email
 	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
+	if len(parts) != 2 || !services.ValidEmailAddress(email) {
 		fail(http.StatusBadRequest, "邮箱格式不正确")
 		return
 	}
@@ -180,7 +201,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		fail(http.StatusBadRequest, services.ErrEmailDomain.Error())
 		return
 	}
-	username := parts[0]
+	username := utils.SanitizeUsername(parts[0])
 
 	if len(password) < 6 {
 		fail(http.StatusBadRequest, "密码至少6位")
@@ -220,14 +241,15 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			fail(http.StatusInternalServerError, "注册失败，请稍后重试")
 			return
 		}
-		existing.Email = email
-		existing.Password = hash
-		existing.CreatedAt = time.Now() // 重新计时，避免刚覆盖完又被别人覆盖
-		db.DB.Save(&existing)
+		// 重新计时，避免刚覆盖完又被别人覆盖
+		if err := db.DB.Model(&existing).Updates(map[string]interface{}{"email": email, "password": hash, "created_at": time.Now()}).Error; err != nil {
+			fail(http.StatusInternalServerError, "注册失败，请稍后重试")
+			return
+		}
 		user = &existing
 	} else {
 		var err error
-		if user, err = h.createUser(username, email, password); err != nil {
+		if user, err = h.createUser(uniqueUsername(username), email, password); err != nil {
 			fail(http.StatusConflict, "邮箱已注册")
 			return
 		}
@@ -268,12 +290,15 @@ func (h *AuthHandler) Activate(c *gin.Context) {
 		return
 	}
 
-	user.IsActivated = true
-	clearVerifyCode(&user)
-	db.DB.Save(&user)
+	updates := verifyCodeCleared()
+	updates["is_activated"] = true
+	if err := db.DB.Model(&user).Updates(updates).Error; err != nil {
+		Render(c, http.StatusInternalServerError, "auth/activate.html", gin.H{"Error": "激活失败，请稍后重试", "Email": email})
+		return
+	}
 
 	// 激活成功后自动登录
-	if err := startUserSession(c, user.ID); err != nil {
+	if err := startUserSession(c, user.ID, user.SessionVersion); err != nil {
 		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "登录状态保存失败，请重试"})
 		return
 	}
@@ -328,7 +353,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	if err := startUserSession(c, user.ID); err != nil {
+	if err := startUserSession(c, user.ID, user.SessionVersion); err != nil {
 		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "登录状态保存失败，请重试"})
 		return
 	}
@@ -336,8 +361,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/")
 }
 
+// Logout 退出登录（POST）。不能用 GET：帖子里放一张地址是 /logout 的图片就能把所有浏览者登出
 func (h *AuthHandler) Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	// 会话存在 Cookie 里，光清 Cookie 作废不了已经泄露的副本；版本号加 1 让所有设备上的旧会话一起失效
+	if u, exists := c.Get(middleware.CheckUserKey); exists {
+		if _, err := middleware.RevokeSessions(u.(*models.User).ID); err != nil {
+			log.Printf("revoke sessions for user %d failed: %v", u.(*models.User).ID, err)
+		}
+	}
 	if err := middleware.ClearSession(session); err != nil {
 		renderLogin(c, http.StatusInternalServerError, gin.H{"Error": "退出登录失败，请重试"})
 		return
@@ -427,10 +459,15 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		Render(c, http.StatusInternalServerError, "auth/reset_password.html", gin.H{"Error": "重置失败，请稍后重试", "Email": email})
 		return
 	}
-	user.Password = hash
-	user.IsActivated = true // 能收到验证码就证明了邮箱归属，未激活账号顺便激活
-	clearVerifyCode(&user)
-	db.DB.Save(&user)
+	updates := verifyCodeCleared()
+	updates["password"] = hash
+	updates["is_activated"] = true // 能收到验证码就证明了邮箱归属，未激活账号顺便激活
+	// 重置密码往往是因为账号被盗，旧会话全部作废
+	updates["session_version"] = gorm.Expr("session_version + 1")
+	if err := db.DB.Model(&user).Updates(updates).Error; err != nil {
+		Render(c, http.StatusInternalServerError, "auth/reset_password.html", gin.H{"Error": "重置失败，请稍后重试", "Email": email})
+		return
+	}
 
 	renderLogin(c, http.StatusOK, gin.H{"Success": "密码重置成功，请登录"})
 }

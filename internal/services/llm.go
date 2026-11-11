@@ -316,10 +316,17 @@ func (s *LLMService) GenerateSEOMetadataLegacy(title, content string) (*SEOMetad
 	return parseSEOResponse(resp)
 }
 
+// 送去做 SEO 和广告判定的正文长度：开头 800 字 + 结尾 400 字
+const (
+	seoPromptHeadRunes = 800
+	seoPromptTailRunes = 400
+)
+
 func buildSEOPrompt(title, content string) string {
+	// 取开头和结尾各一段：只看开头的话，把广告放在正文靠后的位置就能躲过检测
 	contentForPrompt := content
-	if len([]rune(content)) > 500 {
-		contentForPrompt = string([]rune(content)[:500]) + "..."
+	if runes := []rune(content); len(runes) > seoPromptHeadRunes+seoPromptTailRunes {
+		contentForPrompt = string(runes[:seoPromptHeadRunes]) + "\n...（中间省略）...\n" + string(runes[len(runes)-seoPromptTailRunes:])
 	}
 
 	return fmt.Sprintf(`

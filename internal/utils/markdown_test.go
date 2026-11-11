@@ -81,3 +81,60 @@ func TestRenderMarkdownSnippetHasNoHeadingIDs(t *testing.T) {
 		t.Errorf("评论标题不应带 id: %s", out)
 	}
 }
+
+func TestImageSrcRestrictedToExternalOrSiteImages(t *testing.T) {
+	t.Setenv("SITE_URL", "https://zhulink.vip")
+
+	// 指向站内页面的"图片"会让每个浏览者带着 Cookie 去请求那个地址，必须去掉
+	for _, src := range []string{
+		"![x](/logout)",
+		"![x](/admin/post/abcdefgh/restore-ai-block)",
+		"![x](https://zhulink.vip/logout)",
+		"![x](https://ZhuLink.vip/dashboard/settings/bind-google)",
+		"![x](//zhulink.vip/logout)",
+		"![x](logout)",
+		"![x](/img/../logout)",
+		"![x](https://zhulink.vip/img/../logout)",
+	} {
+		if out := string(RenderMarkdown(src)); strings.Contains(out, "<img") {
+			t.Errorf("站内地址的图片未被去掉: %s\n=> %s", src, out)
+		}
+	}
+
+	for _, src := range []string{
+		"![x](https://a.example/x.png)",
+		"![x](http://a.example/x.png)",
+		"![x](/img/AbCd123.jpg)",
+		"![x](/static/img/logo.svg)",
+		"![x](https://zhulink.vip/img/AbCd123.jpg)",
+	} {
+		if out := string(RenderMarkdown(src)); !strings.Contains(out, "<img") {
+			t.Errorf("正常图片被误删: %s\n=> %s", src, out)
+		}
+	}
+}
+
+func TestRenderMarkdownEmptyAfterSanitize(t *testing.T) {
+	// 原始 HTML 会被整个丢掉，结果应该是空串，而不是 <html><head></head><body></body></html>
+	for _, src := range []string{"<script>alert(1)</script>", "<iframe src=\"https://a.example\"></iframe>", ""} {
+		if out := string(RenderMarkdown(src)); strings.Contains(out, "<html") || strings.Contains(out, "<body") || strings.Contains(out, "<script") || strings.Contains(out, "<iframe") {
+			t.Errorf("净化后应为空: %q => %q", src, out)
+		}
+	}
+}
+
+func TestFirstBlocks(t *testing.T) {
+	html := string(RenderMarkdown("> 引用里的段落\n\n第二段\n\n- a\n- b\n\n第四段"))
+	out := FirstBlocks(html, 3)
+	if strings.Contains(out, "第四段") {
+		t.Errorf("超出的块未被截掉: %s", out)
+	}
+	for _, tag := range []string{"blockquote", "p", "ul", "li"} {
+		if open, closed := strings.Count(out, "<"+tag+">"), strings.Count(out, "</"+tag+">"); open == 0 || open != closed {
+			t.Errorf("<%s> 标签不成对（%d 开 %d 闭）: %s", tag, open, closed, out)
+		}
+	}
+	if FirstBlocks("", 3) != "" {
+		t.Error("空内容应返回空串")
+	}
+}

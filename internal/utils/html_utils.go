@@ -3,6 +3,8 @@ package utils
 import (
 	"html"
 	"html/template"
+	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
@@ -33,6 +35,11 @@ func EnhanceHTMLContent(htmlStr string) template.HTML {
 
 	// 增强图片属性
 	doc.Find("img").Each(func(i int, s *goquery.Selection) {
+		// 浏览器加载图片会带着登录 Cookie 发 GET，指向站内页面的"图片"等于替每个浏览者发请求
+		if src, _ := s.Attr("src"); !allowedImageSrc(src) {
+			s.Remove()
+			return
+		}
 		s.SetAttr("referrerpolicy", "no-referrer")
 		s.SetAttr("rel", "noopener")
 		s.SetAttr("loading", "lazy")
@@ -97,11 +104,60 @@ func EnhanceHTMLContent(htmlStr string) template.HTML {
 		}
 	})
 
-	// goquery renders full document tags if missing, we just want the body content
+	// goquery 会补全 <html><body>，这里只取 body 里的内容（净化后为空就返回空串）
 	html, _ := doc.Find("body").Html()
-	if html == "" {
-		html, _ = doc.Html()
-	}
-
 	return template.HTML(html)
+}
+
+// allowedImageSrc 图片地址只允许外站的 http/https 地址，以及本站的图片代理和静态文件
+func allowedImageSrc(src string) bool {
+	src = strings.TrimSpace(src)
+	if isSiteImagePath(src) {
+		return !strings.Contains(src, "..")
+	}
+	u, err := url.Parse(src)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return false
+	}
+	if site := siteHost(); site != "" && strings.EqualFold(u.Host, site) {
+		return isSiteImagePath(u.Path) && !strings.Contains(u.Path, "..")
+	}
+	return true
+}
+
+func isSiteImagePath(p string) bool {
+	return strings.HasPrefix(p, "/img/") || strings.HasPrefix(p, "/static/")
+}
+
+// siteHost 本站域名（取自 SITE_URL），用来识别写成绝对地址的站内链接
+func siteHost() string {
+	raw := os.Getenv("SITE_URL")
+	if raw == "" {
+		raw = "https://zhulink.vip"
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return u.Host
+}
+
+// FirstBlocks 取 HTML 片段的前 n 个顶层块（段落、标题、列表等），保证标签成对
+func FirstBlocks(htmlStr string, n int) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlStr))
+	if err != nil {
+		return ""
+	}
+	var b strings.Builder
+	doc.Find("body").Children().EachWithBreak(func(i int, s *goquery.Selection) bool {
+		if i >= n {
+			return false
+		}
+		if out, err := goquery.OuterHtml(s); err == nil {
+			b.WriteString(out)
+			b.WriteByte('\n')
+		}
+		return true
+	})
+	return b.String()
 }

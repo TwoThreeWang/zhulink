@@ -48,33 +48,60 @@ const (
 
 // 每日限制
 const (
-	DailyPostLimit    = 3 // 每天前3篇帖子有积分
-	DailyCommentLimit = 3 // 每天前3条评论有积分
+	DailyPostLimit    int64 = 3 // 每天前3篇帖子有积分
+	DailyCommentLimit int64 = 3 // 每天前3条评论有积分
 )
 
 // AddPoints 使用事务添加积分并记录明细
 // 传入用户ID、积分变动值（正数增加，负数扣除）、动作描述
 func AddPoints(userID uint, amount int, action string) error {
 	return db.DB.Transaction(func(tx *gorm.DB) error {
-		// 1. 创建积分明细记录
-		log := models.PointLog{
-			UserID: userID,
-			Amount: amount,
-			Action: action,
-		}
-		if err := tx.Create(&log).Error; err != nil {
+		return addPointsTx(tx, userID, amount, action)
+	})
+}
+
+func addPointsTx(tx *gorm.DB, userID uint, amount int, action string) error {
+	// 1. 创建积分明细记录
+	log := models.PointLog{
+		UserID: userID,
+		Amount: amount,
+		Action: action,
+	}
+	if err := tx.Create(&log).Error; err != nil {
+		return err
+	}
+
+	// 2. 更新用户积分余额
+	return tx.Model(&models.User{}).
+		Where("id = ?", userID).
+		UpdateColumn("points", gorm.Expr("points + ?", amount)).
+		Error
+}
+
+// LockUser 在事务里锁住用户行（SELECT ... FOR UPDATE）。
+// 同一用户的并发请求在这里排队，"先检查、再写入"的逻辑才不会被并发绕过
+func LockUser(tx *gorm.DB, userID uint) error {
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").First(&models.User{}, userID).Error
+}
+
+// AddDailyLimitedPoints 加积分，但同一动作每天最多奖励 dailyLimit 次（发帖、评论的每日前 3 次）。
+// 检查和写入在同一个事务里并锁住用户行，并发请求不能多领
+func AddDailyLimitedPoints(userID uint, amount int, action string, dailyLimit int64) error {
+	return db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := LockUser(tx, userID); err != nil {
 			return err
 		}
-
-		// 2. 更新用户积分余额
-		if err := tx.Model(&models.User{}).
-			Where("id = ?", userID).
-			UpdateColumn("points", gorm.Expr("points + ?", amount)).
-			Error; err != nil {
+		startOfDay, endOfDay := getTodayRange()
+		var count int64
+		if err := tx.Model(&models.PointLog{}).
+			Where("user_id = ? AND action = ? AND created_at >= ? AND created_at < ?", userID, action, startOfDay, endOfDay).
+			Count(&count).Error; err != nil {
 			return err
 		}
-
-		return nil
+		if count >= dailyLimit {
+			return nil
+		}
+		return addPointsTx(tx, userID, amount, action)
 	})
 }
 
@@ -103,21 +130,10 @@ func countTodayPointLogs(userID uint, action string) int64 {
 	return count
 }
 
-// CanEarnPostPoints 检查用户今日是否还能通过发帖获取积分
-func CanEarnPostPoints(userID uint) bool {
-	count := countTodayPointLogs(userID, ActionPostCreate)
-	return count < DailyPostLimit
-}
-
-// CanEarnCommentPoints 检查用户今日是否还能通过评论获取积分
-func CanEarnCommentPoints(userID uint) bool {
-	count := countTodayPointLogs(userID, ActionCommentCreate)
-	return count < DailyCommentLimit
-}
-
 // CheckPostPermission 检查用户发帖/评论权限及频率
 // isComment: 是否为评论请求
-func CheckPostPermission(user *models.User, isComment bool) error {
+// tx: 调用方应在事务里先 LockUser 再调用，并在同一事务里写入帖子/评论，否则并发请求能绕过间隔限制
+func CheckPostPermission(tx *gorm.DB, user *models.User, isComment bool) error {
 	// 1. 基本积分门槛：小于 10 积分不能发帖
 	if !isComment && user.Points < 10 {
 		return errors.New("您的等级还太低了（需 10 竹笋），多签到或评论攒攒分再来发帖吧 ~")
@@ -135,13 +151,13 @@ func CheckPostPermission(user *models.User, isComment bool) error {
 	var lastCreatedAt time.Time
 	if isComment {
 		var lastComment models.Comment
-		err := db.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Select("created_at").First(&lastComment).Error
+		err := tx.Where("user_id = ?", user.ID).Order("created_at DESC").Select("created_at").First(&lastComment).Error
 		if err == nil {
 			lastCreatedAt = lastComment.CreatedAt
 		}
 	} else {
 		var lastPost models.Post
-		err := db.DB.Where("user_id = ?", user.ID).Order("created_at DESC").Select("created_at").First(&lastPost).Error
+		err := tx.Where("user_id = ?", user.ID).Order("created_at DESC").Select("created_at").First(&lastPost).Error
 		if err == nil {
 			lastCreatedAt = lastPost.CreatedAt
 		}
@@ -178,7 +194,7 @@ func CheckIn(userID uint) (points int, bonus int, alreadyCheckedIn bool, err err
 	// 使用事务处理签到逻辑
 	err = db.DB.Transaction(func(tx *gorm.DB) error {
 		// 锁住用户行再检查今天是否已签到：并发的签到请求在这里排队，避免重复签到
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").First(&models.User{}, userID).Error; err != nil {
+		if err := LockUser(tx, userID); err != nil {
 			return err
 		}
 		startOfDay, endOfDay := getTodayRange()

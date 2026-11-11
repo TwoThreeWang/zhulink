@@ -132,8 +132,8 @@
             <div class="flex-grow min-w-0">
                 <!-- Title + Domain -->
                 <div class="leading-snug">
-                    {{ if .URL }}
-                    <a href="/p/{{ .Pid }}" onclick="window.open('{{ .URL }}', '_blank'); return true;"
+                    {{ if .SafeURL }}
+                    <a href="/p/{{ .Pid }}" data-ext-url="{{ .SafeURL }}" onclick="window.open(this.dataset.extUrl, '_blank', 'noopener'); return true;"
                         class="font-sans font-medium text-base text-ink hover:text-moss transition-colors inline-flex items-center gap-1 visited-link">
                         {{ .Title }}
                         <svg class="icon w-3.5 h-3.5 text-stone-400 flex-shrink-0" aria-hidden="true"><use href="#i-external-link"/></svg>
